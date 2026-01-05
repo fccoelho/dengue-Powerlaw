@@ -12,6 +12,42 @@ from concurrent.futures import ThreadPoolExecutor
 
 dotenv.load_dotenv()
 
+def fetch_infodengue(geocode, start_date="2010-01-01", end_date=None, disease="dengue", force_download=False):
+    if end_date is None:
+        end_date = date.today().strftime("%Y-%m-%d")
+
+    file_path = f"data/{geocode}.parquet"
+    
+    if not force_download and os.path.exists(file_path):
+        df = pd.read_parquet(file_path)
+        # print(f"Loaded cached data for {geocode}")
+        return df
+    
+    try:
+        # print(f"Downloading data for {geocode}...")
+        df = Infodengue.get(disease=disease,
+                            start=start_date,
+                            end=end_date, 
+                            geocode=geocode,
+                            api_key=os.getenv("MOSQLIMATE_API_KEY"))
+        df = pd.DataFrame(df)
+        if df.empty:
+            return None
+        
+        df['data_iniSE'] = pd.to_datetime(df['data_iniSE'])
+        df.set_index('data_iniSE', inplace=True)
+        
+        df = df.resample('W-SUN').sum()
+        df['EW'] = [int(str(s)[-2:]) for s in df.SE]
+        df['year'] = [int(str(s)[:-2]) for s in df.SE]
+        
+        os.makedirs("data", exist_ok=True)
+        df.to_parquet(file_path)
+        return df
+    except Exception as e:
+        print(f"Error fetching data for {geocode}: {e}")
+        return None
+
 class FitPL:
     def __init__(self, db_path="powerlaw_results.db"):
         self.start_date = "2010-01-01"
@@ -45,39 +81,6 @@ class FitPL:
             if 'end_date' not in columns:
                 cursor.execute("ALTER TABLE powerlaw_fits ADD COLUMN end_date TEXT")
             conn.commit()
-
-    def fetch_infodengue(self, geocode, force_download=False):
-        file_path = f"data/{geocode}.parquet"
-        
-        if not force_download and os.path.exists(file_path):
-            df = pd.read_parquet(file_path)
-            # print(f"Loaded cached data for {geocode}")
-            return df
-        
-        try:
-            # print(f"Downloading data for {geocode}...")
-            df = Infodengue.get(disease=self.disease,
-                                start=self.start_date,
-                                end=self.end_date, 
-                                geocode=geocode,
-                                api_key=os.getenv("MOSQLIMATE_API_KEY"))
-            df = pd.DataFrame(df)
-            if df.empty:
-                return None
-            
-            df['data_iniSE'] = pd.to_datetime(df['data_iniSE'])
-            df.set_index('data_iniSE', inplace=True)
-            
-            df = df.resample('W-SUN').sum()
-            df['EW'] = [int(str(s)[-2:]) for s in df.SE]
-            df['year'] = [int(str(s)[:-2]) for s in df.SE]
-            
-            os.makedirs("data", exist_ok=True)
-            df.to_parquet(file_path)
-            return df
-        except Exception as e:
-            print(f"Error fetching data for {geocode}: {e}")
-            return None
 
     def fit_pl(self, df):
         try:
@@ -118,7 +121,7 @@ class FitPL:
     async def process_city(self, geocode, city_name, executor, force_download=False):
         loop = asyncio.get_running_loop()
         try:
-            df = await loop.run_in_executor(executor, self.fetch_infodengue, geocode, force_download)
+            df = await loop.run_in_executor(executor, fetch_infodengue, geocode, self.start_date, self.end_date, self.disease, force_download)
             
             if df is not None and not df.empty:
                 results = await loop.run_in_executor(executor, self.fit_pl, df)
