@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import date
 import os
+from functools import lru_cache
 import dotenv
 from mosqlient.datastore import Infodengue
 from mosqlient import get_episcanner
@@ -44,7 +45,7 @@ def fetch_infodengue(geocode, start_date="2010-01-01", end_date=None, disease="d
         
         os.makedirs("data", exist_ok=True)
         df.to_parquet(file_path)
-        return df
+        return df.reset_index()
     except Exception as e:
         print(f"Error fetching data for {geocode}: {e}")
         return None
@@ -61,7 +62,7 @@ def fetch_episcanner(disease: str="dengue", state: str="RS", year: int=2024):
     Returns:
         pd.DataFrame: The fetched data.
     """
-    file_path = f"data/episcanner_{state}.parquet"
+    file_path = f"data/episcanner_{state}_{year}.parquet"
     
     if os.path.exists(file_path):
         df = pd.read_parquet(file_path)
