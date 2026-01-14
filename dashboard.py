@@ -15,6 +15,8 @@ GEO_STATE_MAP = {
 }
 import numpy as np
 
+STATE_TO_GEO = {v: k for k, v in GEO_STATE_MAP.items()}
+
 
 # Connect to DB and fetch results
 def get_db_data(db_path="powerlaw_results.db"):
@@ -45,6 +47,197 @@ def get_yearly_db_data(geocode, db_path="powerlaw_results.db"):
     with sqlite3.connect(db_path) as conn:
         df = pd.read_sql_query("SELECT * FROM powerlaw_fits_yearly WHERE geocode=?", conn, params=(geocode,))
     return df
+
+def get_episcanner_fit_results(region, db_path="powerlaw_results.db"):
+    """Fetch Episcanner fit results for a region (state or 'BR') for all years."""
+    with sqlite3.connect(db_path) as conn:
+        if region == "BR":
+            df = pd.read_sql_query("SELECT * FROM episcanner_fits ORDER BY year ASC", conn)
+        else:
+            df = pd.read_sql_query("SELECT * FROM episcanner_state_fits WHERE state=? ORDER BY year ASC", conn, params=(region,))
+    
+    # Sort with year=0 at the top
+    if not df.empty:
+        df['sort_year'] = df['year'].apply(lambda x: -1 if x == 0 else x)
+        df = df.sort_values('sort_year').drop(columns=['sort_year'])
+        
+    return df
+
+def plot_combined_episcanner_fit(region):
+    """
+    Plots the combined (all years) CCDF for total_cases with year-colored points 
+    and the power law fit line.
+    """
+    if not region:
+        return None
+        
+    # 1. Fetch data for all available years
+    years = list(range(2011, 2026))
+    all_dfs = []
+    
+    states = [region] if region != "BR" else [
+        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", 
+        "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", 
+        "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+    ]
+    
+    for year in years:
+        for state in states:
+            df = fetch_episcanner(state=state, year=year)
+            if df is not None and not df.empty:
+                df = df.copy()
+                df['year'] = year
+                all_dfs.append(df)
+    
+    if not all_dfs:
+        return px.scatter(title=f"No Episcanner data found for {region}")
+        
+    combined_df = pd.concat(all_dfs)
+    
+    # 2. Fetch parameters from DB (year=0)
+    fit_df = get_episcanner_fit_results(region)
+    if fit_df.empty:
+        return px.scatter(title=f"No fitted parameters found in DB for {region} (Combined)")
+    
+    alpha = fit_df.iloc[0]['alpha']
+    xmin = fit_df.iloc[0]['xmin']
+    
+    # 3. Prepare CCDF data for Plotly (Year-Colored)
+    combined_df = combined_df[combined_df['total_cases'] > 0].sort_values('total_cases')
+    n = len(combined_df)
+    combined_df['ccdf'] = np.arange(n, 0, -1) / n
+    
+    # Plotly Scatter (Log-Log)
+    fig = px.scatter(
+        combined_df, 
+        x='total_cases', 
+        y='ccdf', 
+        color='year',
+        color_continuous_scale="Viridis",
+        log_x=True, 
+        log_y=True,
+        hover_data=['year', 'muni_name'],
+        title=f"Epidemic Size Power Law Fit (All Years Combined) - {region}",
+        labels={'total_cases': 'Total Cases', 'ccdf': 'P(X >= x)', 'year': 'Year'}
+    )
+    
+    # 4. Add Theoretical Line
+    if xmin and alpha:
+        x_max = combined_df['total_cases'].max()
+        x_theoretical = np.logspace(np.log10(xmin), np.log10(x_max), 100)
+        
+        # Scaling to match empirical CCDF at xmin
+        proportion_tail = np.sum(combined_df['total_cases'] >= xmin) / n
+        y_theoretical = (x_theoretical / xmin) ** -(alpha - 1) * proportion_tail
+        
+        theoretical_df = pd.DataFrame({'x': x_theoretical, 'y': y_theoretical})
+        
+        import plotly.graph_objects as go
+        
+        # Get all fit parameters for hover from the year=0 row
+        xmax = fit_df[fit_df['year'] == 0].iloc[0].get('xmax')
+        R = fit_df[fit_df['year'] == 0].iloc[0].get('R')
+        p = fit_df[fit_df['year'] == 0].iloc[0].get('p')
+        
+        hover_text = (
+            f"alpha: {alpha:.4f}<br>"
+            f"xmin: {xmin:.4f}<br>"
+            f"xmax: {xmax if pd.notnull(xmax) else 'None'}<br>"
+            f"R: {R:.4f}<br>"
+            f"p: {p:.4g}"
+        )
+        
+        fig.add_trace(go.Scatter(
+            x=theoretical_df['x'], 
+            y=theoretical_df['y'], 
+            mode='lines',
+            name=f'Fit (alpha={alpha:.2f})',
+            line=dict(color='red', dash='dash', width=3),
+            hovertemplate=hover_text + "<extra></extra>"
+        ))
+        
+        # Add xmin vertical line
+        fig.add_vline(x=xmin, line_dash="dot", line_color="gray", annotation_text=f"xmin={xmin:.1f}")
+
+    fig.update_layout(template="plotly_white", height=600)
+    return fig
+
+def plot_episcanner_state_map():
+    """Plots a choropleth map of Brazil using state-level combined alpha results (year=0)."""
+    # 1. Fetch data from DB
+    with sqlite3.connect("powerlaw_results.db") as conn:
+        df_states = pd.read_sql_query("SELECT state, alpha FROM episcanner_state_fits WHERE year=0", conn)
+    
+    if df_states.empty:
+        return px.scatter_map(lat=[-15.79], lon=[-47.88], zoom=3, map_style="carto-positron", title="No state-level fit data found")
+    
+    # 2. Load and dissolve geography to state level
+    gdf = load_geography()
+    gdf_states_geom = gdf[['abbrev_state', 'geometry']].dissolve(by='abbrev_state').reset_index()
+    
+    # 3. Merge
+    merged = gdf_states_geom.merge(df_states, left_on='abbrev_state', right_on='state')
+    
+    fig = px.choropleth_map(
+        merged,
+        geojson=merged.geometry,
+        locations=merged.index,
+        color="alpha",
+        hover_name="abbrev_state",
+        hover_data={"alpha": ":.4f"},
+        map_style="carto-positron",
+        center={"lat": -15.793889, "lon": -47.882778},
+        zoom=3,
+        opacity=0.7,
+        title="All-Time Power Law Alpha by State (Epidemic Size)"
+    )
+    
+    fig.update_layout(
+        margin={"r":0,"t":40,"l":0,"b":0},
+        height=600,
+        autosize=True
+    )
+    return fig
+
+def plot_episcanner_region_timeseries(region):
+    """Plots the weekly estimated cases for a state or the entire country."""
+    if not region:
+        return None
+        
+    if region == "BR":
+        # Aggregate all states
+        all_dfs = []
+        for state_code in GEO_STATE_MAP.keys():
+            df = fetch_infodengue(state_code)
+            if df is not None:
+                all_dfs.append(df[['data_iniSE', 'casos_est']])
+        
+        if not all_dfs:
+            return px.line(title="No timeseries data found for Brazil")
+            
+        combined = pd.concat(all_dfs).groupby('data_iniSE').sum().reset_index()
+        title = "Weekly Estimated Cases - Brazil (Total)"
+    else:
+        geocode = STATE_TO_GEO.get(region)
+        if not geocode:
+            return px.line(title=f"Unknown region: {region}")
+            
+        df = fetch_infodengue(geocode)
+        if df is None or df.empty:
+            return px.line(title=f"No timeseries data found for {region}")
+        
+        combined = df
+        title = f"Weekly Estimated Cases - {region}"
+        
+    fig = px.line(
+        combined.sort_values('data_iniSE'), 
+        x='data_iniSE', 
+        y='casos_est', 
+        title=title,
+        labels={'data_iniSE': 'Date', 'casos_est': 'Weekly Estimated Cases'}
+    )
+    fig.update_layout(template="plotly_white", height=400)
+    return fig
 
 def extract_geocode(geocode_str):
     """Robustly extract geocode from strings like 'City (Geocode) - alpha: 1.23'"""
@@ -313,6 +506,22 @@ def plot_fit(geocode_str):
     
     return fig
 
+def add_pvalue_to_trendline(fig, data_len):
+    """Extract p-value from OLS trendline and add it to hover text."""
+    if data_len > 1:
+        try:
+            results = px.get_trendline_results(fig)
+            if not results.empty:
+                ols_res = results.px_fit_results.iloc[0]
+                p_val = ols_res.pvalues[1] # p-value for slope
+                
+                # The trendline is typically the second trace (index 1)
+                if len(fig.data) > 1:
+                    fig.data[1].hovertemplate += f"<br>p-value: {p_val:.4f}"
+        except:
+            pass
+    return fig
+
 def plot_yearly_trend(geocode_str):
     geocode = extract_geocode(geocode_str)
     if geocode is None:
@@ -333,17 +542,7 @@ def plot_yearly_trend(geocode_str):
         trendline="ols" if len(df_yearly) > 1 else None
     )
     
-    if len(df_yearly) > 1:
-        # Extract p-value from trendline results
-        results = px.get_trendline_results(fig)
-        if not results.empty:
-            ols_res = results.px_fit_results.iloc[0]
-            p_val = ols_res.pvalues[1] # p-value for slope
-            
-            # The trendline is typically the second trace (index 1)
-            if len(fig.data) > 1:
-                fig.data[1].hovertemplate += f"<br>p-value: {p_val:.4f}"
-
+    fig = add_pvalue_to_trendline(fig, len(df_yearly))
     fig.update_layout(template="plotly_white")
     return fig
 
@@ -436,6 +635,7 @@ def plot_indicator_plots(geocode_str):
                 hover_data=['year'],
                 trendline="ols" if len(df) > 1 else None
             )
+            fig = add_pvalue_to_trendline(fig, len(df))
             fig.update_layout(template="plotly_white")
             plots.append(fig)
         else:
@@ -572,6 +772,23 @@ def create_dashboard():
                     res_plot = gr.Plot(label="Alpha vs Sum of Residuals")
                 
 
+            with gr.TabItem("Epidemic size Power Laws"):
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        epi_region_dropdown = gr.Dropdown(
+                            choices=["BR"] + states, 
+                            value="BR", 
+                            label="Select Region (State or BR)", 
+                            filterable=True
+                        )
+                        epi_refresh_btn = gr.Button("Refresh Episcanner Plot")
+                        epi_details_table = gr.Dataframe(label="Fit Details (All Years & Yearly)", interactive=False)
+                        epi_timeseries_plot = gr.Plot(label="Regional Cases Timeseries")
+                    
+                    with gr.Column(scale=4):
+                        epi_combined_plot = gr.Plot(label="Episcanner Total Cases Combined Fit")
+                        epi_state_map = gr.Plot(label="State Combined Alpha Map")
+
         # Dashboard Logic / Event Handlers
         def sync_state(state):
             return state, plot_map(state), plot_trend_map(state), plot_alpha_histogram(state), update_city_dropdown(state)
@@ -598,6 +815,13 @@ def create_dashboard():
         city_dropdown.change(fn=get_yearly_details, inputs=[city_dropdown], outputs=yearly_fits_table)
         city_dropdown.change(fn=plot_indicator_plots, inputs=[city_dropdown], outputs=[r0_plot, cases_plot, ini_plot, dur_plot, res_plot])
         
+        # Episcanner logic
+        epi_region_dropdown.change(fn=plot_combined_episcanner_fit, inputs=[epi_region_dropdown], outputs=epi_combined_plot)
+        epi_region_dropdown.change(fn=get_episcanner_fit_results, inputs=[epi_region_dropdown], outputs=epi_details_table)
+        epi_region_dropdown.change(fn=plot_episcanner_region_timeseries, inputs=[epi_region_dropdown], outputs=epi_timeseries_plot)
+        epi_refresh_btn.click(fn=plot_combined_episcanner_fit, inputs=[epi_region_dropdown], outputs=epi_combined_plot)
+        epi_refresh_btn.click(fn=plot_episcanner_region_timeseries, inputs=[epi_region_dropdown], outputs=epi_timeseries_plot)
+
         plot_btn.click(fn=plot_fit, inputs=[city_dropdown], outputs=fit_plot)
         plot_btn.click(fn=plot_yearly_trend, inputs=[city_dropdown], outputs=trend_plot)
         plot_btn.click(fn=plot_timeseries, inputs=[city_dropdown], outputs=timeseries_plot)
@@ -621,13 +845,32 @@ def create_dashboard():
             yearly = get_yearly_details(best_value)
             indicator_plots = plot_indicator_plots(best_value)
             
-            return [map_fig, trend_map_fig, hist_fig, city_upd, fit_fig, trend_fig, ts_fig, details, yearly] + indicator_plots
+            # Episcanner initial load
+            epi_fig = plot_combined_episcanner_fit("BR")
+            epi_details = get_episcanner_fit_results("BR")
+            epi_map = plot_episcanner_state_map()
+            epi_ts = plot_episcanner_region_timeseries("BR")
+
+            # Determine state of the best city
+            best_geocode = extract_geocode(best_value)
+            state_val = None
+            if best_geocode:
+                state_prefix = int(str(best_geocode)[:2])
+                state_val = GEO_STATE_MAP.get(state_prefix)
+            
+            # If no best city found, default to first state
+            if not state_val and states:
+                state_val = states[0]
+            
+            return [state_val, state_val, map_fig, trend_map_fig, hist_fig, city_upd, fit_fig, trend_fig, ts_fig, details, yearly] + indicator_plots + [epi_fig, epi_details, epi_map, epi_ts]
 
         # Trigger initial load (All Brazil)
         demo.load(fn=initial_load, inputs=[], outputs=[
+            state_dropdown_overview, state_dropdown_city,
             map_plot, trend_map_plot, alpha_hist, city_dropdown, fit_plot, trend_plot, timeseries_plot, 
             city_details_table, yearly_fits_table,
-            r0_plot, cases_plot, ini_plot, dur_plot, res_plot
+            r0_plot, cases_plot, ini_plot, dur_plot, res_plot,
+            epi_combined_plot, epi_details_table, epi_state_map, epi_timeseries_plot
         ])
 
     return demo
