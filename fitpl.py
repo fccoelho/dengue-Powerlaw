@@ -2,6 +2,7 @@ import pandas as pd
 import numpy as np
 from datetime import date
 import os
+import traceback
 from functools import lru_cache
 import dotenv
 from mosqlient.datastore import Infodengue
@@ -14,6 +15,13 @@ from concurrent.futures import ThreadPoolExecutor
 
 dotenv.load_dotenv()
 
+GEO_STATE_MAP = {
+    11: "RO", 12: "AC", 13: "AM", 14: "RR", 15: "PA", 16: "AP", 17: "TO",
+    21: "MA", 22: "PI", 23: "CE", 24: "RN", 25: "PB", 26: "PE", 27: "AL",
+    28: "SE", 29: "BA", 31: "MG", 32: "ES", 33: "RJ", 35: "SP", 41: "PR",
+    42: "SC", 43: "RS", 50: "MS", 51: "MT", 52: "GO", 53: "DF"
+}
+
 def fetch_infodengue(geocode, start_date="2010-01-01", end_date=None, disease="dengue", force_download=False):
     if end_date is None:
         end_date = date.today().strftime("%Y-%m-%d")
@@ -23,31 +31,69 @@ def fetch_infodengue(geocode, start_date="2010-01-01", end_date=None, disease="d
     if not force_download and os.path.exists(file_path):
         df = pd.read_parquet(file_path)
         # print(f"Loaded cached data for {geocode}")
-        return df
+        return df.reset_index()
     
     try:
-        # print(f"Downloading data for {geocode}...")
-        df = Infodengue.get(disease=disease,
-                            start=start_date,
-                            end=end_date, 
-                            geocode=geocode,
-                            api_key=os.getenv("MOSQLIMATE_API_KEY"))
-        df = pd.DataFrame(df)
+        # Determine if geocode is a state abbreviation or a numeric geocode
+        uf_val = None
+        geocode_val = None
+        if isinstance(geocode, str) and len(geocode) == 2 and geocode.isalpha():
+            uf_val = geocode.upper()
+        else:
+            geocode_val = int(geocode)
+
+        start_dt = pd.to_datetime(start_date)
+        end_dt = pd.to_datetime(end_date)
+
+        if (end_dt - start_dt).days > 365:
+            # print(f"Downloading data for {uf_val or geocode_val} in yearly chunks...")
+            dfs = []
+            for year in range(start_dt.year, end_dt.year + 1):
+                print(f"Downloading data for {uf_val or geocode_val} in {year}...")
+                y_start = max(start_dt, pd.to_datetime(f"{year}-01-01")).strftime("%Y-%m-%d")
+                y_end = min(end_dt, pd.to_datetime(f"{year}-12-31")).strftime("%Y-%m-%d")
+                
+                df_year = Infodengue.get(disease=disease,
+                                    start=y_start,
+                                    end=y_end, 
+                                    uf=uf_val,
+                                    geocode=geocode_val,
+                                    api_key=os.getenv("MOSQLIMATE_API_KEY"))
+                if df_year:
+                    dfs.append(pd.DataFrame(df_year))
+            
+            if not dfs:
+                return None
+            df = pd.concat(dfs).drop_duplicates()
+        else:
+            # print(f"Downloading data for {uf_val or geocode_val}...")
+            df = Infodengue.get(disease=disease,
+                                start=start_date,
+                                end=end_date, 
+                                uf=uf_val,
+                                geocode=geocode_val,
+                                api_key=os.getenv("MOSQLIMATE_API_KEY"))
+            df = pd.DataFrame(df)
         if df.empty:
             return None
         
         df['data_iniSE'] = pd.to_datetime(df['data_iniSE'])
         df.set_index('data_iniSE', inplace=True)
         
-        df = df.resample('W-SUN').sum()
-        df['EW'] = [int(str(s)[-2:]) for s in df.SE]
-        df['year'] = [int(str(s)[:-2]) for s in df.SE]
+        # Numeric columns to sum
+        numeric_cols = df.select_dtypes(include=[np.number]).columns
+        df = df[numeric_cols].resample('W-SUN').sum()
+        
+        # Ensure 'SE' is present if it was in original columns, otherwise re-derive from index if possible
+        # Actually SE is yyyyww. Let's re-derive year and EW from index.
+        df['year'] = df.index.isocalendar().year
+        df['EW'] = df.index.isocalendar().week
         
         os.makedirs("data", exist_ok=True)
         df.to_parquet(file_path)
         return df.reset_index()
     except Exception as e:
-        print(f"Error fetching data for {geocode}: {e}")
+        print(f"Error fetching data for {geocode}: {traceback.print_exc()}")
         return None
 
 def fetch_episcanner(disease: str="dengue", state: str="RS", year: int=2024):
@@ -209,24 +255,41 @@ class FitPL:
         except Exception as e:
             print(f"Failed to process yearly data for {city_name} ({geocode}): {e}")
 
+    async def _update_state_cache(self, executor, force_download=False):
+        loop = asyncio.get_running_loop()
+        print("--- Downloading Statewide Aggregated Data ---")
+        state_tasks = []
+        for state_uf in GEO_STATE_MAP.values():
+            # Use fetch_infodengue directly in executor for caching
+            task = loop.run_in_executor(executor, fetch_infodengue, state_uf, self.start_date, self.end_date, self.disease, force_download)
+            state_tasks.append(task)
+        
+        if state_tasks:
+            await asyncio.gather(*state_tasks)
+
     async def run_scan(self, geocodes=None, force_download=False, max_workers=5):
         if geocodes is None:
             geocodes = NAME_BY_GEOCODE
             
         executor = ThreadPoolExecutor(max_workers=max_workers)
+        loop = asyncio.get_running_loop()
         tasks = []
         
-        for geocode, city_name in geocodes.items():
-            task = self.process_city(geocode, city_name, executor, force_download)
-            tasks.append(task)
+        # for geocode, city_name in geocodes.items():
+        #     task = self.process_city(geocode, city_name, executor, force_download)
+        #     tasks.append(task)
             
-        await asyncio.gather(*tasks)
+        # await asyncio.gather(*tasks)
+
+        # Process states
+        await self._update_state_cache(executor, force_download)
 
     async def run_yearly_scan(self, geocodes=None, force_download=False, max_workers=5):
         if geocodes is None:
             geocodes = NAME_BY_GEOCODE
             
         executor = ThreadPoolExecutor(max_workers=max_workers)
+        loop = asyncio.get_running_loop()
         tasks = []
         
         for geocode, city_name in geocodes.items():
@@ -235,6 +298,9 @@ class FitPL:
             
         await asyncio.gather(*tasks)
 
+        # Process states
+        await self._update_state_cache(executor, force_download)
+
 if __name__ == "__main__":
-    # asyncio.run(FitPL().run_scan(max_workers=10))
-    asyncio.run(FitPL().run_yearly_scan(max_workers=10))
+    asyncio.run(FitPL().run_scan(max_workers=1))
+    # asyncio.run(FitPL().run_yearly_scan(max_workers=10))
