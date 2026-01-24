@@ -1,3 +1,7 @@
+"""
+Fit power laws o episcanner data
+"""
+
 import pandas as pd
 import sqlite3
 import powerlaw

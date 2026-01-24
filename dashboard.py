@@ -10,6 +10,7 @@ from functools import lru_cache
 from fitpl import FitPL, fetch_infodengue as _fetch_infodengue, fetch_episcanner as _fetch_episcanner
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
+from scipy import stats
 
 @lru_cache(maxsize=128)
 def fetch_infodengue(geocode, **kwargs):
@@ -41,19 +42,27 @@ def get_alpha_trends(db_path="powerlaw_results.db"):
     with sqlite3.connect(db_path) as conn:
         df_yearly = pd.read_sql_query("SELECT geocode, year, alpha FROM powerlaw_fits_yearly", conn)
     
+    # Ensure numeric types (sometimes SQLite returns bytes or objects)
+    df_yearly['geocode'] = pd.to_numeric(df_yearly['geocode'], errors='coerce')
+    df_yearly['year'] = pd.to_numeric(df_yearly['year'], errors='coerce')
+    df_yearly['alpha'] = pd.to_numeric(df_yearly['alpha'], errors='coerce')
+    df_yearly = df_yearly.dropna(subset=['geocode', 'year', 'alpha'])
+    
     trends = []
     for geocode, group in df_yearly.groupby('geocode'):
+        group = group.dropna(subset=['alpha', 'year'])
         if len(group) >= 2:
-            # OLS slope
             try:
-                # Remove NaNs
-                group = group.dropna(subset=['alpha', 'year'])
-                if len(group) >= 2:
-                    slope, _ = np.polyfit(group['year'], group['alpha'], 1)
-                    trends.append({'geocode': geocode, 'alpha_trend': slope})
+                # Use linregress to get slope and p-value
+                res = stats.linregress(group['year'], group['alpha'])
+                trends.append({
+                    'geocode': geocode, 
+                    'alpha_trend': res.slope,
+                    'p_value': res.pvalue
+                })
             except:
                 pass
-    return pd.DataFrame(trends, columns=['geocode', 'alpha_trend'])
+    return pd.DataFrame(trends, columns=['geocode', 'alpha_trend', 'p_value'])
 
 def get_yearly_db_data(geocode, db_path="powerlaw_results.db"):
     with sqlite3.connect(db_path) as conn:
@@ -102,14 +111,14 @@ def plot_combined_episcanner_fit(region):
                 all_dfs.append(df)
     
     if not all_dfs:
-        return px.scatter(title=f"No Episcanner data found for {region}")
+        return go.Figure().update_layout(title=f"No Episcanner data found for {region}")
         
     combined_df = pd.concat(all_dfs)
     
     # 2. Fetch parameters from DB (year=0)
     fit_df = get_episcanner_fit_results(region)
     if fit_df.empty:
-        return px.scatter(title=f"No fitted parameters found in DB for {region} (Combined)")
+        return go.Figure().update_layout(title=f"No fitted parameters found in DB for {region} (Combined)")
     
     alpha = fit_df.iloc[0]['alpha']
     xmin = fit_df.iloc[0]['xmin']
@@ -181,7 +190,7 @@ def plot_episcanner_state_map():
         df_states = pd.read_sql_query("SELECT state, alpha FROM episcanner_state_fits WHERE year=0", conn)
     
     if df_states.empty:
-        return px.scatter_map(lat=[-15.79], lon=[-47.88], zoom=3, map_style="carto-positron", title="No state-level fit data found")
+        return go.Figure().update_layout(title="No state-level fit data found")
     
     # 2. Load and dissolve geography to state level
     gdf = load_geography()
@@ -230,7 +239,7 @@ def plot_episcanner_region_timeseries(region):
         all_dfs = [df for df in all_dfs if df is not None]
         
         if not all_dfs:
-            return px.line(title="No timeseries data found for Brazil")
+            return go.Figure().update_layout(title="No timeseries data found for Brazil")
             
         combined = pd.concat(all_dfs).groupby('data_iniSE').sum(numeric_only=True).reset_index()
         title = "Weekly Estimated Cases - Brazil (Total)"
@@ -238,7 +247,7 @@ def plot_episcanner_region_timeseries(region):
         # region is already the UF (e.g., 'RJ')
         df = fetch_infodengue(region)
         if df is None or df.empty:
-            return px.line(title=f"No timeseries data found for {region}")
+            return go.Figure().update_layout(title=f"No timeseries data found for {region}")
         
         combined = df
         title = f"Weekly Estimated Cases - {region}"
@@ -390,9 +399,7 @@ def plot_map(state_abbrev=None):
     merged, _ = get_merged_data(state_abbrev=state_abbrev)
     
     if merged.empty:
-        fig = px.scatter_map(lat=[-15.79], lon=[-47.88], zoom=3, map_style="carto-positron")
-        fig.update_layout(title="No data for selected state")
-        return fig
+        return go.Figure().update_layout(title="No data for selected state")
 
     if state_abbrev is None:
         # State-level aggregation
@@ -449,19 +456,23 @@ def plot_trend_map(state_abbrev=None):
     merged, _ = get_merged_data(state_abbrev=state_abbrev, include_trends=True)
     
     if merged.empty or 'alpha_trend' not in merged.columns or merged['alpha_trend'].isna().all():
-        fig = px.scatter_map(lat=[-15.79], lon=[-47.88], zoom=3, map_style="carto-positron")
         msg = "No trend data available" if merged.empty else "Insufficient data to calculate trends (need at least 2 years per city)"
-        fig.update_layout(title=msg)
-        return fig
+        return go.Figure().update_layout(title=msg)
 
     if state_abbrev is None:
         # State-level aggregation of trends
-        state_data = merged.groupby('abbrev_state').agg({
-            'alpha_trend': 'mean'
+        # Only aggregate cities that have a trend
+        trend_cities = merged.dropna(subset=['alpha_trend'])
+        if trend_cities.empty:
+            return go.Figure().update_layout(title="No trend data available for any city")
+
+        state_data = trend_cities.groupby('abbrev_state').agg({
+            'alpha_trend': 'mean',
+            'p_value': 'mean' 
         }).reset_index()
         
-        gdf_states_geom = merged[['abbrev_state', 'geometry']].dissolve(by='abbrev_state').reset_index()
-        gdf_states = gdf_states_geom.merge(state_data, on='abbrev_state')
+        gdf_states_geom = load_geography()[['abbrev_state', 'geometry']].dissolve(by='abbrev_state').reset_index()
+        gdf_states = gdf_states_geom.merge(state_data, on='abbrev_state', how='left')
         
         fig = px.choropleth_map(
             gdf_states,
@@ -469,7 +480,7 @@ def plot_trend_map(state_abbrev=None):
             locations=gdf_states.index,
             color="alpha_trend",
             hover_name="abbrev_state",
-            hover_data={"alpha_trend": ":.4f"},
+            hover_data={"alpha_trend": ":.4f", "p_value": ":.4f"},
             color_continuous_scale="RdBu",
             color_continuous_midpoint=0,
             map_style="carto-positron",
@@ -479,13 +490,14 @@ def plot_trend_map(state_abbrev=None):
             title="Avg Yearly Alpha Trend by State"
         )
     else:
+        # Municipality-level view for selected state
         fig = px.choropleth_map(
             merged,
             geojson=merged.geometry,
             locations=merged.index,
             color="alpha_trend",
             hover_name="city_name",
-            hover_data=["alpha_trend"],
+            hover_data=["alpha_trend", "p_value"],
             color_continuous_scale="RdBu",
             color_continuous_midpoint=0,
             map_style="carto-positron",
@@ -494,6 +506,26 @@ def plot_trend_map(state_abbrev=None):
             opacity=0.7,
             title=f"Yearly Alpha Trend - {state_abbrev}"
         )
+        
+        # Add hatching for significant trends (p < 0.05)
+        # Note: Plotly choropleth_map doesn't support a simple "hatching" argument like px.bar.
+        # We can add a second layer with a different opacity or a pattern if we use go.Choroplethmapbox, 
+        # but let's stick to adding a trace for significant cities.
+        significant = merged[merged['p_value'] < 0.05].copy()
+        if not significant.empty:
+            # We can use go.Choroplethmap for a custom pattern if available in this plotly version,
+            # or add a scatter layer with symbols. 
+            # In many plotly versions, choropleth patterns are only for px.bar.
+            # A common workaround is to overlay a semi-transparent layer or markers.
+            # Let's try adding markers to indicate significance.
+            fig.add_trace(go.Scattermap(
+                lat=significant.geometry.centroid.y,
+                lon=significant.geometry.centroid.x,
+                mode='markers',
+                marker=dict(size=8, color='black', symbol='circle', opacity=0.5),
+                name='p < 0.05',
+                hoverinfo='skip'
+            ))
 
     fig.update_layout(
         margin={"r":0,"t":40,"l":0,"b":0},
@@ -507,8 +539,7 @@ def plot_alpha_histogram(state_abbrev=None):
     merged, _ = get_merged_data(state_abbrev=state_abbrev)
     
     if merged.empty or "alpha" not in merged.columns:
-        fig = px.scatter(title="No data available for histogram")
-        return fig
+        return go.Figure().update_layout(title="No data available for histogram")
     
     if state_abbrev is None:
         # Use state averages for the overall histogram
@@ -521,8 +552,7 @@ def plot_alpha_histogram(state_abbrev=None):
         label = "Municipality Alpha"
 
     if plot_df.empty:
-        fig = px.scatter(title="No alpha values found")
-        return fig
+        return go.Figure().update_layout(title="No alpha values found")
 
     fig = px.histogram(
         plot_df, 
@@ -630,8 +660,7 @@ def plot_yearly_trend(geocode_str):
     df_yearly = get_yearly_db_data(geocode)
     
     if df_yearly.empty:
-        fig = px.scatter(title=f"No yearly trend data for {geocode_str}")
-        return fig
+        return go.Figure().update_layout(title=f"No yearly trend data for {geocode_str}")
         
     fig = px.scatter(
         df_yearly, 
@@ -661,7 +690,7 @@ def plot_timeseries(geocode_str):
     
     df = fetch_infodengue(geocode)
     if df is None or df.empty:
-        return px.line(title=f"No timeseries data for {geocode_str}")
+        return go.Figure().update_layout(title=f"No timeseries data for {geocode_str}")
     
     # Sort by date
     df = df.sort_values('data_iniSE')
@@ -721,8 +750,7 @@ def plot_indicator_plots(geocode_str):
     df = get_combined_indicator_data(geocode)
     
     if df.empty:
-        empty_fig = px.scatter(title="No episcanner data available for correlation")
-        return [empty_fig]*5
+        return [go.Figure().update_layout(title="No episcanner data available for correlation")]*5
         
     # Alpha must be on Y axis as per user request
     plots = []
@@ -747,7 +775,7 @@ def plot_indicator_plots(geocode_str):
             fig.update_layout(template="plotly_white")
             plots.append(fig)
         else:
-            plots.append(px.scatter(title=f"Column {col} missing"))
+            plots.append(go.Figure().update_layout(title=f"Column {col} missing"))
             
     return plots
 
@@ -990,22 +1018,29 @@ def create_dashboard():
                 f_emap = executor.submit(plot_episcanner_state_map)
                 f_ets = executor.submit(plot_episcanner_region_timeseries, "BR")
 
+                def safe_result(future, default=None):
+                    try:
+                        return future.result()
+                    except Exception as e:
+                        print(f"Task failed: {e}")
+                        return default or go.Figure().update_layout(title=f"Error loading plot: {e}")
+
                 # Collect results
-                map_fig = f_map.result()
-                trend_map_fig = f_tmap.result()
-                hist_fig = f_hist.result()
+                map_fig = safe_result(f_map)
+                trend_map_fig = safe_result(f_tmap)
+                hist_fig = safe_result(f_hist)
                 city_upd = gr.Dropdown(choices=choices, value=best_value, filterable=True)
-                fit_fig = f_fit.result()
-                trend_fig = f_ytrend.result()
-                ts_fig = f_ts.result()
-                details = f_details.result()
-                yearly = f_yearly.result()
-                indicator_plots = f_indicator.result()
-                epi_fig = f_epi.result()
-                epi_disp_fig = f_edisp.result()
-                epi_details = f_edetails.result()
-                epi_map = f_emap.result()
-                epi_ts = f_ets.result()
+                fit_fig = safe_result(f_fit)
+                trend_fig = safe_result(f_ytrend)
+                ts_fig = safe_result(f_ts)
+                details = safe_result(f_details, pd.DataFrame())
+                yearly = safe_result(f_yearly, pd.DataFrame())
+                indicator_plots = safe_result(f_indicator, [go.Figure()]*5)
+                epi_fig = safe_result(f_epi)
+                epi_disp_fig = safe_result(f_edisp)
+                epi_details = safe_result(f_edetails, pd.DataFrame())
+                epi_map = safe_result(f_emap)
+                epi_ts = safe_result(f_ts)
 
             # Determine state of the best city
             best_geocode = extract_geocode(best_value)

@@ -124,6 +124,10 @@ def fetch_episcanner(disease: str="dengue", state: str="RS", year: int=2024):
         df.to_parquet(file_path)
         return df
     except Exception as e:
+        # Check if it's a 404 error from requests (mosqlient usually uses requests)
+        if "404" in str(e):
+            # print(f"No Episcanner data for {state} in {year} (404)")
+            return None
         print(f"Error fetching data for {state}: {e}")
         return None
 
@@ -271,35 +275,35 @@ class FitPL:
         if geocodes is None:
             geocodes = NAME_BY_GEOCODE
             
-        executor = ThreadPoolExecutor(max_workers=max_workers)
-        loop = asyncio.get_running_loop()
-        tasks = []
-        
-        # for geocode, city_name in geocodes.items():
-        #     task = self.process_city(geocode, city_name, executor, force_download)
-        #     tasks.append(task)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            loop = asyncio.get_running_loop()
+            tasks = []
             
-        # await asyncio.gather(*tasks)
+            # for geocode, city_name in geocodes.items():
+            #     task = self.process_city(geocode, city_name, executor, force_download)
+            #     tasks.append(task)
+                
+            # await asyncio.gather(*tasks)
 
-        # Process states
-        await self._update_state_cache(executor, force_download)
+            # Process states
+            await self._update_state_cache(executor, force_download)
 
     async def run_yearly_scan(self, geocodes=None, force_download=False, max_workers=5):
         if geocodes is None:
             geocodes = NAME_BY_GEOCODE
             
-        executor = ThreadPoolExecutor(max_workers=max_workers)
-        loop = asyncio.get_running_loop()
-        tasks = []
-        
-        for geocode, city_name in geocodes.items():
-            task = self.process_city_yearly(geocode, city_name, executor, force_download)
-            tasks.append(task)
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            loop = asyncio.get_running_loop()
+            tasks = []
             
-        await asyncio.gather(*tasks)
+            for geocode, city_name in geocodes.items():
+                task = self.process_city_yearly(geocode, city_name, executor, force_download)
+                tasks.append(task)
+                
+            await asyncio.gather(*tasks)
 
-        # Process states
-        await self._update_state_cache(executor, force_download)
+            # Process states
+            await self._update_state_cache(executor, force_download)
 
 if __name__ == "__main__":
     asyncio.run(FitPL().run_scan(max_workers=1))
