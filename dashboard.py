@@ -11,6 +11,7 @@ from fitpl import FitPL, fetch_infodengue as _fetch_infodengue, fetch_episcanner
 from concurrent.futures import ThreadPoolExecutor
 import asyncio
 from scipy import stats
+import pygeoda
 
 @lru_cache(maxsize=128)
 def fetch_infodengue(geocode, **kwargs):
@@ -69,13 +70,13 @@ def get_yearly_db_data(geocode, db_path="powerlaw_results.db"):
         df = pd.read_sql_query("SELECT * FROM powerlaw_fits_yearly WHERE geocode=?", conn, params=(geocode,))
     return df
 
-def get_episcanner_fit_results(region, db_path="powerlaw_results.db"):
+def get_episcanner_fit_results(region, metric="total_cases", db_path="powerlaw_results.db"):
     """Fetch Episcanner fit results for a region (state or 'BR') for all years."""
     with sqlite3.connect(db_path) as conn:
         if region == "BR":
-            df = pd.read_sql_query("SELECT * FROM episcanner_fits ORDER BY year ASC", conn)
+            df = pd.read_sql_query("SELECT * FROM episcanner_fits WHERE metric=? ORDER BY year ASC", conn, params=(metric,))
         else:
-            df = pd.read_sql_query("SELECT * FROM episcanner_state_fits WHERE state=? ORDER BY year ASC", conn, params=(region,))
+            df = pd.read_sql_query("SELECT * FROM episcanner_state_fits WHERE state=? AND metric=? ORDER BY year ASC", conn, params=(region, metric))
     
     # Sort with year=0 at the top
     if not df.empty:
@@ -84,14 +85,16 @@ def get_episcanner_fit_results(region, db_path="powerlaw_results.db"):
         
     return df
 
-def plot_combined_episcanner_fit(region):
+def plot_combined_episcanner_fit(region, metric="total_cases"):
     """
-    Plots the combined (all years) CCDF for total_cases with year-colored points 
+    Plots the combined (all years) CCDF for a given metric with year-colored points 
     and the power law fit line.
     """
     if not region:
         return None
         
+    metric_label = "Total Cases" if metric == "total_cases" else "Epidemic Duration (Weeks)"
+    
     # 1. Fetch data for all available years
     years = list(range(2011, 2026))
     all_dfs = []
@@ -116,49 +119,52 @@ def plot_combined_episcanner_fit(region):
     combined_df = pd.concat(all_dfs)
     
     # 2. Fetch parameters from DB (year=0)
-    fit_df = get_episcanner_fit_results(region)
+    fit_df = get_episcanner_fit_results(region, metric=metric)
     if fit_df.empty:
-        return go.Figure().update_layout(title=f"No fitted parameters found in DB for {region} (Combined)")
+        return go.Figure().update_layout(title=f"No fitted parameters found in DB for {region} (Combined {metric_label})")
     
-    alpha = fit_df.iloc[0]['alpha']
-    xmin = fit_df.iloc[0]['xmin']
+    # Filter year=0 row
+    year_0_fit = fit_df[fit_df['year'] == 0]
+    if year_0_fit.empty:
+        return go.Figure().update_layout(title=f"No combined (Year 0) parameters found for {region}")
+        
+    alpha = year_0_fit.iloc[0]['alpha']
+    xmin = year_0_fit.iloc[0]['xmin']
     
     # 3. Prepare CCDF data for Plotly (Year-Colored)
-    combined_df = combined_df[combined_df['total_cases'] > 0].sort_values('total_cases')
+    combined_df = combined_df[combined_df[metric] > 0].sort_values(metric)
     n = len(combined_df)
     combined_df['ccdf'] = np.arange(n, 0, -1) / n
     
     # Plotly Scatter (Log-Log)
     fig = px.scatter(
         combined_df, 
-        x='total_cases', 
+        x=metric, 
         y='ccdf', 
         color='year',
         color_continuous_scale="Viridis",
         log_x=True, 
         log_y=True,
         hover_data=['year', 'muni_name'],
-        title=f"Epidemic Size Power Law Fit (All Years Combined) - {region}",
-        labels={'total_cases': 'Total Cases', 'ccdf': 'P(X >= x)', 'year': 'Year'}
+        title=f"Epidemic {metric_label} Power Law Fit (All Years Combined) - {region}",
+        labels={metric: metric_label, 'ccdf': 'P(X >= x)', 'year': 'Year'}
     )
     
     # 4. Add Theoretical Line
     if xmin and alpha:
-        x_max = combined_df['total_cases'].max()
+        x_max = combined_df[metric].max()
         x_theoretical = np.logspace(np.log10(xmin), np.log10(x_max), 100)
         
         # Scaling to match empirical CCDF at xmin
-        proportion_tail = np.sum(combined_df['total_cases'] >= xmin) / n
+        proportion_tail = np.sum(combined_df[metric] >= xmin) / n
         y_theoretical = (x_theoretical / xmin) ** -(alpha - 1) * proportion_tail
         
         theoretical_df = pd.DataFrame({'x': x_theoretical, 'y': y_theoretical})
         
-        import plotly.graph_objects as go
-        
         # Get all fit parameters for hover from the year=0 row
-        xmax = fit_df[fit_df['year'] == 0].iloc[0].get('xmax')
-        R = fit_df[fit_df['year'] == 0].iloc[0].get('R')
-        p = fit_df[fit_df['year'] == 0].iloc[0].get('p')
+        xmax = year_0_fit.iloc[0].get('xmax')
+        R = year_0_fit.iloc[0].get('R')
+        p = year_0_fit.iloc[0].get('p')
         
         hover_text = (
             f"alpha: {alpha:.4f}<br>"
@@ -183,14 +189,16 @@ def plot_combined_episcanner_fit(region):
     fig.update_layout(template="plotly_white", height=600)
     return fig
 
-def plot_episcanner_state_map():
+def plot_episcanner_state_map(metric="total_cases"):
     """Plots a choropleth map of Brazil using state-level combined alpha results (year=0)."""
     # 1. Fetch data from DB
+    metric_label = "Epidemic Size" if metric == "total_cases" else "Epidemic Duration"
+    
     with sqlite3.connect("powerlaw_results.db") as conn:
-        df_states = pd.read_sql_query("SELECT state, alpha FROM episcanner_state_fits WHERE year=0", conn)
+        df_states = pd.read_sql_query("SELECT state, alpha FROM episcanner_state_fits WHERE year=0 AND metric=?", conn, params=(metric,))
     
     if df_states.empty:
-        return go.Figure().update_layout(title="No state-level fit data found")
+        return go.Figure().update_layout(title=f"No state-level fit data found for {metric_label}")
     
     # 2. Load and dissolve geography to state level
     gdf = load_geography()
@@ -210,7 +218,7 @@ def plot_episcanner_state_map():
         center={"lat": -15.793889, "lon": -47.882778},
         zoom=3,
         opacity=0.7,
-        title="All-Time Power Law Alpha by State (Epidemic Size)"
+        title=f"All-Time {metric_label} Power Law Alpha by State"
     )
     
     fig.update_layout(
@@ -262,14 +270,16 @@ def plot_episcanner_region_timeseries(region):
     fig.update_layout(template="plotly_white", height=400)
     return fig
 
-def plot_episcanner_dispersion_alpha(region):
+def plot_episcanner_dispersion_alpha(region, metric="total_cases"):
     """
-    Plots a boxplot of total_cases per year and overlays the alpha fit for each year.
+    Plots a boxplot of a metric per year and overlays the alpha fit for each year.
     Uses a secondary Y-axis for alpha.
     """
     if not region:
         return None
 
+    metric_label = "Total Cases" if metric == "total_cases" else "Epidemic Duration (Weeks)"
+    
     # 1. Fetch RAW data for all years to build the boxplot
     years = list(range(2011, 2026))
     all_raw_dfs = []
@@ -286,34 +296,33 @@ def plot_episcanner_dispersion_alpha(region):
             if df is not None and not df.empty:
                 df = df.copy()
                 df['year'] = year
-                all_raw_dfs.append(df[['year', 'total_cases']])
+                all_raw_dfs.append(df[['year', metric]])
     
     if not all_raw_dfs:
         return go.Figure().update_layout(title=f"No Episcanner data found for {region}")
         
     combined_raw = pd.concat(all_raw_dfs)
-    # Filter cases > 0 for log plot
-    combined_raw = combined_raw[combined_raw['total_cases'] > 0]
+    # Filter > 0 for log plot
+    combined_raw = combined_raw[combined_raw[metric] > 0]
 
     # 2. Fetch ALPHA values for all years from DB
-    fit_df = get_episcanner_fit_results(region)
+    fit_df = get_episcanner_fit_results(region, metric=metric)
     # Filter out year=0 (combined) for the trend line
     yearly_alphas = fit_df[fit_df['year'] > 0].sort_values('year')
 
     # 3. Create the figure with secondary Y-axis
     fig = make_subplots(specs=[[{"secondary_y": True}]])
 
-    # Add Boxplot for total_cases
-    # Group by year for the box plot
+    # Add Boxplot
     for yr in sorted(combined_raw['year'].unique()):
         yr_data = combined_raw[combined_raw['year'] == yr]
         fig.add_trace(
             go.Box(
-                y=yr_data['total_cases'],
+                y=yr_data[metric],
                 name=str(yr),
                 marker_color='lightblue',
                 showlegend=False,
-                boxpoints=False # Too many points? maybe 'outliers'
+                boxpoints=False
             ),
             secondary_y=False,
         )
@@ -333,9 +342,9 @@ def plot_episcanner_dispersion_alpha(region):
         )
 
     fig.update_layout(
-        title=f"Total Cases Dispersion vs Alpha Fit by Year - {region}",
+        title=f"{metric_label} Dispersion vs Alpha Fit by Year - {region}",
         xaxis_title="Year",
-        yaxis_title="Total Cases (Log Scale)",
+        yaxis_title=f"{metric_label} (Log Scale)",
         yaxis_type="log",
         template="plotly_white",
         height=600,
@@ -343,7 +352,7 @@ def plot_episcanner_dispersion_alpha(region):
         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1)
     )
 
-    fig.update_yaxes(title_text="Alpha Value", secondary_y=True, range=[1, 4]) # Alpha usually 1-3
+    fig.update_yaxes(title_text="Alpha Value", secondary_y=True, range=[1, 4])
 
     return fig
 
@@ -444,6 +453,18 @@ def plot_map(state_abbrev=None):
             title=f"Power Law Alpha Parameter - {state_abbrev}"
         )
 
+    # Add dots for significant municipalities (p <= 0.05 and R > 0)
+    significant = merged[(merged['p'] <= 0.05) & (merged['R'] > 0)].copy()
+    if not significant.empty:
+        fig.add_trace(go.Scattermap(
+            lat=significant.geometry.centroid.y,
+            lon=significant.geometry.centroid.x,
+            mode='markers',
+            marker=dict(size=6, color='gray', opacity=0.6),
+            name='Significant (p<=0.05 & R>0)',
+            hoverinfo='skip'
+        ))
+
     fig.update_layout(
         margin={"r":0,"t":40,"l":0,"b":0},
         width=800,
@@ -534,6 +555,68 @@ def plot_trend_map(state_abbrev=None):
         autosize=True
     )
     return fig
+
+def plot_local_moran(state_abbrev=None):
+    if state_abbrev is None:
+        return go.Figure().update_layout(title="Select a state to see Local Moran clustering")
+        
+    merged, _ = get_merged_data(state_abbrev=state_abbrev)
+    
+    if merged.empty or 'alpha' not in merged.columns or merged['alpha'].isna().all():
+        return go.Figure().update_layout(title="Insufficient data for Local Moran clustering")
+
+    # Filter out NaNs for clustering
+    df_clean = merged.dropna(subset=['alpha']).copy()
+    if len(df_clean) < 3: # Need at least some neighbors
+        return go.Figure().update_layout(title="Insufficient data for Local Moran clustering")
+
+    try:
+        # 1. Create Geoda object
+        gda = pygeoda.open(df_clean)
+        
+        # 2. Create Weights
+        w = pygeoda.queen_weights(gda)
+        
+        # 3. Local Moran
+        lisa = pygeoda.local_moran(w, gda['alpha'])
+        
+        # 4. Get clusters
+        clusters = lisa.lisa_clusters()
+        labels = lisa.lisa_labels()
+        colors = lisa.lisa_colors()
+        
+        # Map clusters to labels
+        df_clean['cluster_label'] = [labels[c] for c in clusters]
+        
+        # Color mapping for Plotly
+        color_map = {labels[i]: colors[i] for i in range(len(labels))}
+        
+        fig = px.choropleth_map(
+            df_clean,
+            geojson=df_clean.geometry,
+            locations=df_clean.index,
+            color="cluster_label",
+            color_discrete_map=color_map,
+            hover_name="city_name",
+            hover_data=["alpha"],
+            map_style="carto-positron",
+            center={"lat": df_clean.geometry.centroid.y.mean(), "lon": df_clean.geometry.centroid.x.mean()},
+            zoom=6,
+            opacity=0.7,
+            title=f"Local Moran Clustering (Alpha) - {state_abbrev}"
+        )
+        
+        fig.update_layout(
+            margin={"r":0,"t":40,"l":0,"b":0},
+            width=800,
+            height=600,
+            autosize=True,
+            legend_title_text='Local Moran Cluster'
+        )
+        return fig
+        
+    except Exception as e:
+        return go.Figure().update_layout(title=f"Error computing Local Moran: {str(e)}")
 
 def plot_alpha_histogram(state_abbrev=None):
     merged, _ = get_merged_data(state_abbrev=state_abbrev)
@@ -878,6 +961,7 @@ def create_dashboard():
                     with gr.Column(scale=4):
                         map_plot = gr.Plot(label="Alpha Parameter Map")
                         trend_map_plot = gr.Plot(label="Alpha Trend Map")
+                        moran_plot = gr.Plot(label="Local Moran Clustering Map")
                 
 
             with gr.TabItem("City Details & Yearly Trends"):
@@ -908,7 +992,7 @@ def create_dashboard():
                     res_plot = gr.Plot(label="Alpha vs Sum of Residuals")
                 
 
-            with gr.TabItem("Epidemic size Power Laws"):
+            with gr.TabItem("Epidemic Metrics Power Laws"):
                 with gr.Row():
                     with gr.Column(scale=1):
                         epi_region_dropdown = gr.Dropdown(
@@ -917,14 +1001,25 @@ def create_dashboard():
                             label="Select Region (State or BR)", 
                             filterable=True
                         )
-                        epi_refresh_btn = gr.Button("Refresh Episcanner Plot")
-                        epi_details_table = gr.Dataframe(label="Fit Details (All Years & Yearly)", interactive=False)
+                        epi_refresh_btn = gr.Button("Refresh Episcanner Plots")
+                        with gr.Row():
+                            epi_details_table_size = gr.Dataframe(label="Fit Details (Size)", interactive=False)
+                            epi_details_table_dur = gr.Dataframe(label="Fit Details (Duration)", interactive=False)
                     
                     with gr.Column(scale=4):
-                        epi_combined_plot = gr.Plot(label="Episcanner Total Cases Combined Fit")
-                        epi_dispersion_plot = gr.Plot(label="Dispersion vs Alpha Yearly")
+                        with gr.Row():
+                            epi_combined_plot_size = gr.Plot(label="Size: Combined Fit")
+                            epi_combined_plot_dur = gr.Plot(label="Duration: Combined Fit")
+                        
+                        with gr.Row():
+                            epi_dispersion_plot_size = gr.Plot(label="Size: Dispersion vs Alpha")
+                            epi_dispersion_plot_dur = gr.Plot(label="Duration: Dispersion vs Alpha")
+                        
+                        with gr.Row():
+                            epi_state_map_size = gr.Plot(label="Size: State Alpha Map")
+                            epi_state_map_dur = gr.Plot(label="Duration: State Alpha Map")
+                        
                         epi_timeseries_plot = gr.Plot(label="Regional Cases Timeseries")
-                        epi_state_map = gr.Plot(label="State Combined Alpha Map")
 
         # Dashboard Logic / Event Handlers
         def sync_state(state):
@@ -933,6 +1028,7 @@ def create_dashboard():
             
             map_fig = plot_map(base_state)
             trend_map_fig = plot_trend_map(base_state)
+            moran_fig = plot_local_moran(base_state)
             hist_fig = plot_alpha_histogram(base_state)
             city_choices, best_city = get_city_options(base_state)
             
@@ -942,36 +1038,50 @@ def create_dashboard():
                 state if state in ["BR"] + states else base_state, # epi_region_dropdown (can be "BR")
                 map_fig, 
                 trend_map_fig, 
-                alpha_hist, 
+                moran_fig,
+                hist_fig, 
                 gr.Dropdown(choices=city_choices, value=best_city)
             )
 
         state_dropdown_overview.change(
             fn=sync_state, 
             inputs=[state_dropdown_overview], 
-            outputs=[state_dropdown_city, epi_region_dropdown, map_plot, trend_map_plot, alpha_hist, city_dropdown]
+            outputs=[state_dropdown_city, epi_region_dropdown, map_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown]
         )
         
         state_dropdown_city.change(
             fn=sync_state, 
             inputs=[state_dropdown_city], 
-            outputs=[state_dropdown_overview, epi_region_dropdown, map_plot, trend_map_plot, alpha_hist, city_dropdown]
+            outputs=[state_dropdown_overview, epi_region_dropdown, map_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown]
         )
 
         epi_region_dropdown.change(
             fn=sync_state,
             inputs=[epi_region_dropdown],
-            outputs=[state_dropdown_overview, state_dropdown_city, map_plot, trend_map_plot, alpha_hist, city_dropdown]
+            outputs=[state_dropdown_overview, state_dropdown_city, map_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown]
         )
 
         # Separate handler for episcanner-specific plots when region changes
         def update_episcanner(region):
-            return plot_combined_episcanner_fit(region), plot_episcanner_dispersion_alpha(region), get_episcanner_fit_results(region), plot_episcanner_region_timeseries(region)
+            return (
+                plot_combined_episcanner_fit(region, "total_cases"), 
+                plot_combined_episcanner_fit(region, "ep_dur"),
+                plot_episcanner_dispersion_alpha(region, "total_cases"), 
+                plot_episcanner_dispersion_alpha(region, "ep_dur"),
+                get_episcanner_fit_results(region, "total_cases"),
+                get_episcanner_fit_results(region, "ep_dur"),
+                plot_episcanner_region_timeseries(region)
+            )
 
         epi_region_dropdown.change(
             fn=update_episcanner, 
             inputs=[epi_region_dropdown], 
-            outputs=[epi_combined_plot, epi_dispersion_plot, epi_details_table, epi_timeseries_plot]
+            outputs=[
+                epi_combined_plot_size, epi_combined_plot_dur, 
+                epi_dispersion_plot_size, epi_dispersion_plot_dur, 
+                epi_details_table_size, epi_details_table_dur, 
+                epi_timeseries_plot
+            ]
         )
 
         city_dropdown.change(fn=plot_fit, inputs=[city_dropdown], outputs=fit_plot)
@@ -983,7 +1093,12 @@ def create_dashboard():
         epi_refresh_btn.click(
             fn=update_episcanner, 
             inputs=[epi_region_dropdown], 
-            outputs=[epi_combined_plot, epi_dispersion_plot, epi_details_table, epi_timeseries_plot]
+            outputs=[
+                epi_combined_plot_size, epi_combined_plot_dur, 
+                epi_dispersion_plot_size, epi_dispersion_plot_dur, 
+                epi_details_table_size, epi_details_table_dur, 
+                epi_timeseries_plot
+            ]
         )
 
         plot_btn.click(fn=plot_fit, inputs=[city_dropdown], outputs=fit_plot)
@@ -1011,11 +1126,18 @@ def create_dashboard():
                 f_yearly = executor.submit(get_yearly_details, best_value)
                 f_indicator = executor.submit(plot_indicator_plots, best_value)
                 
-                # 4. Episcanner data
-                f_epi = executor.submit(plot_combined_episcanner_fit, "BR")
-                f_edisp = executor.submit(plot_episcanner_dispersion_alpha, "BR")
-                f_edetails = executor.submit(get_episcanner_fit_results, "BR")
-                f_emap = executor.submit(plot_episcanner_state_map)
+                # 4. Episcanner data (Size)
+                f_epi_size = executor.submit(plot_combined_episcanner_fit, "BR", "total_cases")
+                f_edisp_size = executor.submit(plot_episcanner_dispersion_alpha, "BR", "total_cases")
+                f_edetails_size = executor.submit(get_episcanner_fit_results, "BR", "total_cases")
+                f_emap_size = executor.submit(plot_episcanner_state_map, "total_cases")
+                
+                # 5. Episcanner data (Duration)
+                f_epi_dur = executor.submit(plot_combined_episcanner_fit, "BR", "ep_dur")
+                f_edisp_dur = executor.submit(plot_episcanner_dispersion_alpha, "BR", "ep_dur")
+                f_edetails_dur = executor.submit(get_episcanner_fit_results, "BR", "ep_dur")
+                f_emap_dur = executor.submit(plot_episcanner_state_map, "ep_dur")
+                
                 f_ets = executor.submit(plot_episcanner_region_timeseries, "BR")
 
                 def safe_result(future, default=None):
@@ -1036,11 +1158,16 @@ def create_dashboard():
                 details = safe_result(f_details, pd.DataFrame())
                 yearly = safe_result(f_yearly, pd.DataFrame())
                 indicator_plots = safe_result(f_indicator, [go.Figure()]*5)
-                epi_fig = safe_result(f_epi)
-                epi_disp_fig = safe_result(f_edisp)
-                epi_details = safe_result(f_edetails, pd.DataFrame())
-                epi_map = safe_result(f_emap)
-                epi_ts = safe_result(f_ts)
+                
+                epi_fig_size = safe_result(f_epi_size)
+                epi_dur_fig = safe_result(f_epi_dur)
+                epi_disp_fig_size = safe_result(f_edisp_size)
+                epi_disp_fig_dur = safe_result(f_edisp_dur)
+                epi_details_size = safe_result(f_edetails_size, pd.DataFrame())
+                epi_details_dur = safe_result(f_edetails_dur, pd.DataFrame())
+                epi_map_size = safe_result(f_emap_size)
+                epi_map_dur = safe_result(f_emap_dur)
+                epi_ts = safe_result(f_ets)
 
             # Determine state of the best city
             best_geocode = extract_geocode(best_value)
@@ -1052,7 +1179,7 @@ def create_dashboard():
             if not state_val and states:
                 state_val = states[0]
             
-            return [state_val, state_val, state_val, map_fig, trend_map_fig, hist_fig, city_upd, fit_fig, trend_fig, ts_fig, details, yearly] + indicator_plots + [epi_fig, epi_disp_fig, epi_details, epi_map, epi_ts]
+            return [state_val, state_val, state_val, map_fig, trend_map_fig, hist_fig, city_upd, fit_fig, trend_fig, ts_fig, details, yearly] + indicator_plots + [epi_fig_size, epi_dur_fig, epi_disp_fig_size, epi_disp_fig_dur, epi_details_size, epi_details_dur, epi_map_size, epi_map_dur, epi_ts]
 
         # Trigger initial load (All Brazil)
         demo.load(fn=initial_load, inputs=[], outputs=[
@@ -1060,7 +1187,11 @@ def create_dashboard():
             map_plot, trend_map_plot, alpha_hist, city_dropdown, fit_plot, trend_plot, timeseries_plot, 
             city_details_table, yearly_fits_table,
             r0_plot, cases_plot, ini_plot, dur_plot, res_plot,
-            epi_combined_plot, epi_dispersion_plot, epi_details_table, epi_state_map, epi_timeseries_plot
+            epi_combined_plot_size, epi_combined_plot_dur, 
+            epi_dispersion_plot_size, epi_dispersion_plot_dur, 
+            epi_details_table_size, epi_details_table_dur, 
+            epi_state_map_size, epi_state_map_dur, 
+            epi_timeseries_plot
         ])
 
     return demo

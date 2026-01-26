@@ -24,24 +24,27 @@ def init_db():
         cursor = conn.cursor()
         cursor.execute('''
             CREATE TABLE IF NOT EXISTS episcanner_fits (
-                year INTEGER PRIMARY KEY,
-                alpha REAL,
-                xmin REAL,
-                xmax REAL,
-                R REAL,
-                p REAL
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS episcanner_state_fits (
-                state TEXT,
+                metric TEXT,
                 year INTEGER,
                 alpha REAL,
                 xmin REAL,
                 xmax REAL,
                 R REAL,
                 p REAL,
-                PRIMARY KEY (state, year)
+                PRIMARY KEY (metric, year)
+            )
+        ''')
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS episcanner_state_fits (
+                state TEXT,
+                metric TEXT,
+                year INTEGER,
+                alpha REAL,
+                xmin REAL,
+                xmax REAL,
+                R REAL,
+                p REAL,
+                PRIMARY KEY (state, metric, year)
             )
         ''')
         conn.commit()
@@ -85,26 +88,28 @@ def main():
                     state_all_years_data[state].append(df)
                     national_yearly_data[year].append(df)
                     
-                    # Individual state/year fit
-                    results = fit_pl(df.total_cases.values)
+                    # Individual state/year fits
+                    for metric in ['total_cases', 'ep_dur']:
+                        results = fit_pl(df[metric].values)
+                        if results:
+                            alpha, xmin, xmax, R, p = results
+                            cursor.execute('''
+                                INSERT OR REPLACE INTO episcanner_state_fits (state, metric, year, alpha, xmin, xmax, R, p)
+                                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                            ''', (state, metric, year, alpha, xmin, xmax, R, p))
+            
+            # National fits for the current year
+            if national_yearly_data[year]:
+                br_year_df = pd.concat(national_yearly_data[year])
+                for metric in ['total_cases', 'ep_dur']:
+                    results = fit_pl(br_year_df[metric].values)
                     if results:
                         alpha, xmin, xmax, R, p = results
                         cursor.execute('''
-                            INSERT OR REPLACE INTO episcanner_state_fits (state, year, alpha, xmin, xmax, R, p)
+                            INSERT OR REPLACE INTO episcanner_fits (metric, year, alpha, xmin, xmax, R, p)
                             VALUES (?, ?, ?, ?, ?, ?, ?)
-                        ''', (state, year, alpha, xmin, xmax, R, p))
-            
-            # National fit for the current year
-            if national_yearly_data[year]:
-                br_year_df = pd.concat(national_yearly_data[year])
-                results = fit_pl(br_year_df.total_cases.values)
-                if results:
-                    alpha, xmin, xmax, R, p = results
-                    cursor.execute('''
-                        INSERT OR REPLACE INTO episcanner_fits (year, alpha, xmin, xmax, R, p)
-                        VALUES (?, ?, ?, ?, ?, ?)
-                    ''', (year, alpha, xmin, xmax, R, p))
-                    print(f"National fit for {year}: alpha={alpha:.2f}")
+                        ''', (metric, year, alpha, xmin, xmax, R, p))
+                        print(f"National {metric} fit for {year}: alpha={alpha:.2f}")
             
             conn.commit()
         
@@ -114,14 +119,15 @@ def main():
         for state in STATES:
             if state_all_years_data[state]:
                 state_combined_df = pd.concat(state_all_years_data[state])
-                results = fit_pl(state_combined_df.total_cases.values)
-                if results:
-                    alpha, xmin, xmax, R, p = results
-                    cursor.execute('''
-                        INSERT OR REPLACE INTO episcanner_state_fits (state, year, alpha, xmin, xmax, R, p)
-                        VALUES (?, ?, ?, ?, ?, ?, ?)
-                    ''', (state, 0, alpha, xmin, xmax, R, p))
-                    print(f"Combined fit for {state}: alpha={alpha:.2f}")
+                for metric in ['total_cases', 'ep_dur']:
+                    results = fit_pl(state_combined_df[metric].values)
+                    if results:
+                        alpha, xmin, xmax, R, p = results
+                        cursor.execute('''
+                            INSERT OR REPLACE INTO episcanner_state_fits (state, metric, year, alpha, xmin, xmax, R, p)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+                        ''', (state, metric, 0, alpha, xmin, xmax, R, p))
+                        print(f"Combined {metric} fit for {state}: alpha={alpha:.2f}")
         
         # 2. National/All Years Combined
         all_national_dfs = []
@@ -131,14 +137,15 @@ def main():
         
         if all_national_dfs:
             br_combined_df = pd.concat(all_national_dfs)
-            results = fit_pl(br_combined_df.total_cases.values)
-            if results:
-                alpha, xmin, xmax, R, p = results
-                cursor.execute('''
-                    INSERT OR REPLACE INTO episcanner_fits (year, alpha, xmin, xmax, R, p)
-                    VALUES (?, ?, ?, ?, ?, ?)
-                ''', (0, alpha, xmin, xmax, R, p))
-                print(f"National combined fit (All Years): alpha={alpha:.2f}")
+            for metric in ['total_cases', 'ep_dur']:
+                results = fit_pl(br_combined_df[metric].values)
+                if results:
+                    alpha, xmin, xmax, R, p = results
+                    cursor.execute('''
+                        INSERT OR REPLACE INTO episcanner_fits (metric, year, alpha, xmin, xmax, R, p)
+                        VALUES (?, ?, ?, ?, ?, ?, ?)
+                    ''', (metric, 0, alpha, xmin, xmax, R, p))
+                    print(f"National combined {metric} fit (All Years): alpha={alpha:.2f}")
         
         conn.commit()
 
