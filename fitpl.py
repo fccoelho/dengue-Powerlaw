@@ -279,11 +279,11 @@ class FitPL:
             loop = asyncio.get_running_loop()
             tasks = []
             
-            # for geocode, city_name in geocodes.items():
-            #     task = self.process_city(geocode, city_name, executor, force_download)
-            #     tasks.append(task)
+            for geocode, city_name in geocodes.items():
+                task = self.process_city(geocode, city_name, executor, force_download)
+                tasks.append(task)
                 
-            # await asyncio.gather(*tasks)
+            await asyncio.gather(*tasks)
 
             # Process states
             await self._update_state_cache(executor, force_download)

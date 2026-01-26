@@ -33,3 +33,53 @@ Given the vast number of administrative units in Brazil (>5,500), the explorator
 - **Fitting Engine**: Core logic implemented in the `FitPL` class using the `powerlaw` Python library.
 - **Asynchronous Workflow**: High-performance data fetching and processing using `asyncio` for exhaustive scanning of all 5,500+ municipalities.
 - **Interactive Analytics**: A multi-tab Gradio dashboard providing real-time visualization of empirical CCDFs, longitudinal trends, and multi-indicator correlations.
+
+## Getting Started
+
+### 1. Environment Setup
+
+This project uses `uv` for fast, reliable Python package management.
+
+1.  **Install `uv`** (if you haven't already):
+    ```bash
+    curl -LsSf https://astral.sh/uv/install.sh | sh
+    ```
+2.  **Create a virtual environment and install dependencies**:
+    ```bash
+    uv sync
+    ```
+3.  **Activate the environment**:
+    ```bash
+    source .venv/bin/activate
+    ```
+
+### 2. Configuration
+
+Create a `.env` file in the root directory and add your Mosqlimate API key:
+```env
+MOSQLIMATE_API_KEY=your_api_key_here
+```
+
+### 3. Data Caching and Fitting
+
+Before running the dashboard, you need to populate the local cache and SQLite database. This process may take some time depending on the number of municipalities.
+
+1.  **Fetch Infodengue data and fit power laws**:
+    ```bash
+    python fitpl.py
+    ```
+    *This script processes all Brazilian municipalities and saves results to `powerlaw_results.db`.*
+
+2.  **Fetch Episcanner data and fit power laws**:
+    ```bash
+    python fit_episcanner_pl.py
+    ```
+    *This script processes state-level and national-level Episcanner metrics.*
+
+### 4. Running the Dashboard
+
+Once the data is cached, launch the interactive dashboard:
+```bash
+python dashboard.py
+```
+The dashboard will be available at `http://127.0.0.1:7860`.
