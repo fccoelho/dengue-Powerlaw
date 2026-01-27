@@ -186,7 +186,12 @@ def plot_combined_episcanner_fit(region, metric="total_cases"):
         # Add xmin vertical line
         fig.add_vline(x=xmin, line_dash="dot", line_color="gray", annotation_text=f"xmin={xmin:.1f}")
 
-    fig.update_layout(template="plotly_white", height=600)
+    fig.update_layout(
+        template="plotly_white", 
+        height=600,
+        xaxis=dict(type='log', autorange=True),
+        yaxis=dict(type='log', autorange=True)
+    )
     return fig
 
 def plot_episcanner_state_map(metric="total_cases"):
@@ -207,13 +212,18 @@ def plot_episcanner_state_map(metric="total_cases"):
     # 3. Merge
     merged = gdf_states_geom.merge(df_states, left_on='abbrev_state', right_on='state')
     
+    # Ensure WGS84 for Plotly maps
+    if merged.crs is None or merged.crs.to_epsg() != 4326:
+        merged = merged.to_crs(epsg=4326)
+    
     fig = px.choropleth_map(
         merged,
-        geojson=merged.geometry,
-        locations=merged.index,
+        geojson=merged.__geo_interface__,
+        locations="abbrev_state",
+        featureidkey="properties.abbrev_state",
         color="alpha",
         hover_name="abbrev_state",
-        hover_data={"alpha": ":.4f"},
+        hover_data={"alpha": ":.4f", "abbrev_state": False},
         map_style="carto-positron",
         center={"lat": -15.793889, "lon": -47.882778},
         zoom=3,
@@ -322,7 +332,7 @@ def plot_episcanner_dispersion_alpha(region, metric="total_cases"):
                 name=str(yr),
                 marker_color='lightblue',
                 showlegend=False,
-                boxpoints=False
+                boxpoints=False,
             ),
             secondary_y=False,
         )
@@ -344,8 +354,8 @@ def plot_episcanner_dispersion_alpha(region, metric="total_cases"):
     fig.update_layout(
         title=f"{metric_label} Dispersion vs Alpha Fit by Year - {region}",
         xaxis_title="Year",
-        yaxis_title=f"{metric_label} (Log Scale)",
-        yaxis_type="log",
+        yaxis_title=f"{metric_label} (Linear Scale)",
+        yaxis_type="linear",
         template="plotly_white",
         height=600,
         showlegend=True,
@@ -423,13 +433,18 @@ def plot_map(state_abbrev=None):
         # Merge with aggregated state data
         gdf_states = gdf_states_geom.merge(state_data, on='abbrev_state')
         
+        # Ensure WGS84 for Plotly maps
+        if gdf_states.crs is None or gdf_states.crs.to_epsg() != 4326:
+            gdf_states = gdf_states.to_crs(epsg=4326)
+            
         fig = px.choropleth_map(
             gdf_states,
-            geojson=gdf_states.geometry,
-            locations=gdf_states.index,
+            geojson=gdf_states.__geo_interface__,
+            locations="abbrev_state",
+            featureidkey="properties.abbrev_state",
             color="alpha",
             hover_name="abbrev_state",
-            hover_data={"alpha": ":.4f", "mun_count": True} if "mun_count" in gdf_states.columns else ["alpha"],
+            hover_data={"alpha": ":.4f", "mun_count": True, "abbrev_state": False} if "mun_count" in gdf_states.columns else ["alpha"],
             map_style="carto-positron",
             center={"lat": -15.793889, "lon": -47.882778},
             zoom=3,
@@ -438,10 +453,15 @@ def plot_map(state_abbrev=None):
         )
     else:
         # Municipality-level view for selected state
+        # Ensure WGS84 for Plotly maps
+        if merged.crs is None or merged.crs.to_epsg() != 4326:
+            merged = merged.to_crs(epsg=4326)
+            
         fig = px.choropleth_map(
             merged,
-            geojson=merged.geometry,
-            locations=merged.index,
+            geojson=merged.__geo_interface__,
+            locations="code_muni",
+            featureidkey="properties.code_muni",
             color="alpha",
             hover_name="city_name",
             hover_data=["alpha", "xmin", "xmax"],
@@ -495,13 +515,18 @@ def plot_trend_map(state_abbrev=None):
         gdf_states_geom = load_geography()[['abbrev_state', 'geometry']].dissolve(by='abbrev_state').reset_index()
         gdf_states = gdf_states_geom.merge(state_data, on='abbrev_state', how='left')
         
+        # Ensure WGS84 for Plotly maps
+        if gdf_states.crs is None or gdf_states.crs.to_epsg() != 4326:
+            gdf_states = gdf_states.to_crs(epsg=4326)
+            
         fig = px.choropleth_map(
             gdf_states,
-            geojson=gdf_states.geometry,
-            locations=gdf_states.index,
+            geojson=gdf_states.__geo_interface__,
+            locations="abbrev_state",
+            featureidkey="properties.abbrev_state",
             color="alpha_trend",
             hover_name="abbrev_state",
-            hover_data={"alpha_trend": ":.4f", "p_value": ":.4f"},
+            hover_data={"alpha_trend": ":.4f", "p_value": ":.4f", "abbrev_state": False},
             color_continuous_scale="RdBu",
             color_continuous_midpoint=0,
             map_style="carto-positron",
@@ -512,10 +537,15 @@ def plot_trend_map(state_abbrev=None):
         )
     else:
         # Municipality-level view for selected state
+        # Ensure WGS84 for Plotly maps
+        if merged.crs is None or merged.crs.to_epsg() != 4326:
+            merged = merged.to_crs(epsg=4326)
+            
         fig = px.choropleth_map(
             merged,
-            geojson=merged.geometry,
-            locations=merged.index,
+            geojson=merged.__geo_interface__,
+            locations="code_muni",
+            featureidkey="properties.code_muni",
             color="alpha_trend",
             hover_name="city_name",
             hover_data=["alpha_trend", "p_value"],
@@ -591,10 +621,15 @@ def plot_local_moran(state_abbrev=None):
         # Color mapping for Plotly
         color_map = {labels[i]: colors[i] for i in range(len(labels))}
         
+        # Ensure WGS84 for Plotly maps
+        if df_clean.crs is None or df_clean.crs.to_epsg() != 4326:
+            df_clean = df_clean.to_crs(epsg=4326)
+            
         fig = px.choropleth_map(
             df_clean,
-            geojson=df_clean.geometry,
-            locations=df_clean.index,
+            geojson=df_clean.__geo_interface__,
+            locations="code_muni",
+            featureidkey="properties.code_muni",
             color="cluster_label",
             color_discrete_map=color_map,
             hover_name="city_name",
@@ -1068,6 +1103,8 @@ def create_dashboard():
                 plot_combined_episcanner_fit(region, "ep_dur"),
                 plot_episcanner_dispersion_alpha(region, "total_cases"), 
                 plot_episcanner_dispersion_alpha(region, "ep_dur"),
+                plot_episcanner_state_map("total_cases"),
+                plot_episcanner_state_map("ep_dur"),
                 get_episcanner_fit_results(region, "total_cases"),
                 get_episcanner_fit_results(region, "ep_dur"),
                 plot_episcanner_region_timeseries(region)
@@ -1079,6 +1116,7 @@ def create_dashboard():
             outputs=[
                 epi_combined_plot_size, epi_combined_plot_dur, 
                 epi_dispersion_plot_size, epi_dispersion_plot_dur, 
+                epi_state_map_size, epi_state_map_dur,
                 epi_details_table_size, epi_details_table_dur, 
                 epi_timeseries_plot
             ]
@@ -1198,4 +1236,12 @@ def create_dashboard():
 
 if __name__ == "__main__":
     demo = create_dashboard()
-    demo.launch(debug=True)
+    import os
+    import gradio.networking
+    gradio.networking.url_ok = lambda x: True
+    os.environ["NO_PROXY"] = "localhost,127.0.0.1"
+    demo.launch(
+        debug=True,
+        server_name="127.0.0.1",
+        server_port=7861
+    )
