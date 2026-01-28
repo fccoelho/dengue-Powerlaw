@@ -38,6 +38,16 @@ def get_db_data(db_path="powerlaw_results.db"):
         df = pd.read_sql_query("SELECT * FROM powerlaw_fits", conn)
     return df
 
+def get_city_stats(db_path="powerlaw_results.db"):
+    with sqlite3.connect(db_path) as conn:
+        # Check if table exists
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='city_stats'")
+        if cursor.fetchone():
+            df = pd.read_sql_query("SELECT * FROM city_stats", conn)
+            return df
+    return pd.DataFrame()
+
 @lru_cache(maxsize=1)
 def get_alpha_trends(db_path="powerlaw_results.db"):
     with sqlite3.connect(db_path) as conn:
@@ -405,6 +415,13 @@ def get_merged_data(state_abbrev=None, include_trends=False):
     
     merged = gdf.merge(df_results, left_on='code_muni', right_on='geocode', how='inner' if state_abbrev else 'right')
     
+    # Merge with city stats
+    df_stats = get_city_stats()
+    if not df_stats.empty:
+        merged = merged.merge(df_stats, left_on='code_muni', right_on='geocode', how='left', suffixes=('', '_stats_dup'))
+        if 'geocode_stats_dup' in merged.columns:
+            merged.drop(columns=['geocode_stats_dup'], inplace=True)
+
     if include_trends:
         df_trends = get_alpha_trends()
         merged = merged.merge(df_trends, left_on='code_muni', right_on='geocode', how='left', suffixes=('', '_trend_dup'))
@@ -679,6 +696,39 @@ def plot_alpha_histogram(state_abbrev=None):
         title=title,
         labels={"alpha": label}
     )
+    fig.update_layout(
+        margin={"r":20,"t":40,"l":20,"b":40},
+        height=400,
+        template="plotly_white"
+    )
+    return fig
+
+def plot_alpha_vs_incidence(state_abbrev=None):
+    merged, _ = get_merged_data(state_abbrev=state_abbrev)
+    
+    if merged.empty or "alpha" not in merged.columns or "incidence" not in merged.columns:
+        return go.Figure().update_layout(title="No data available for Alpha vs Incidence plot")
+    
+    plot_df = merged.dropna(subset=['alpha', 'incidence'])
+    
+    if plot_df.empty:
+        return go.Figure().update_layout(title="No cities with both alpha and incidence found")
+
+    fig = px.scatter(
+        plot_df, 
+        x="incidence", 
+        y="alpha", 
+        color="abbrev_state" if state_abbrev is None else None,
+        hover_name="city_name",
+        hover_data=["total_cases", "population", "alpha", "incidence"],
+        title=f"Alpha vs Accumulated Cases/Population {'(Brazil)' if state_abbrev is None else f'({state_abbrev})'}",
+        labels={"incidence": "Total Cases / Population * 10^5", "alpha": "Alpha Value"},
+        trendline="ols" if len(plot_df) > 2 else None
+    )
+    
+    if len(plot_df) > 2:
+        fig = add_pvalue_to_trendline(fig, len(plot_df))
+        
     fig.update_layout(
         margin={"r":20,"t":40,"l":20,"b":40},
         height=400,
@@ -995,6 +1045,7 @@ def create_dashboard():
                         load_map_btn = gr.Button("Refresh Overview")
                     with gr.Column(scale=4):
                         map_plot = gr.Plot(label="Alpha Parameter Map")
+                        alpha_incidence_plot = gr.Plot(label="Alpha vs Incidence (accumulated)")
                         trend_map_plot = gr.Plot(label="Alpha Trend Map")
                         moran_plot = gr.Plot(label="Local Moran Clustering Map")
                 
@@ -1065,6 +1116,7 @@ def create_dashboard():
             trend_map_fig = plot_trend_map(base_state)
             moran_fig = plot_local_moran(base_state)
             hist_fig = plot_alpha_histogram(base_state)
+            incidence_fig = plot_alpha_vs_incidence(base_state)
             city_choices, best_city = get_city_options(base_state)
             
             # Sync all three dropdowns
@@ -1072,6 +1124,7 @@ def create_dashboard():
                 base_state, # state_dropdown_city
                 state if state in ["BR"] + states else base_state, # epi_region_dropdown (can be "BR")
                 map_fig, 
+                incidence_fig,
                 trend_map_fig, 
                 moran_fig,
                 hist_fig, 
@@ -1081,19 +1134,19 @@ def create_dashboard():
         state_dropdown_overview.change(
             fn=sync_state, 
             inputs=[state_dropdown_overview], 
-            outputs=[state_dropdown_city, epi_region_dropdown, map_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown]
+            outputs=[state_dropdown_city, epi_region_dropdown, map_plot, alpha_incidence_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown]
         )
         
         state_dropdown_city.change(
             fn=sync_state, 
             inputs=[state_dropdown_city], 
-            outputs=[state_dropdown_overview, epi_region_dropdown, map_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown]
+            outputs=[state_dropdown_overview, epi_region_dropdown, map_plot, alpha_incidence_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown]
         )
 
         epi_region_dropdown.change(
             fn=sync_state,
             inputs=[epi_region_dropdown],
-            outputs=[state_dropdown_overview, state_dropdown_city, map_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown]
+            outputs=[state_dropdown_overview, state_dropdown_city, map_plot, alpha_incidence_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown]
         )
 
         # Separate handler for episcanner-specific plots when region changes
@@ -1151,7 +1204,9 @@ def create_dashboard():
                 # 1. Overview data
                 f_map = executor.submit(plot_map, None)
                 f_tmap = executor.submit(plot_trend_map, None)
+                f_moran = executor.submit(plot_local_moran, None)
                 f_hist = executor.submit(plot_alpha_histogram, None)
+                f_incidence = executor.submit(plot_alpha_vs_incidence, None)
                 
                 # 2. Get best city
                 choices, best_value = get_city_options(None)
@@ -1185,10 +1240,11 @@ def create_dashboard():
                         print(f"Task failed: {e}")
                         return default or go.Figure().update_layout(title=f"Error loading plot: {e}")
 
-                # Collect results
                 map_fig = safe_result(f_map)
                 trend_map_fig = safe_result(f_tmap)
+                moran_fig = safe_result(f_moran)
                 hist_fig = safe_result(f_hist)
+                incidence_fig = safe_result(f_incidence)
                 city_upd = gr.Dropdown(choices=choices, value=best_value, filterable=True)
                 fit_fig = safe_result(f_fit)
                 trend_fig = safe_result(f_ytrend)
@@ -1217,12 +1273,14 @@ def create_dashboard():
             if not state_val and states:
                 state_val = states[0]
             
-            return [state_val, state_val, state_val, map_fig, trend_map_fig, hist_fig, city_upd, fit_fig, trend_fig, ts_fig, details, yearly] + indicator_plots + [epi_fig_size, epi_dur_fig, epi_disp_fig_size, epi_disp_fig_dur, epi_details_size, epi_details_dur, epi_map_size, epi_map_dur, epi_ts]
+            return [state_val, state_val, state_val, map_fig, incidence_fig, trend_map_fig, moran_fig, hist_fig, city_upd, 
+            fit_fig, trend_fig, ts_fig, details, yearly] + indicator_plots + [epi_fig_size, epi_dur_fig, epi_disp_fig_size, 
+            epi_disp_fig_dur, epi_details_size, epi_details_dur, epi_map_size, epi_map_dur, epi_ts]
 
         # Trigger initial load (All Brazil)
         demo.load(fn=initial_load, inputs=[], outputs=[
             state_dropdown_overview, state_dropdown_city, epi_region_dropdown,
-            map_plot, trend_map_plot, alpha_hist, city_dropdown, fit_plot, trend_plot, timeseries_plot, 
+            map_plot, alpha_incidence_plot, trend_map_plot, moran_plot, alpha_hist, city_dropdown, fit_plot, trend_plot, timeseries_plot, 
             city_details_table, yearly_fits_table,
             r0_plot, cases_plot, ini_plot, dur_plot, res_plot,
             epi_combined_plot_size, epi_combined_plot_dur, 
