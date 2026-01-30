@@ -12,6 +12,9 @@ from concurrent.futures import ThreadPoolExecutor
 import asyncio
 from scipy import stats
 import pygeoda
+import duckdb
+import glob
+import os
 
 @lru_cache(maxsize=128)
 def fetch_infodengue(geocode, **kwargs):
@@ -94,6 +97,55 @@ def get_episcanner_fit_results(region, metric="total_cases", db_path="powerlaw_r
         df = df.sort_values('sort_year').drop(columns=['sort_year'])
         
     return df
+    return _fetch_episcanner(disease=disease, state=state, year=year)
+
+def ensure_episcanner_files(region, years=None):
+    """Ensures that parquet files exist for the given region and years. Fetches if missing."""
+    if years is None:
+        years = list(range(2011, 2026))
+        
+    states = [region] if region != "BR" else [
+        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", 
+        "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", 
+        "RS", "RO", "RR", "SC", "SP", "SE", "TO"
+    ]
+    
+    missing_found = False
+    for year in years:
+        for state in states:
+            file_path = f"data/episcanner_{state}_{year}.parquet"
+            if not os.path.exists(file_path):
+                # print(f"Fetching missing data for {state} {year}")
+                fetch_episcanner(state=state, year=year)
+                missing_found = True
+    return missing_found
+
+def get_duckdb_episcanner_data(region, years=None, columns="*"):
+    """Aggregates Episcanner data using DuckDB."""
+    if years is None:
+        years = list(range(2011, 2026))
+        
+    try:
+        con = duckdb.connect()
+        min_y, max_y = min(years), max(years)
+        
+        if region == "BR":
+            query = f"""
+                SELECT {columns} FROM read_parquet('data/episcanner_*.parquet')
+                WHERE year BETWEEN {min_y} AND {max_y}
+            """
+        else:
+            if not glob.glob(f"data/episcanner_{region}_*.parquet"):
+                return pd.DataFrame()
+            query = f"""
+                SELECT {columns} FROM read_parquet('data/episcanner_{region}_*.parquet')
+                WHERE year BETWEEN {min_y} AND {max_y}
+            """
+            
+        return con.query(query).df()
+    except Exception as e:
+        print(f"DuckDB query failed: {e}")
+        return pd.DataFrame()
 
 def plot_combined_episcanner_fit(region, metric="total_cases"):
     """
@@ -103,30 +155,19 @@ def plot_combined_episcanner_fit(region, metric="total_cases"):
     if not region:
         return None
         
-    metric_label = "Total Cases" if metric == "total_cases" else "Epidemic Duration (Weeks)"
+    metric_label = "Size (cases)" if metric == "total_cases" else "Duration (weeks)"
     
     # 1. Fetch data for all available years
     years = list(range(2011, 2026))
-    all_dfs = []
     
-    states = [region] if region != "BR" else [
-        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", 
-        "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", 
-        "RS", "RO", "RR", "SC", "SP", "SE", "TO"
-    ]
-    
-    for year in years:
-        for state in states:
-            df = fetch_episcanner(state=state, year=year)
-            if df is not None and not df.empty:
-                df = df.copy()
-                df['year'] = year
-                all_dfs.append(df)
-    
-    if not all_dfs:
-        return go.Figure().update_layout(title=f"No Episcanner data found for {region}")
+    # Ensure files exist
+    ensure_episcanner_files(region, years)
+
+    # Use DuckDB to aggregate
+    combined_df = get_duckdb_episcanner_data(region, years)
         
-    combined_df = pd.concat(all_dfs)
+    if combined_df.empty:
+        return go.Figure().update_layout(title=f"No Episcanner data found for {region}")
     
     # 2. Fetch parameters from DB (year=0)
     fit_df = get_episcanner_fit_results(region, metric=metric)
@@ -207,7 +248,7 @@ def plot_combined_episcanner_fit(region, metric="total_cases"):
 def plot_episcanner_state_map(metric="total_cases"):
     """Plots a choropleth map of Brazil using state-level combined alpha results (year=0)."""
     # 1. Fetch data from DB
-    metric_label = "Epidemic Size" if metric == "total_cases" else "Epidemic Duration"
+    metric_label = "Epidemic Size's alpha" if metric == "total_cases" else "Epidemic Duration's alpha"
     
     with sqlite3.connect("powerlaw_results.db") as conn:
         df_states = pd.read_sql_query("SELECT state, alpha FROM episcanner_state_fits WHERE year=0 AND metric=?", conn, params=(metric,))
@@ -238,7 +279,7 @@ def plot_episcanner_state_map(metric="total_cases"):
         center={"lat": -15.793889, "lon": -47.882778},
         zoom=3,
         opacity=0.7,
-        title=f"All-Time {metric_label} Power Law Alpha by State"
+        title=f"All-Time {metric_label} by State"
     )
     
     fig.update_layout(
@@ -249,46 +290,75 @@ def plot_episcanner_state_map(metric="total_cases"):
     return fig
 
 def plot_episcanner_region_timeseries(region):
-    """Plots the weekly estimated cases for a state or the entire country."""
+    """Plots the weekly estimated cases for a state or the entire country using DuckDB."""
     if not region:
         return None
         
-    if region == "BR":
-        # Aggregate all states in parallel
-        def fetch_and_extract(state_uf):
-            data = fetch_infodengue(state_uf)
-            if data is not None:
-                return data[['data_iniSE', 'casos_est']]
-            return None
-
-        with ThreadPoolExecutor(max_workers=10) as executor:
-            all_dfs = list(executor.map(fetch_and_extract, GEO_STATE_MAP.values()))
-        
-        all_dfs = [df for df in all_dfs if df is not None]
-        
-        if not all_dfs:
-            return go.Figure().update_layout(title="No timeseries data found for Brazil")
+    con = duckdb.connect()  # in-memory mostly
+    
+    try:
+        if region == "BR":
+            # Check if we have state files available to aggregate
+            # Assuming state files are named like 'data/RJ.parquet', etc.
+            # But the fetch_infodengue cache saves as geocode.parquet mostly.
+            # State geocodes are 2 digits? Or fitpl saves them as {UF}.parquet?
+            # Let's check fitpl.py again. fitpl saves as data/{geocode}.parquet.
+            # If geocode is UF (str), it saves as data/{UF}.parquet?
+            # fitpl.py: file_path = f"data/{geocode}.parquet"
+            # If geocode is "RJ", it's data/RJ.parquet.
             
-        combined = pd.concat(all_dfs).groupby('data_iniSE').sum(numeric_only=True).reset_index()
-        title = "Weekly Estimated Cases - Brazil (Total)"
-    else:
-        # region is already the UF (e.g., 'RJ')
-        df = fetch_infodengue(region)
-        if df is None or df.empty:
-            return go.Figure().update_layout(title=f"No timeseries data found for {region}")
+            # So we can look for data/[A-Z][A-Z].parquet for states
+            files = glob.glob('data/[A-Z][A-Z].parquet')
+            if not files:
+                # Fallback to slow method if no cache files found
+                return go.Figure().update_layout(title="No state cache files found for Brazil aggregation")
+                
+            combined = con.query("""
+                SELECT data_iniSE, SUM(casos_est) as casos_est 
+                FROM read_parquet('data/[A-Z][A-Z].parquet') 
+                GROUP BY data_iniSE 
+                ORDER BY data_iniSE
+            """).df()
+            title = "Weekly Estimated Cases - Brazil (Total)"
+            
+        else:
+            # region is UF (e.g., 'RJ')
+            # Check if file exists
+            file_path = f"data/{region}.parquet"
+            if not os.path.exists(file_path):
+                 # Try fetching via API if not cached? 
+                 # The original used fetch_infodengue which fetches and caches.
+                 # If we use DuckDB we rely on cache.
+                 # Let's use fetch_infodengue to ensure it's there, then read?
+                 # Or just fallback to fetch_infodengue if file missing.
+                 df = fetch_infodengue(region)
+                 if df is None or df.empty:
+                    return go.Figure().update_layout(title=f"No timeseries data found for {region}")
+                 combined = df
+            else:
+                 combined = con.query(f"""
+                    SELECT data_iniSE, casos_est 
+                    FROM read_parquet('{file_path}')
+                    ORDER BY data_iniSE
+                """).df()
+            title = f"Weekly Estimated Cases - {region}"
+
+        if combined.empty:
+             return go.Figure().update_layout(title=f"No data for {region}")
+
+        fig = px.line(
+            combined, 
+            x='data_iniSE', 
+            y='casos_est', 
+            title=title,
+            labels={'data_iniSE': 'Date', 'casos_est': 'Estimated weekly cases'}
+        )
+        fig.update_layout(template="plotly_white")
+        return fig
         
-        combined = df
-        title = f"Weekly Estimated Cases - {region}"
-        
-    fig = px.line(
-        combined.sort_values('data_iniSE'), 
-        x='data_iniSE', 
-        y='casos_est', 
-        title=title,
-        labels={'data_iniSE': 'Date', 'casos_est': 'Weekly Estimated Cases'}
-    )
-    fig.update_layout(template="plotly_white", height=400)
-    return fig
+    except Exception as e:
+        print(f"DuckDB aggregation failed: {e}")
+        return go.Figure().update_layout(title=f"Error plotting timeseries: {e}")
 
 def plot_episcanner_dispersion_alpha(region, metric="total_cases"):
     """
@@ -298,30 +368,24 @@ def plot_episcanner_dispersion_alpha(region, metric="total_cases"):
     if not region:
         return None
 
-    metric_label = "Total Cases" if metric == "total_cases" else "Epidemic Duration (Weeks)"
+    metric_label = "Size (cases)" if metric == "total_cases" else "Duration (weeks)"
     
     # 1. Fetch RAW data for all years to build the boxplot
     years = list(range(2011, 2026))
-    all_raw_dfs = []
     
-    states = [region] if region != "BR" else [
-        "AC", "AL", "AP", "AM", "BA", "CE", "DF", "ES", "GO", "MA", 
-        "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", 
-        "RS", "RO", "RR", "SC", "SP", "SE", "TO"
-    ]
+    # Ensure files exist
+    ensure_episcanner_files(region, years)
     
-    for year in years:
-        for state in states:
-            df = fetch_episcanner(state=state, year=year)
-            if df is not None and not df.empty:
-                df = df.copy()
-                df['year'] = year
-                all_raw_dfs.append(df[['year', metric]])
+    # Use DuckDB to aggregate
+    # We only need specific columns: year, metric
+    # But wait, we need to construct a dataframe with 'year' and 'metric' 
+    combined_df = get_duckdb_episcanner_data(region, years, columns=f"year, {metric}")
     
-    if not all_raw_dfs:
+    if combined_df.empty:
         return go.Figure().update_layout(title=f"No Episcanner data found for {region}")
         
-    combined_raw = pd.concat(all_raw_dfs)
+    # combined_raw = combined_df
+    combined_raw = combined_df
     # Filter > 0 for log plot
     combined_raw = combined_raw[combined_raw[metric] > 0]
 
@@ -362,7 +426,7 @@ def plot_episcanner_dispersion_alpha(region, metric="total_cases"):
         )
 
     fig.update_layout(
-        title=f"{metric_label} Dispersion vs Alpha Fit by Year - {region}",
+        title=f"{metric_label} Dispersion vs Alpha by Year - {region}",
         xaxis_title="Year",
         yaxis_title=f"{metric_label} (Linear Scale)",
         yaxis_type="linear",
@@ -890,25 +954,34 @@ def get_combined_indicator_data(geocode):
     if not state:
         return pd.DataFrame()
         
-    years = df_yearly['year'].unique()
-    epi_dfs = []
-    
-    for yr in years:
-        df_epi = fetch_episcanner(state=state, year=yr)
-        if df_epi is not None and not df_epi.empty:
-            # Filter for this city
-            df_epi_city = df_epi[df_epi['geocode'] == geocode].copy()
-            df_epi_city['year'] = yr
-            epi_dfs.append(df_epi_city)
-            
-    if not epi_dfs:
-        return pd.DataFrame()
+    # Use DuckDB to read all yearly episcanner files for this state
+    try:
+        con = duckdb.connect()
+        # Pattern match all years for this state: data/episcanner_{state}_*.parquet
+        pattern = f"data/episcanner_{state}_*.parquet"
+        files = glob.glob(pattern)
         
-    df_epi_combined = pd.concat(epi_dfs)
-    
-    # Merge on year
-    merged = df_yearly.merge(df_epi_combined, on='year', suffixes=('', '_epi'))
-    return merged
+        if not files:
+            return pd.DataFrame()
+            
+        # Select only this geocode
+        df_epi_combined = con.query(f"""
+            SELECT * FROM read_parquet('{pattern}')
+            WHERE geocode = {geocode}
+        """).df()
+        
+        if df_epi_combined.empty:
+            return pd.DataFrame()
+            
+        # Merge on year
+        # df_epi_combined should have 'year' column from the parquet usually?
+        # fitpl.py saves it with 'year' column.
+        merged = df_yearly.merge(df_epi_combined, on='year', suffixes=('', '_epi'))
+        return merged
+        
+    except Exception as e:
+        print(f"DuckDB indicator fetch failed: {e}")
+        return pd.DataFrame()
 
 def plot_indicator_plots(geocode_str):
     geocode = extract_geocode(geocode_str)
@@ -1151,17 +1224,29 @@ def create_dashboard():
 
         # Separate handler for episcanner-specific plots when region changes
         def update_episcanner(region):
-            return (
-                plot_combined_episcanner_fit(region, "total_cases"), 
-                plot_combined_episcanner_fit(region, "ep_dur"),
-                plot_episcanner_dispersion_alpha(region, "total_cases"), 
-                plot_episcanner_dispersion_alpha(region, "ep_dur"),
-                plot_episcanner_state_map("total_cases"),
-                plot_episcanner_state_map("ep_dur"),
-                get_episcanner_fit_results(region, "total_cases"),
-                get_episcanner_fit_results(region, "ep_dur"),
-                plot_episcanner_region_timeseries(region)
-            )
+            with ThreadPoolExecutor(max_workers=10) as executor:
+                f1 = executor.submit(plot_combined_episcanner_fit, region, "total_cases")
+                f2 = executor.submit(plot_combined_episcanner_fit, region, "ep_dur")
+                f3 = executor.submit(plot_episcanner_dispersion_alpha, region, "total_cases")
+                f4 = executor.submit(plot_episcanner_dispersion_alpha, region, "ep_dur")
+                f5 = executor.submit(plot_episcanner_state_map, "total_cases")
+                f6 = executor.submit(plot_episcanner_state_map, "ep_dur")
+                f7 = executor.submit(get_episcanner_fit_results, region, "total_cases")
+                f8 = executor.submit(get_episcanner_fit_results, region, "ep_dur")
+                f9 = executor.submit(plot_episcanner_region_timeseries, region)
+
+                def get_res(f, default=None):
+                    try:
+                        return f.result()
+                    except Exception as e:
+                        print(f"Task failed: {e}")
+                        return default or go.Figure()
+
+                return (
+                    get_res(f1), get_res(f2), get_res(f3), get_res(f4), 
+                    get_res(f5), get_res(f6), get_res(f7, pd.DataFrame()), 
+                    get_res(f8, pd.DataFrame()), get_res(f9)
+                )
 
         epi_region_dropdown.change(
             fn=update_episcanner, 
@@ -1187,6 +1272,7 @@ def create_dashboard():
             outputs=[
                 epi_combined_plot_size, epi_combined_plot_dur, 
                 epi_dispersion_plot_size, epi_dispersion_plot_dur, 
+                epi_state_map_size, epi_state_map_dur,
                 epi_details_table_size, epi_details_table_dur, 
                 epi_timeseries_plot
             ]
