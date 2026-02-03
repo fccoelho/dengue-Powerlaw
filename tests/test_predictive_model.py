@@ -113,3 +113,27 @@ def test_train_models():
     
     preds = predictive_model.predict_future(models, df_train.iloc[:5], features)
     assert len(preds['total_cases']) == 5
+
+def test_train_models_temporal():
+    # Create fake training data with years
+    df_train = pd.DataFrame({
+        'year': [2020, 2021, 2022, 2023]*10,
+        'total_cases': np.random.rand(40)*100,
+        'ep_dur': np.random.rand(40)*20,
+        'peak_week': np.random.rand(40)*52,
+        'prev_total_cases': np.random.rand(40)*100,
+        'prev_ep_dur': np.random.rand(40)*20,
+        'prev_peak_week': np.random.rand(40)*52,
+        'prev_alpha_size': np.random.rand(40)*3
+    })
+    
+    # Train with split at 2022. Train: 2020, 2021. Test: 2022, 2023.
+    models, metrics, features = predictive_model.train_predictive_models(df_train, test_year=2022)
+    
+    assert 'total_cases' in models
+    assert metrics['total_cases']['MAE'] >= 0
+    # Ideally checking that it didn't crash.
+    
+    # Test with split beyond data
+    models_empty, metrics_empty, _ = predictive_model.train_predictive_models(df_train, test_year=2025)
+    assert metrics_empty['total_cases']['MAE'] == 0

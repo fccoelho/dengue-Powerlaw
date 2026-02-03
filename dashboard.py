@@ -1,5 +1,6 @@
 import gradio as gr
 import pandas as pd
+import numpy as np
 import sqlite3
 from concurrent.futures import ThreadPoolExecutor
 import plotly.graph_objects as go
@@ -147,25 +148,44 @@ def create_dashboard():
                             epi_timeseries_plot = gr.Plot(label="Regional Timeseries")
 
             with gr.TabItem("Predictive Modeling"):
-                gr.Markdown("## Forecast Epidemic Metrics (Beta)")
+                gr.Markdown("""
+                ## Forecast Epidemic Metrics (Beta)
+
+                ### Model Description
+                The predictive model forecasts epidemic characteristics for year $t$ using data from year $t-1$.
+                # """)
+                gr.Markdown("""
+                **Model Equation:**
+
+                $$Y_t = f_{RF}(X_{t-1})$$
+                """)
                 gr.Markdown(r"""
                 > **Tip**: For improved accuracy, we recommend incorporating climate data (e.g., ERA5 temperature/precipitation) from the [Mosqlimate](https://mosqlimate.org) platform.
                 
-                ### Model Description
-                The predictive model forecasts epidemic characteristics for year $t$ using data from year $t-1$.
+                
+                
+                
+
+                where $f_{RF}$ is a Random Forest Regressor.
                 
                 **Target Variables ($Y_t$):**
-                *   $S_t$: Epidemic Size (Total Cases)
-                *   $D_t$: Epidemic Duration (Weeks)
-                *   $P_t$: Peak Week
+
+                $S_t$: Epidemic Size (Total Cases)
+                
+                $D_t$: Epidemic Duration (Weeks)
+                
+                $P_t$: Peak Week
                 
                 **Features ($X_{t-1}$):**
-                *   $S_{t-1}, D_{t-1}, P_{t-1}$: Lagged Epidemic Metrics
-                *   $\alpha_{S, t-1}, x_{min, S, t-1}$: Lagged Power Law Scaling Factors (Size)
-                *   $R_{0, t-1}$: Lagged Basic Reproduction Number
+
+                $S_{t-1}, D_{t-1}, P_{t-1}$: Lagged Epidemic Metrics
                 
-                **Model**: Random Forest Regressor trained on historical data.
-                """)
+                $\alpha_{S, t-1}, x_{min, S, t-1}$: Lagged Power Law Scaling Factors (Size)
+                
+                $\dot{\alpha}_{S, t-1}$: Historical Alpha Trend (Slope)
+                
+                $R_{0, t-1}$: Lagged Basic Reproduction Number
+                """, latex_delimiters=[{ "left": "$", "right": "$", "display": False }])
                 
                 with gr.Row():
                     with gr.Column(scale=1):
@@ -216,7 +236,7 @@ def create_dashboard():
                 merged, _ = get_merged_data(state) # Reuse helper
                 choices = [f"{row['city_name']} ({row['geocode']})" for _, row in merged.iterrows()]
             
-            return gr.update(visible=city_visible, choices=choices)
+            return gr.update(visible=city_visible, choices=choices, value=None)
 
         pred_level_radio.change(fn=update_pred_inputs, inputs=[pred_level_radio, pred_state_dropdown], outputs=[pred_city_dropdown])
         pred_state_dropdown.change(fn=update_pred_inputs, inputs=[pred_level_radio, pred_state_dropdown], outputs=[pred_city_dropdown])
@@ -326,7 +346,8 @@ def create_dashboard():
         def run_prediction(level, region, city_str, year):
             try:
                 # Determine aggregation level
-                agg_level = 'city' if level == 'City' else 'state'
+                # Force 'city' level training if we want state aggregate from city observations
+                agg_level = 'city' if (level == 'City' or (level == 'State' and region != 'BR')) else 'state'
                 
                 # 1. Prepare data
                 # If City level, we fetch data for the STATE to train the model on many cities
@@ -341,17 +362,25 @@ def create_dashboard():
                 
                 df_all = predictive_model.prepare_lagged_data(region, target_year=None, level=feature_level_arg)
                 
+                # Critical: Reset index to ensure positional alignment with numpy arrays from model.predict
+                if not df_all.empty:
+                    df_all = df_all.reset_index(drop=True)
+                
                 if df_all.empty:
                     return [go.Figure().update_layout(title="No data for training")]*4 + ["No data", pd.DataFrame()]
 
                 # 2. Train
-                models, metrics, feature_cols = predictive_model.train_predictive_models(df_all)
+                models, metrics, feature_cols = predictive_model.train_predictive_models(df_all, test_year=year)
                 
                 # 3. Plots (Validation on whole dataset)
                 val_preds = predictive_model.predict_future(models, df_all, feature_cols)
                 
                 plots = []
                 for target in ['total_cases', 'ep_dur', 'peak_week']:
+                    if target not in val_preds:
+                        plots.append(go.Figure().update_layout(title=f"{target}: Model not trained (Insufficient data)"))
+                        continue
+                    
                     y_true = df_all[target]
                     y_pred = val_preds[target]
                     
@@ -377,64 +406,78 @@ def create_dashboard():
                     metrics_data.append([t, f"{m['MAE']:.2f}", f"{m['MAPE']:.2f}", f"{m['R2']:.2f}"])
                 metrics_df = pd.DataFrame(metrics_data, columns=["Metric", "MAE", "MAPE", "R2"])
                 
-                # 6. Specific Prediction
-                # Find the row corresponding to the target choice
-                target_pred_text = f"### Prediction for {year}\n"
+                # 6. Specific Prediction & Aggregation
+                target_pred_text = f"### Forecast for Year {year}\n"
                 
-                if level == 'State':
-                    # Look for State row in df_all for year 'year'
-                    # region is e.g. "RS" or "BR". If BR, which state? 
-                    # If Region is BR, we predicted for all states. Show nothing or average?
-                    # Assuming user meant prediction for the region aggregate if level=state?
-                    # But prepare_lagged_data(region='BR', level='state') returns DataFrame with 'state' column.
-                    # Which state to show? "BR" aggregate? No, our data is by state.
-                    # We can show prediction for ALL states or just say "See plots".
-                    # If region is specific State (e.g. RS), there is only 1 row per year.
+                # We always want city-level data if region != BR to perform aggregation
+                df_target_year = df_all[df_all['year'] == year].copy()
+                
+                if not df_target_year.empty:
+                    # Predict for all cities in target year
+                    X_target_all = df_target_year[feature_cols]
                     
+                    # Initialize with zeros to avoid KeyError if models weren't trained
+                    targets = ['total_cases', 'ep_dur', 'peak_week']
+                    preds_all = {t: np.zeros(len(df_target_year)) for t in targets}
+                    
+                    for t in targets:
+                        model = models.get(t)
+                        if model:
+                            preds_all[t] = model.predict(X_target_all)
+                    
+                    # 6a. State Aggregation (if applicable)
                     if region != "BR":
-                         row = df_all[df_all['year'] == year]
-                         if not row.empty:
-                             p_vals = {}
-                             for t in ['total_cases', 'ep_dur', 'peak_week']:
-                                 p_vals[t] = val_preds[t][row.index[0]] # Get value by index matching
-                             
-                             target_pred_text += f"- **Total Cases**: {p_vals['total_cases']:.0f}\n"
-                             target_pred_text += f"- **Duration**: {p_vals['ep_dur']:.1f} weeks\n"
-                             target_pred_text += f"- **Peak Week**: {p_vals['peak_week']:.1f}\n"
-                         else:
-                             target_pred_text += "No data available for this year."
-                    else:
-                        target_pred_text += "Select a specific state to see single prediction."
+                        # Predicted Aggregates
+                        pred_cases_total = np.sum(preds_all['total_cases'])
                         
-                elif level == 'City':
-                     # Filter by selected city
-                     if city_str:
-                         geocode = extract_geocode(city_str)
-                         if geocode:
-                             row = df_all[(df_all['geocode'] == int(geocode)) & (df_all['year'] == year)]
-                             if not row.empty:
-                                 # We need to find the index of this row in df_all to get the prediction from val_preds (which is array aligned with df_all)
-                                 # val_preds is dict of arrays.
-                                 idx_pos = df_all.index.get_loc(row.index[0])
-                                 if isinstance(idx_pos, slice): # uncommon
-                                     idx_pos = idx_pos.start
-                                 
-                                 # idx_pos is integer position? No calculate by iloc/index
-                                 # Actually `val_preds` from `predict_future` returns Dict of Arrays.
-                                 # We need to map back.
-                                 # Simplest: Recalculate for just this row using model.predict
-                                 
-                                 X_target = row[feature_cols]
-                                 p_vals = {}
-                                 for t, model in models.items():
-                                     p_vals[t] = model.predict(X_target)[0]
-                                     
-                                 target_pred_text += f"**{city_str}**:\n"
-                                 target_pred_text += f"- **Total Cases**: {p_vals['total_cases']:.0f}\n"
-                                 target_pred_text += f"- **Duration**: {p_vals['ep_dur']:.1f} weeks\n"
-                                 target_pred_text += f"- **Peak Week**: {p_vals['peak_week']:.1f}\n"
-                             else:
-                                 target_pred_text += "No data available for this city/year."
+                        # Weighted means for duration and peak (weighted by predicted cases)
+                        weights = preds_all['total_cases']
+                        if np.sum(weights) > 0:
+                            pred_dur_agg = np.sum(preds_all['ep_dur'] * weights) / np.sum(weights)
+                            pred_peak_agg = np.sum(preds_all['peak_week'] * weights) / np.sum(weights)
+                        else:
+                            pred_dur_agg = np.mean(preds_all['ep_dur'])
+                            pred_peak_agg = np.mean(preds_all['peak_week'])
+                            
+                        # Observed Aggregates
+                        obs_cases_total = df_target_year['total_cases'].sum()
+                        obs_weights = df_target_year['total_cases']
+                        if obs_cases_total > 0:
+                            obs_dur_agg = np.sum(df_target_year['ep_dur'] * obs_weights) / obs_cases_total
+                            obs_peak_agg = np.sum(df_target_year['peak_week'] * obs_weights) / obs_cases_total
+                        else:
+                            obs_dur_agg = df_target_year['ep_dur'].mean()
+                            obs_peak_agg = df_target_year['peak_week'].mean()
+                            
+                        # Errors
+                        err_cases = pred_cases_total - obs_cases_total
+                        err_dur = pred_dur_agg - obs_dur_agg
+                        err_peak = pred_peak_agg - obs_peak_agg
+                        
+                        target_pred_text += f"#### State Aggregate ({region})\n"
+                        target_pred_text += f"- **Total Cases**: {pred_cases_total:.0f} (Observed: {obs_cases_total:.0f}, Error: {err_cases:+.0f})\n"
+                        target_pred_text += f"- **Duration (Weighted)**: {pred_dur_agg:.1f} weeks (Observed: {obs_dur_agg:.1f}, Error: {err_dur:+.1f})\n"
+                        target_pred_text += f"- **Peak Week (Weighted)**: {pred_peak_agg:.1f} (Observed: {obs_peak_agg:.1f}, Error: {err_peak:+.1f})\n\n"
+
+                    # 6b. Individual City Prediction (if Level=City)
+                    if level == 'City' and city_str:
+                        geocode = extract_geocode(city_str)
+                        if geocode:
+                            city_row_idx = df_target_year.index[df_target_year['geocode'] == int(geocode)]
+                            if not city_row_idx.empty:
+                                pos = df_target_year.index.get_loc(city_row_idx[0])
+                                target_pred_text += f"#### Individual City: {city_str}\n"
+                                for t in ['total_cases', 'ep_dur', 'peak_week']:
+                                    val = preds_all[t][pos]
+                                    obs = df_target_year.loc[city_row_idx[0], t]
+                                    err = val - obs
+                                    label = t.replace('_', ' ').title()
+                                    if t == 'ep_dur': label = "Duration"
+                                    target_pred_text += f"- **{label}**: {val:.1f} (Observed: {obs:.1f}, Error: {err:+.1f})\n"
+                            else:
+                                target_pred_text += f"*City {city_str} data not available for {year}.*\n"
+                else:
+                    target_pred_text += f"*No data available for year {year} in {region}.*\n"
                 
                 return plots + [fig_imp, target_pred_text, metrics_df]
                 
@@ -547,5 +590,5 @@ if __name__ == "__main__":
     demo.launch(
         debug=True,
         server_name="127.0.0.1",
-        server_port=7861
+        server_port=7860
     )

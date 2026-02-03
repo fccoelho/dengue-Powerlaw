@@ -8,6 +8,7 @@ import duckdb
 import glob
 import os
 from data_utils import get_duckdb_episcanner_data, get_episcanner_fit_results, ensure_episcanner_files, GEO_STATE_MAP
+from scipy import stats
 
 def prepare_lagged_data(region="BR", target_year=None, level="state"):
     """
@@ -127,35 +128,59 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
         # Add city_name for reference if available?
         # df_features['city_name'] = ...
         
-    else:
-        return pd.DataFrame()
     
-    # sort
+    def calculate_historical_slope(group):
+        group = group.sort_values('year')
+        slopes = []
+        for i, row in group.iterrows():
+            curr_y = row['year']
+            # Historical alpha values (years < current)
+            hist = group[group['year'] < curr_y].dropna(subset=['alpha_size'])
+            if len(hist) >= 2:
+                try:
+                    res = stats.linregress(hist['year'], hist['alpha_size'])
+                    slopes.append(res.slope)
+                except:
+                    slopes.append(np.nan)
+            else:
+                slopes.append(np.nan)
+        group['alpha_trend'] = slopes
+        return group
+
+    df_features = df_features.groupby(group_col, group_keys=False).apply(calculate_historical_slope)
+    
+    # Sort
     df_features = df_features.sort_values([group_col, 'year'])
     
     # Create Lagged Features
-    feature_cols = ['total_cases', 'ep_dur', 'peak_week', 'R0', 'alpha_size', 'xmin_size', 'alpha_dur', 'xmin_dur']
+    # Basic metrics can be assumed 0 if missing (meaning no epidemic detected)
+    basic_metrics = ['total_cases', 'ep_dur', 'peak_week', 'R0']
+    fit_metrics = ['alpha_size', 'xmin_size', 'alpha_dur', 'xmin_dur', 'alpha_trend']
+    feature_cols = basic_metrics + fit_metrics
     
     df_lagged = df_features.copy()
     for col in feature_cols:
-        # Group by the entity (state or geocode)
-        df_lagged[f'prev_{col}'] = df_lagged.groupby(group_col)[col].shift(1)
+        # Note: alpha_trend for Year T already uses data from Years < T.
+        # However, to keep it consistent with 'prev_' naming, 
+        # we treat it like other features and shift if needed, or use it as is.
+        # Let's shift it by 1 JUST to be safe so 'prev_alpha_trend' at Year T
+        # uses the trend calculated at Year T-1 (which used data < T-1).
+        # Actually, if we use the slope of < T, it's already a valid predictor for T.
+        df_lagged[f'prev_{col}'] = df_lagged.groupby(group_col)[col].shift(1) if col != 'alpha_trend' else df_lagged['alpha_trend']
         
-    # Drop rows with NaN in prev_ columns (lag creation)
-    # However, for city level, alpha_dur might be always NaN. 
-    # If a feature is fully NaN, we should drop the feature or fill it.
-    # Check if 'alpha_dur' is fully NaN -> drop it from feature list
+    mandatory_features = [f'prev_{c}' for c in basic_metrics + ['alpha_size', 'xmin_size']]
+    # Filter mandatory to only those that actually exist in df_lagged
+    mandatory_features = [c for c in mandatory_features if c in df_lagged.columns and not df_lagged[c].isnull().all()]
     
-    cols_to_use = []
-    for col in feature_cols:
-        col_name = f'prev_{col}'
-        if df_lagged[col_name].isnull().all():
-            pass # Drop this feature
-        else:
-            cols_to_use.append(col_name)
-            
-    # Drop rows where used features are NaN
-    df_model = df_lagged.dropna(subset=cols_to_use)
+    # Drop rows missing mandatory features
+    count_before = len(df_lagged)
+    df_model = df_lagged.dropna(subset=mandatory_features)
+    
+    # Optional features (trend) - impute with 0 if missing instead of dropping
+    if 'prev_alpha_trend' in df_model.columns:
+        df_model.loc[:, 'prev_alpha_trend'] = df_model['prev_alpha_trend'].fillna(0)
+        
+    print(f"[Model Data] {region} {level}: {count_before} -> {len(df_model)} rows after dropping missing mandatory lags")
     
     # If filling NaNs is needed for sklearn:
     # df_model = df_model.fillna(0) # Risks biasing
@@ -166,43 +191,77 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
         
     return df_model
 
-def train_predictive_models(train_df):
+def train_predictive_models(train_df, test_year=None):
     """
-    Trains Random Forest models for Size, Duration, and Peak Week using lagged features.
+    Trains Random Forest models for Size, Duration, and Peak Week.
+    If test_year is provided, trains on data where year < test_year,
+    and calculates metrics on data where year >= test_year.
+    Otherwise uses random split.
     """
-    # Identify available lagged columns
-    feature_cols = [c for c in train_df.columns if c.startswith('prev_')]
+    # Identify available lagged columns that have at least some data
+    all_prev_cols = [c for c in train_df.columns if c.startswith('prev_')]
+    feature_cols = [c for c in all_prev_cols if not train_df[c].isnull().all()]
+    
     targets = ['total_cases', 'ep_dur', 'peak_week']
     
     models = {}
     metrics = {}
     
-    # Drop any remaining NaNs in features or targets just in case
+    # Drop NaNs only for the features we actually intend to use and targets
     train_clean = train_df.dropna(subset=feature_cols + targets)
     
     if train_clean.empty:
+        print(f"[Training] FAILED: Input dataframe is empty after dropping NaNs. Input size: {len(train_df)}")
+        print(f"Features considered: {all_prev_cols}")
+        print(f"Features with data: {feature_cols}")
         return {}, {}, feature_cols
+    
+    print(f"[Training] Starting for {len(train_clean)} clean rows. Test Year: {test_year}")
+    print(f"Features used: {feature_cols}")
     
     X = train_clean[feature_cols]
     
     for target in targets:
         y = train_clean[target]
         
-        if len(train_clean) > 10:
-            X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        if test_year:
+            # Temporal Split
+            mask_train = train_clean['year'] < test_year
+            mask_test = train_clean['year'] >= test_year
+            
+            X_train = X[mask_train]
+            y_train = y[mask_train]
+            X_test = X[mask_test]
+            y_test = y[mask_test]
+            
+            if X_train.empty:
+                # Cannot train
+                models[target] = None
+                metrics[target] = {'MAE': 0, 'RMSE': 0, 'R2': 0, 'MAPE': 0}
+                continue
         else:
-            X_train, X_test, y_train, y_test = X, X, y, y
+            # Random Split
+            if len(train_clean) > 10:
+                X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+            else:
+                X_train, X_test, y_train, y_test = X, X, y, y
             
         model = RandomForestRegressor(n_estimators=100, random_state=42)
         model.fit(X_train, y_train)
         
-        preds = model.predict(X_test)
-        
-        mae = mean_absolute_error(y_test, preds)
-        rmse = np.sqrt(mean_squared_error(y_test, preds))
-        r2 = r2_score(y_test, preds) if len(y_test) > 1 else 0
-        mape = mean_absolute_percentage_error(y_test, preds)
-        
+        # Calculate metrics if test set exists
+        if len(y_test) > 0:
+            preds = model.predict(X_test)
+            mae = mean_absolute_error(y_test, preds)
+            rmse = np.sqrt(mean_squared_error(y_test, preds))
+            r2 = r2_score(y_test, preds) if len(y_test) > 1 else 0
+            try:
+                mape = mean_absolute_percentage_error(y_test, preds)
+            except:
+                mape = 0
+        else:
+            mae, rmse, r2, mape = 0, 0, 0, 0
+            
         models[target] = model
         metrics[target] = {'MAE': mae, 'RMSE': rmse, 'R2': r2, 'MAPE': mape}
         
