@@ -18,6 +18,7 @@ from viz_utils import (
     plot_episcanner_dispersion_alpha, plot_episcanner_state_map, 
     plot_episcanner_region_timeseries, plot_state_residuals_vs_alpha
 )
+import predictive_model
 
 def on_map_select(evt: gr.SelectData):
     """Event handler for map selection."""
@@ -145,6 +146,81 @@ def create_dashboard():
                         with gr.Row():
                             epi_timeseries_plot = gr.Plot(label="Regional Timeseries")
 
+            with gr.TabItem("Predictive Modeling"):
+                gr.Markdown("## Forecast Epidemic Metrics (Beta)")
+                gr.Markdown(r"""
+                > **Tip**: For improved accuracy, we recommend incorporating climate data (e.g., ERA5 temperature/precipitation) from the [Mosqlimate](https://mosqlimate.org) platform.
+                
+                ### Model Description
+                The predictive model forecasts epidemic characteristics for year $t$ using data from year $t-1$.
+                
+                **Target Variables ($Y_t$):**
+                *   $S_t$: Epidemic Size (Total Cases)
+                *   $D_t$: Epidemic Duration (Weeks)
+                *   $P_t$: Peak Week
+                
+                **Features ($X_{t-1}$):**
+                *   $S_{t-1}, D_{t-1}, P_{t-1}$: Lagged Epidemic Metrics
+                *   $\alpha_{S, t-1}, x_{min, S, t-1}$: Lagged Power Law Scaling Factors (Size)
+                *   $R_{0, t-1}$: Lagged Basic Reproduction Number
+                
+                **Model**: Random Forest Regressor trained on historical data.
+                """)
+                
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        pred_level_radio = gr.Radio(choices=["State", "City"], value="State", label="Prediction Level")
+                        
+                        pred_state_dropdown = gr.Dropdown(
+                            choices=["BR"] + states, 
+                            value="BR", 
+                            label="Region/State", 
+                            filterable=True
+                        )
+                        
+                        pred_city_dropdown = gr.Dropdown(
+                            choices=[], 
+                            label="City (Select State first)", 
+                            visible=False,
+                            filterable=True
+                        )
+                        
+                        pred_target_year = gr.Slider(
+                            minimum=2012, maximum=2025, step=1, value=2024, label="Target Prediction Year"
+                        )
+                        pred_train_btn = gr.Button("Train & Predict", variant="primary")
+                        
+                        gr.Markdown("### Predicted Values")
+                        pred_values_output = gr.Markdown("Run prediction to see values.")
+                        
+                        pred_metrics_table = gr.Dataframe(
+                            headers=["Metric", "MAE", "MAPE", "R2"], 
+                            label="Model Performance (Test Set)",
+                            interactive=False
+                        )
+                        
+                    with gr.Column(scale=3):
+                        with gr.Row():
+                            pred_plot_size = gr.Plot(label="Predicted vs Actual: Total Cases")
+                            pred_plot_dur = gr.Plot(label="Predicted vs Actual: Duration")
+                            pred_plot_peak = gr.Plot(label="Predicted vs Actual: Peak Week")
+                        
+                        with gr.Row():
+                            pred_feat_imp_plot = gr.Plot(label="Feature Importance")
+
+        # Update City Dropdown visibility based on Radio
+        def update_pred_inputs(level, state):
+            city_visible = (level == "City")
+            choices = []
+            if city_visible and state and state != "BR":
+                merged, _ = get_merged_data(state) # Reuse helper
+                choices = [f"{row['city_name']} ({row['geocode']})" for _, row in merged.iterrows()]
+            
+            return gr.update(visible=city_visible, choices=choices)
+
+        pred_level_radio.change(fn=update_pred_inputs, inputs=[pred_level_radio, pred_state_dropdown], outputs=[pred_city_dropdown])
+        pred_state_dropdown.change(fn=update_pred_inputs, inputs=[pred_level_radio, pred_state_dropdown], outputs=[pred_city_dropdown])
+
         def sync_state(state):
             base_state = None if state == "BR" else state
             map_fig = plot_map(base_state)
@@ -246,6 +322,134 @@ def create_dashboard():
         plot_btn.click(fn=get_city_details, inputs=[city_dropdown], outputs=city_details_table)
         plot_btn.click(fn=get_yearly_details, inputs=[city_dropdown], outputs=yearly_fits_table)
         plot_btn.click(fn=plot_indicator_plots, inputs=[city_dropdown], outputs=[r0_plot, cases_plot, ini_plot, dur_plot, res_plot])
+
+        def run_prediction(level, region, city_str, year):
+            try:
+                # Determine aggregation level
+                agg_level = 'city' if level == 'City' else 'state'
+                
+                # 1. Prepare data
+                # If City level, we fetch data for the STATE to train the model on many cities
+                # But if region is BR, handle carefully. BR + City level -> All cities in Brazil? (Too big/slow?)
+                # Warn user? For now assume Region is State if Level is City.
+                
+                if agg_level == 'city' and region == 'BR':
+                     # Default to RS or warn? Or just try?
+                     pass
+                
+                feature_level_arg = agg_level
+                
+                df_all = predictive_model.prepare_lagged_data(region, target_year=None, level=feature_level_arg)
+                
+                if df_all.empty:
+                    return [go.Figure().update_layout(title="No data for training")]*4 + ["No data", pd.DataFrame()]
+
+                # 2. Train
+                models, metrics, feature_cols = predictive_model.train_predictive_models(df_all)
+                
+                # 3. Plots (Validation on whole dataset)
+                val_preds = predictive_model.predict_future(models, df_all, feature_cols)
+                
+                plots = []
+                for target in ['total_cases', 'ep_dur', 'peak_week']:
+                    y_true = df_all[target]
+                    y_pred = val_preds[target]
+                    
+                    fig = go.Figure()
+                    fig.add_trace(go.Scatter(x=y_true, y=y_pred, mode='markers', name='Data Points', hovertext=df_all['year']))
+                    min_val = min(y_true.min(), y_pred.min())
+                    max_val = max(y_true.max(), y_pred.max())
+                    fig.add_trace(go.Scatter(x=[min_val, max_val], y=[min_val, max_val], mode='lines', line=dict(dash='dash', color='gray'), name='Ideal'))
+                    fig.update_layout(title=f"{target}: Actual vs Predicted", xaxis_title="Actual", yaxis_title="Predicted", template="plotly_white")
+                    plots.append(fig)
+                    
+                # 4. Feature Importance
+                imp_df = predictive_model.get_variable_importance(models, feature_cols)
+                fig_imp = go.Figure()
+                for col in imp_df.columns:
+                    if col != "Feature":
+                        fig_imp.add_trace(go.Bar(name=col, y=imp_df['Feature'], x=imp_df[col], orientation='h'))
+                fig_imp.update_layout(title="Feature Importance", barmode='group', template="plotly_white", height=500)
+                
+                # 5. Metrics Table
+                metrics_data = []
+                for t, m in metrics.items():
+                    metrics_data.append([t, f"{m['MAE']:.2f}", f"{m['MAPE']:.2f}", f"{m['R2']:.2f}"])
+                metrics_df = pd.DataFrame(metrics_data, columns=["Metric", "MAE", "MAPE", "R2"])
+                
+                # 6. Specific Prediction
+                # Find the row corresponding to the target choice
+                target_pred_text = f"### Prediction for {year}\n"
+                
+                if level == 'State':
+                    # Look for State row in df_all for year 'year'
+                    # region is e.g. "RS" or "BR". If BR, which state? 
+                    # If Region is BR, we predicted for all states. Show nothing or average?
+                    # Assuming user meant prediction for the region aggregate if level=state?
+                    # But prepare_lagged_data(region='BR', level='state') returns DataFrame with 'state' column.
+                    # Which state to show? "BR" aggregate? No, our data is by state.
+                    # We can show prediction for ALL states or just say "See plots".
+                    # If region is specific State (e.g. RS), there is only 1 row per year.
+                    
+                    if region != "BR":
+                         row = df_all[df_all['year'] == year]
+                         if not row.empty:
+                             p_vals = {}
+                             for t in ['total_cases', 'ep_dur', 'peak_week']:
+                                 p_vals[t] = val_preds[t][row.index[0]] # Get value by index matching
+                             
+                             target_pred_text += f"- **Total Cases**: {p_vals['total_cases']:.0f}\n"
+                             target_pred_text += f"- **Duration**: {p_vals['ep_dur']:.1f} weeks\n"
+                             target_pred_text += f"- **Peak Week**: {p_vals['peak_week']:.1f}\n"
+                         else:
+                             target_pred_text += "No data available for this year."
+                    else:
+                        target_pred_text += "Select a specific state to see single prediction."
+                        
+                elif level == 'City':
+                     # Filter by selected city
+                     if city_str:
+                         geocode = extract_geocode(city_str)
+                         if geocode:
+                             row = df_all[(df_all['geocode'] == int(geocode)) & (df_all['year'] == year)]
+                             if not row.empty:
+                                 # We need to find the index of this row in df_all to get the prediction from val_preds (which is array aligned with df_all)
+                                 # val_preds is dict of arrays.
+                                 idx_pos = df_all.index.get_loc(row.index[0])
+                                 if isinstance(idx_pos, slice): # uncommon
+                                     idx_pos = idx_pos.start
+                                 
+                                 # idx_pos is integer position? No calculate by iloc/index
+                                 # Actually `val_preds` from `predict_future` returns Dict of Arrays.
+                                 # We need to map back.
+                                 # Simplest: Recalculate for just this row using model.predict
+                                 
+                                 X_target = row[feature_cols]
+                                 p_vals = {}
+                                 for t, model in models.items():
+                                     p_vals[t] = model.predict(X_target)[0]
+                                     
+                                 target_pred_text += f"**{city_str}**:\n"
+                                 target_pred_text += f"- **Total Cases**: {p_vals['total_cases']:.0f}\n"
+                                 target_pred_text += f"- **Duration**: {p_vals['ep_dur']:.1f} weeks\n"
+                                 target_pred_text += f"- **Peak Week**: {p_vals['peak_week']:.1f}\n"
+                             else:
+                                 target_pred_text += "No data available for this city/year."
+                
+                return plots + [fig_imp, target_pred_text, metrics_df]
+                
+            except Exception as e:
+                print(f"Prediction failed: {e}")
+                import traceback
+                traceback.print_exc()
+                empty = go.Figure().update_layout(title=f"Error: {str(e)}")
+                return [empty]*4 + [f"Error: {str(e)}", pd.DataFrame()]
+
+        pred_train_btn.click(
+            fn=run_prediction,
+            inputs=[pred_level_radio, pred_state_dropdown, pred_city_dropdown, pred_target_year],
+            outputs=[pred_plot_size, pred_plot_dur, pred_plot_peak, pred_feat_imp_plot, pred_values_output, pred_metrics_table]
+        )
 
         def initial_load():
             with ThreadPoolExecutor(max_workers=10) as executor:

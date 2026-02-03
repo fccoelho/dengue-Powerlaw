@@ -1,0 +1,37 @@
+\documentclass[english,10pt,b5paper]{article}
+\usepackage[T1]{fontenc}
+\usepackage{graphicx}
+\usepackage{mathtools}
+\usepackage{amssymb}
+\usepackage{babel}
+\usepackage[]{natbib}
+\title{Power Laws and the Forecasting of Epidemics}
+\begin{document}
+	\maketitle
+	\begin{abstract}
+		conteúdo...
+	\end{abstract}
+	
+\section{Introduction}
+Understanding the dynamics of infectious disease epidemics has lead to a very prolific literature both in terms of mechanistic mathematical models and statistical models\citep{siettos2013mathematical}. The former attempting to capture the causal chain of events involved in disease transmission and 
+the latter trying to make sense of growing collection of data about infectious disease incidence.
+
+Among the most salient result of the mathematical modeling of infectious diseases was the definition of the basic reproductive number, $R_0$, that determines the most important characteristics of epidemics such as its spreading speed and  the epidemic threshold, also know as herd immunity threshold. The $R_0$ appears in equations governing prevalence growth, as an exponent determining the initial exponential growth of an epidemic. It also defines an important bifurcation points $R_0=1$  linking the to the existence and stability of equilibria in epidemic models.
+
+On the statistical side of the literature related to infectious disease modeling, an important if not the biggest portion of published literature deals with statistical modeling. for the first two thirds of the 20th century, the literature consisted mainly of parametric frequentist models, with Bayesian statistics gaining more preeminence towards the end of century[REFS].
+
+One of the most commonly modeled kind of epidemic data is incidence data, i.e., the number of cases accumulated over time and space or studied as a stochastic process, such as a Poisson of Negative Binomial processes \citep{becker1999statistical, li2012log}.
+
+One particular challenge when modeling inference data, is that it follows a power law distribution\citep{rhodes1997critical,clauset2009power}. The very heavy tail of this distribution means most models have difficulty predicting extreme values, which are the most important in epidemiology as they cause the most disease and consequent economic burden.
+
+In this paper we study the statistical distribution of dengue epidemics on a very large dataset of thousands of real epidemics in Brazilian cities of various sizes over more than a decade. Our goal is to determine how well the power law  distribution fits incidence data, be it in the form of distribution of weekly case counts or the total size of seasonal epidemics. We also look at the distribution of the power law distribution and how it correlate with other epidemic characteristics. Finally we will discuss how the estimation of these power law distribution can improve the prediction of future incidence, when compared to more traditional forecasting models adopting more tractable distributions, such as log-normal, Poisson and others to approximate the real data distribution.
+\section{Methods}
+Based on data made available through the Mosqlimate platform\citep{araujo2025large} [cite Mosqlimate paper], We have fitted power laws to epidemics to dengue incidence data from 2010 to the present. 
+\subsection{Power law fitting}
+We follow the methodology of Clauset et al.\cite{clauset2009power} to fit a power law distribution to two datasets: the weekly case counts, and the yearly cumulative incidence, that is the number of cases accumulated over an epidemic year.
+\section{Results}
+\section{Discussion}
+\section{Conclusion}
+	\bibliographystyle{apalike}
+	\bibliography{refs}
+\end{document}
