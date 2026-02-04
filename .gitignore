@@ -14,3 +14,17 @@ data/
 
 .env
 .aider*
+
+# Latex compiled files
+*.aux
+*.log
+*.out
+*.toc
+*.synctex.gz
+*.bbl
+*.blg
+*.idx
+*.ilg
+*.ind
+
+

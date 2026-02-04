@@ -327,6 +327,8 @@ def train_predictive_models(train_df, test_year=None):
     
     for target in targets:
         y = train_clean[target]
+        if target == 'total_cases':
+            y = np.log1p(y)
         
         if test_year:
             # Temporal Split
@@ -355,8 +357,17 @@ def train_predictive_models(train_df, test_year=None):
         # Calculate metrics if test set exists
         if len(y_test) > 0:
             preds = model.predict(X_test)
-            mae = mean_absolute_error(y_test, preds)
-            rmse = np.sqrt(mean_squared_error(y_test, preds))
+            
+            # Back-transform total_cases for MAE/RMSE calculation
+            if target == 'total_cases':
+                p_preds = np.expm1(preds)
+                p_y_test = np.expm1(y_test)
+                mae = mean_absolute_error(p_y_test, p_preds)
+                rmse = np.sqrt(mean_squared_error(p_y_test, p_preds))
+            else:
+                mae = mean_absolute_error(y_test, preds)
+                rmse = np.sqrt(mean_squared_error(y_test, preds))
+                
             r2 = r2_score(y_test, preds) if len(y_test) > 1 else 0
             try:
                 mape = mean_absolute_percentage_error(y_test, preds)
@@ -381,7 +392,11 @@ def predict_future(models, current_data_df, feature_cols):
     
     for target, model in models.items():
         if model:
-            predictions[target] = model.predict(X)
+            preds = model.predict(X)
+            if target == 'total_cases':
+                predictions[target] = np.expm1(preds)
+            else:
+                predictions[target] = preds
             
     return predictions
 
