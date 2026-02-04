@@ -385,7 +385,25 @@ def create_dashboard():
                     y_pred = val_preds[target]
                     
                     fig = go.Figure()
-                    fig.add_trace(go.Scatter(x=y_true, y=y_pred, mode='markers', name='Data Points', hovertext=df_all['year']))
+                    
+                    # Create hover text
+                    hover_text = []
+                    for i, row in df_all.iterrows():
+                        txt = f"Year: {int(row['year'])}<br>"
+                        if 'city_name' in df_all.columns:
+                            txt += f"City: {row['city_name']} ({int(row['geocode'])})"
+                        elif 'state' in df_all.columns:
+                            txt += f"State: {row['state']}"
+                        hover_text.append(txt)
+                        
+                    fig.add_trace(go.Scatter(
+                        x=y_true, 
+                        y=y_pred, 
+                        mode='markers', 
+                        name='Data Points', 
+                        hovertext=hover_text,
+                        hoverinfo='text+x+y'
+                    ))
                     min_val = min(y_true.min(), y_pred.min())
                     max_val = max(y_true.max(), y_pred.max())
                     fig.add_trace(go.Scatter(x=[min_val, max_val], y=[min_val, max_val], mode='lines', line=dict(dash='dash', color='gray'), name='Ideal'))

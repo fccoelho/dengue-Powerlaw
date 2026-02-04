@@ -2,13 +2,18 @@ import pandas as pd
 import numpy as np
 import sqlite3
 from sklearn.ensemble import RandomForestRegressor
+from sklearn.ensemble import GradientBoostingRegressor
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, mean_absolute_percentage_error
 from sklearn.model_selection import train_test_split
 import duckdb
 import glob
 import os
-from data_utils import get_duckdb_episcanner_data, get_episcanner_fit_results, ensure_episcanner_files, GEO_STATE_MAP
+from data_utils import get_duckdb_episcanner_data, get_episcanner_fit_results, ensure_episcanner_files, GEO_STATE_MAP, get_city_stats
 from scipy import stats
+try:
+    from _mun_by_geocode import NAME_BY_GEOCODE
+except ImportError:
+    NAME_BY_GEOCODE = {}
 
 def prepare_lagged_data(region="BR", target_year=None, level="state"):
     """
@@ -78,6 +83,13 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
         
         group_col = 'state'
         
+        # Add Population for State
+        df_pop = get_city_stats()
+        if not df_pop.empty:
+            df_pop['state'] = df_pop['geocode'].apply(get_state)
+            state_pop = df_pop.groupby('state')['population'].sum().reset_index()
+            df_features = df_features.merge(state_pop, on='state', how='left')
+        
     elif level == 'city':
         # Use city-level data (df_metrics is already city level, but check uniqueness)
         # We need to filter by region if region != BR
@@ -128,6 +140,11 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
         # Add city_name for reference if available?
         # df_features['city_name'] = ...
         
+        # Add Population for City
+        df_pop = get_city_stats()
+        if not df_pop.empty:
+            df_features = df_features.merge(df_pop[['geocode', 'population']], on='geocode', how='left')
+        
     
     def calculate_historical_slope(group):
         group = group.sort_values('year')
@@ -149,6 +166,10 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
 
     df_features = df_features.groupby(group_col, group_keys=False).apply(calculate_historical_slope)
     
+    # Calculate log population
+    if 'population' in df_features.columns:
+        df_features['log_pop'] = np.log10(df_features['population'].replace(0, np.nan))
+    
     # Sort
     df_features = df_features.sort_values([group_col, 'year'])
     
@@ -156,7 +177,8 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
     # Basic metrics can be assumed 0 if missing (meaning no epidemic detected)
     basic_metrics = ['total_cases', 'ep_dur', 'peak_week', 'R0']
     fit_metrics = ['alpha_size', 'xmin_size', 'alpha_dur', 'xmin_dur', 'alpha_trend']
-    feature_cols = basic_metrics + fit_metrics
+    static_features = ['log_pop'] if 'log_pop' in df_features.columns else []
+    feature_cols = basic_metrics + fit_metrics + static_features
     
     df_lagged = df_features.copy()
     for col in feature_cols:
@@ -166,7 +188,10 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
         # Let's shift it by 1 JUST to be safe so 'prev_alpha_trend' at Year T
         # uses the trend calculated at Year T-1 (which used data < T-1).
         # Actually, if we use the slope of < T, it's already a valid predictor for T.
-        df_lagged[f'prev_{col}'] = df_lagged.groupby(group_col)[col].shift(1) if col != 'alpha_trend' else df_lagged['alpha_trend']
+        if col in static_features:
+            df_lagged[f'prev_{col}'] = df_lagged[col] # Static features don't need real lag if we assume they don't change
+        else:
+            df_lagged[f'prev_{col}'] = df_lagged.groupby(group_col)[col].shift(1) if col != 'alpha_trend' else df_lagged['alpha_trend']
         
     mandatory_features = [f'prev_{c}' for c in basic_metrics + ['alpha_size', 'xmin_size']]
     # Filter mandatory to only those that actually exist in df_lagged
@@ -174,6 +199,13 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
     
     # Drop rows missing mandatory features
     count_before = len(df_lagged)
+    
+    # We want to keep city_name/state for plotting even if they are not features
+    id_cols = ['year', group_col]
+    if group_col == 'geocode':
+        df_lagged['city_name'] = df_lagged['geocode'].map(NAME_BY_GEOCODE)
+        id_cols.append('city_name')
+    
     df_model = df_lagged.dropna(subset=mandatory_features)
     
     # Optional features (trend) - impute with 0 if missing instead of dropping
@@ -245,8 +277,7 @@ def train_predictive_models(train_df, test_year=None):
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             else:
                 X_train, X_test, y_train, y_test = X, X, y, y
-            
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
+        model = RandomForestRegressor(n_estimators=100, random_state=42)    
         model.fit(X_train, y_train)
         
         # Calculate metrics if test set exists
