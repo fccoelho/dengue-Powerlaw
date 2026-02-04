@@ -212,7 +212,7 @@ def create_dashboard():
                         pred_values_output = gr.Markdown("Run prediction to see values.")
                         
                         pred_metrics_table = gr.Dataframe(
-                            headers=["Metric", "MAE", "MAPE", "R2"], 
+                            headers=["Metric", "MAE", "RMSE", "OOB R2"], 
                             label="Model Performance (Test Set)",
                             interactive=False
                         )
@@ -456,8 +456,8 @@ def create_dashboard():
                 # 5. Metrics Table
                 metrics_data = []
                 for t, m in metrics.items():
-                    metrics_data.append([t, f"{m['MAE']:.2f}", f"{m['MAPE']:.2f}", f"{m['R2']:.2f}"])
-                metrics_df = pd.DataFrame(metrics_data, columns=["Metric", "MAE", "MAPE", "R2"])
+                    metrics_data.append([t, f"{m['MAE']:.2f}", f"{m['RMSE']:.2f}", f"{m['OOB_R2']:.2f}"])
+                metrics_df = pd.DataFrame(metrics_data, columns=["Metric", "MAE", "RMSE", "OOB R2"])
                 
                 # 6. Specific Prediction & Aggregation
                 target_pred_text = f"### Forecast for Year {year}\n"

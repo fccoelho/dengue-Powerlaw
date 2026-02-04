@@ -349,7 +349,7 @@ def train_predictive_models(train_df, test_year=None):
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             else:
                 X_train, X_test, y_train, y_test = X, X, y, y
-        model = RandomForestRegressor(n_estimators=100, random_state=42)    
+        model = RandomForestRegressor(n_estimators=150, bootstrap=True, oob_score=True, random_state=42, n_jobs=-1)    
         model.fit(X_train, y_train)
         
         # Calculate metrics if test set exists
@@ -365,8 +365,10 @@ def train_predictive_models(train_df, test_year=None):
         else:
             mae, rmse, r2, mape = 0, 0, 0, 0
             
+        oob_r2 = model.oob_score_ if hasattr(model, 'oob_score_') else 0
+            
         models[target] = model
-        metrics[target] = {'MAE': mae, 'RMSE': rmse, 'R2': r2, 'MAPE': mape}
+        metrics[target] = {'MAE': mae, 'RMSE': rmse, 'R2': r2, 'MAPE': mape, 'OOB_R2': oob_r2}
         
     return models, metrics, feature_cols
 

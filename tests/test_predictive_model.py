@@ -36,9 +36,11 @@ def test_prepare_lagged_data(mock_ensure, mock_fits, mock_duck):
 
 @patch('predictive_model.pd.read_sql_query')
 @patch('predictive_model.sqlite3.connect')
+@patch('predictive_model.get_quarterly_climate')
+@patch('predictive_model.get_city_stats')
 @patch('predictive_model.get_duckdb_episcanner_data')
 @patch('predictive_model.ensure_episcanner_files')
-def test_prepare_lagged_data_full(mock_ensure, mock_duck, mock_connect, mock_read_sql):
+def test_prepare_lagged_data_full(mock_ensure, mock_duck, mock_pop, mock_climate, mock_connect, mock_read_sql):
     
     # Mock Episcanner Data
     mock_duck.return_value = pd.DataFrame({
@@ -73,6 +75,27 @@ def test_prepare_lagged_data_full(mock_ensure, mock_duck, mock_connect, mock_rea
         
     mock_read_sql.side_effect = side_effect
     
+    # Mock Population Data
+    mock_pop.return_value = pd.DataFrame({
+        'geocode': [4300001, 4300002],
+        'population': [100000, 200000]
+    })
+    
+    # Mock Climate Data
+    def climate_side_effect(region, level="state"):
+        df = pd.DataFrame({
+            'geocode': [4300001, 4300001, 4300002, 4300002],
+            'year': [2021, 2022, 2021, 2022],
+            'avg_temp_Q1': [20.0, 21.0, 22.0, 23.0],
+            'avg_umid_Q1': [70.0, 71.0, 72.0, 73.0]
+        })
+        if level == 'state':
+            df['state'] = 'RS'
+            return df.groupby(['state', 'year'])[['avg_temp_Q1', 'avg_umid_Q1']].mean().reset_index()
+        return df
+
+    mock_climate.side_effect = climate_side_effect
+    
     # Test
     df_res = predictive_model.prepare_lagged_data("RS")
     
@@ -86,9 +109,15 @@ def test_prepare_lagged_data_full(mock_ensure, mock_duck, mock_connect, mock_rea
     df_res_city = predictive_model.prepare_lagged_data("RS", level="city")
     assert not df_res_city.empty
     if not df_res_city.empty:
-         # Check if grouped by geocode
-         # The mock returns city level data, so we should have rows
-         pass
+         assert 'log_pop' in df_res_city.columns
+         assert 'prev_log_pop' in df_res_city.columns
+         # log10(100000) = 5
+         assert 5.0 in df_res_city['log_pop'].values
+         
+         assert 'avg_temp_Q1' in df_res_city.columns
+         assert 'prev_avg_temp_Q1' in df_res_city.columns
+         # For 2022, prev_avg_temp_Q1 should be 20.0 (from 2021)
+         assert 20.0 in df_res_city[df_res_city['year']==2022]['prev_avg_temp_Q1'].values
 
 def test_train_models():
     # Create fake training data
