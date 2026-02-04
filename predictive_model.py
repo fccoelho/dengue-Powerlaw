@@ -15,6 +15,73 @@ try:
 except ImportError:
     NAME_BY_GEOCODE = {}
 
+def get_quarterly_climate(region, level="state"):
+    """
+    Fetches and aggregates tempmin and umidmin by quarter from Infodengue parquet files.
+    """
+    con = duckdb.connect()
+    data_path = "data/[0-9]*.parquet"
+    
+    # Filter by region if not BR
+    where_clause = ""
+    if region != "BR":
+        state_code = None
+        for k, v in GEO_STATE_MAP.items():
+            if v == region:
+                state_code = k
+                break
+        if state_code:
+            min_geo = state_code * 100000
+            max_geo = (state_code + 1) * 100000
+            where_clause = f"WHERE municipio_geocodigo >= {min_geo} AND municipio_geocodigo < {max_geo}"
+    
+    try:
+        # Extract quarter and year from data_iniSE
+        # umidmin and tempmin are weekly. We average by quarter.
+        query = f"""
+            SELECT 
+                municipio_geocodigo as geocode,
+                year,
+                EXTRACT(quarter FROM data_iniSE) as quarter,
+                AVG(tempmin) as avg_temp,
+                AVG(umidmin) as avg_umid
+            FROM read_parquet('{data_path}')
+            {where_clause}
+            GROUP BY geocode, year, quarter
+        """
+        df_q = con.execute(query).df()
+        
+        if df_q.empty:
+            return pd.DataFrame()
+            
+        # Pivot to have Year, Geocode as rows and (Metric, Quarter) as columns
+        df_pivot = df_q.pivot_table(
+            index=['geocode', 'year'], 
+            columns='quarter', 
+            values=['avg_temp', 'avg_umid']
+        )
+        
+        # Flatten columns
+        df_pivot.columns = [f"{col[0]}_Q{int(col[1])}" for col in df_pivot.columns]
+        df_pivot = df_pivot.reset_index()
+        
+        if level == 'state':
+            # Map to states and aggregate
+            def get_state(code):
+                try: return GEO_STATE_MAP.get(int(str(code)[:2]), 'Unknown')
+                except: return 'Unknown'
+            
+            df_pivot['state'] = df_pivot['geocode'].apply(get_state)
+            climate_cols = [c for c in df_pivot.columns if 'avg_' in c]
+            df_res = df_pivot.groupby(['state', 'year'])[climate_cols].mean().reset_index()
+            return df_res
+        else:
+            return df_pivot
+            
+    except Exception as e:
+        print(f"Error fetching climate data: {e}")
+        return pd.DataFrame()
+
 def prepare_lagged_data(region="BR", target_year=None, level="state"):
     """
     Prepares a dataset with lagged features for predicting target_year metrics.
@@ -144,7 +211,11 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
         df_pop = get_city_stats()
         if not df_pop.empty:
             df_features = df_features.merge(df_pop[['geocode', 'population']], on='geocode', how='left')
-        
+            
+    # Add Climate Data
+    df_climate = get_quarterly_climate(region, level=level)
+    if not df_climate.empty:
+        df_features = df_features.merge(df_climate, on=[group_col, 'year'], how='left')
     
     def calculate_historical_slope(group):
         group = group.sort_values('year')
@@ -178,7 +249,8 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
     basic_metrics = ['total_cases', 'ep_dur', 'peak_week', 'R0']
     fit_metrics = ['alpha_size', 'xmin_size', 'alpha_dur', 'xmin_dur', 'alpha_trend']
     static_features = ['log_pop'] if 'log_pop' in df_features.columns else []
-    feature_cols = basic_metrics + fit_metrics + static_features
+    climate_features = [c for c in df_features.columns if 'avg_temp' in c or 'avg_umid' in c]
+    feature_cols = basic_metrics + fit_metrics + static_features + climate_features
     
     df_lagged = df_features.copy()
     for col in feature_cols:

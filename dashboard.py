@@ -164,7 +164,6 @@ def create_dashboard():
                 
                 
                 
-                
 
                 where $f_{RF}$ is a Random Forest Regressor.
                 
@@ -178,13 +177,12 @@ def create_dashboard():
                 
                 **Features ($X_{t-1}$):**
 
-                $S_{t-1}, D_{t-1}, P_{t-1}$: Lagged Epidemic Metrics
-                
-                $\alpha_{S, t-1}, x_{min, S, t-1}$: Lagged Power Law Scaling Factors (Size)
-                
-                $\dot{\alpha}_{S, t-1}$: Historical Alpha Trend (Slope)
-                
-                $R_{0, t-1}$: Lagged Basic Reproduction Number
+                1. **Lagged Epidemic Metrics**: $S_{t-1}, D_{t-1}, P_{t-1}$
+                2. **Scaling Factors**: $\alpha_{S, t-1}, x_{min, S, t-1}$ (Power Law fit for Size)
+                3. **Historical Trend**: $\dot{\alpha}_{S, t-1}$ (Slope of alpha over past years)
+                4. **Epidemiological Driver**: $R_{0, t-1}$ (Lagged Basic Reproduction Number)
+                5. **Demographics**: $\log_{10}(Pop)$ (Logarithm of total population)
+                6. **Climate (Quarterly)**: Mean quarterly minimum temperature and minimum humidity ($\bar{T}_{Q1...Q4}, \bar{H}_{Q1...Q4}$) from Year $t-1$.
                 """, latex_delimiters=[{ "left": "$", "right": "$", "display": False }])
                 
                 with gr.Row():
@@ -227,6 +225,12 @@ def create_dashboard():
                         
                         with gr.Row():
                             pred_feat_imp_plot = gr.Plot(label="Feature Importance")
+                        
+                        gr.Markdown("### Error Analysis: Population Distribution (>20% absolute error)")
+                        with gr.Row():
+                            pred_hist_size = gr.Plot(label="Pop. Histogram: Cases Error > 20%")
+                            pred_hist_dur = gr.Plot(label="Pop. Histogram: Duration Error > 20%")
+                            pred_hist_peak = gr.Plot(label="Pop. Histogram: Peak Week Error > 20%")
 
         # Update City Dropdown visibility based on Radio
         def update_pred_inputs(level, state):
@@ -376,13 +380,21 @@ def create_dashboard():
                 val_preds = predictive_model.predict_future(models, df_all, feature_cols)
                 
                 plots = []
+                hist_plots = []
                 for target in ['total_cases', 'ep_dur', 'peak_week']:
                     if target not in val_preds:
                         plots.append(go.Figure().update_layout(title=f"{target}: Model not trained (Insufficient data)"))
+                        hist_plots.append(go.Figure().update_layout(title=f"{target}: No Error Data"))
                         continue
                     
                     y_true = df_all[target]
                     y_pred = val_preds[target]
+                    
+                    # High Error Calculation (> 20% relative error)
+                    # We use relative error: abs(true - pred) / true
+                    # Adding small epsilon to avoid div by zero
+                    rel_error = np.abs(y_true - y_pred) / (y_true.replace(0, 1e-5))
+                    high_error_mask = rel_error > 0.2
                     
                     fig = go.Figure()
                     
@@ -394,6 +406,10 @@ def create_dashboard():
                             txt += f"City: {row['city_name']} ({int(row['geocode'])})"
                         elif 'state' in df_all.columns:
                             txt += f"State: {row['state']}"
+                        
+                        # Add error info to hover
+                        err_val = rel_error.iloc[i] * 100
+                        txt += f"<br>Error: {err_val:.1f}%"
                         hover_text.append(txt)
                         
                     fig.add_trace(go.Scatter(
@@ -401,6 +417,7 @@ def create_dashboard():
                         y=y_pred, 
                         mode='markers', 
                         name='Data Points', 
+                        marker=dict(color=high_error_mask.map({True: 'red', False: 'blue'}), opacity=0.6),
                         hovertext=hover_text,
                         hoverinfo='text+x+y'
                     ))
@@ -409,6 +426,24 @@ def create_dashboard():
                     fig.add_trace(go.Scatter(x=[min_val, max_val], y=[min_val, max_val], mode='lines', line=dict(dash='dash', color='gray'), name='Ideal'))
                     fig.update_layout(title=f"{target}: Actual vs Predicted", xaxis_title="Actual", yaxis_title="Predicted", template="plotly_white")
                     plots.append(fig)
+                    
+                    # Population Histogram for High Error cities
+                    if 'population' in df_all.columns:
+                        high_error_pop = df_all.loc[high_error_mask, 'population']
+                        fig_hist = go.Figure()
+                        if not high_error_pop.empty:
+                             fig_hist.add_trace(go.Histogram(x=high_error_pop, name='Pop. Size', marker_color='red'))
+                             fig_hist.update_layout(
+                                 title=f"Pop. Distribution of Cities with >20% Error in {target}",
+                                 xaxis_title="Population Size",
+                                 yaxis_title="Count",
+                                 template="plotly_white"
+                             )
+                        else:
+                             fig_hist.update_layout(title=f"No cities with >20% error in {target}")
+                        hist_plots.append(fig_hist)
+                    else:
+                        hist_plots.append(go.Figure().update_layout(title="Population data not available"))
                     
                 # 4. Feature Importance
                 imp_df = predictive_model.get_variable_importance(models, feature_cols)
@@ -497,19 +532,23 @@ def create_dashboard():
                 else:
                     target_pred_text += f"*No data available for year {year} in {region}.*\n"
                 
-                return plots + [fig_imp, target_pred_text, metrics_df]
+                return plots + [fig_imp, target_pred_text, metrics_df] + hist_plots
                 
             except Exception as e:
                 print(f"Prediction failed: {e}")
                 import traceback
                 traceback.print_exc()
                 empty = go.Figure().update_layout(title=f"Error: {str(e)}")
-                return [empty]*4 + [f"Error: {str(e)}", pd.DataFrame()]
+                return [empty]*4 + [f"Error: {str(e)}", pd.DataFrame()] + [empty]*3
 
         pred_train_btn.click(
             fn=run_prediction,
             inputs=[pred_level_radio, pred_state_dropdown, pred_city_dropdown, pred_target_year],
-            outputs=[pred_plot_size, pred_plot_dur, pred_plot_peak, pred_feat_imp_plot, pred_values_output, pred_metrics_table]
+            outputs=[
+                pred_plot_size, pred_plot_dur, pred_plot_peak, 
+                pred_feat_imp_plot, pred_values_output, pred_metrics_table,
+                pred_hist_size, pred_hist_dur, pred_hist_peak
+            ]
         )
 
         def initial_load():
