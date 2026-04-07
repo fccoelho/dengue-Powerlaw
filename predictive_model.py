@@ -3,6 +3,8 @@ import numpy as np
 import sqlite3
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.ensemble import GradientBoostingRegressor
+from sklearn.ensemble import HistGradientBoostingRegressor
+from sklearn.inspection import permutation_importance
 from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score, mean_absolute_percentage_error
 from sklearn.model_selection import train_test_split
 import duckdb
@@ -10,6 +12,11 @@ import glob
 import os
 from data_utils import get_duckdb_episcanner_data, get_episcanner_fit_results, ensure_episcanner_files, GEO_STATE_MAP, get_city_stats
 from scipy import stats
+try:
+    import lightgbm as lgb
+    HAS_LIGHTGBM = True
+except ImportError:
+    HAS_LIGHTGBM = False
 try:
     from _mun_by_geocode import NAME_BY_GEOCODE
 except ImportError:
@@ -295,9 +302,13 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
         
     return df_model
 
-def train_predictive_models(train_df, test_year=None):
+def train_predictive_models(train_df, test_year=None, model_type="random_forest", quantile=0.5):
     """
-    Trains Random Forest models for Size, Duration, and Peak Week.
+    Trains models for Size, Duration, and Peak Week.
+    
+    model_type: "random_forest", "lightgbm_quantile", "hist_gradient_boosting_quantile"
+    quantile: quantile level for quantile loss models (default 0.5 = median)
+    
     If test_year is provided, trains on data where year < test_year,
     and calculates metrics on data where year >= test_year.
     Otherwise uses random split.
@@ -305,41 +316,42 @@ def train_predictive_models(train_df, test_year=None):
     # Identify available lagged columns that have at least some data
     all_prev_cols = [c for c in train_df.columns if c.startswith('prev_')]
     feature_cols = [c for c in all_prev_cols if not train_df[c].isnull().all()]
-    
+
     targets = ['total_cases', 'ep_dur', 'peak_week']
-    
+
     models = {}
     metrics = {}
-    
+
     # Drop NaNs only for the features we actually intend to use and targets
     train_clean = train_df.dropna(subset=feature_cols + targets)
-    
+
     if train_clean.empty:
         print(f"[Training] FAILED: Input dataframe is empty after dropping NaNs. Input size: {len(train_df)}")
         print(f"Features considered: {all_prev_cols}")
         print(f"Features with data: {feature_cols}")
-        return {}, {}, feature_cols
-    
-    print(f"[Training] Starting for {len(train_clean)} clean rows. Test Year: {test_year}")
+        return {}, {}, feature_cols, {}
+
+    print(f"[Training] Starting for {len(train_clean)} clean rows. Test Year: {test_year}, Model: {model_type}")
     print(f"Features used: {feature_cols}")
-    
+
     X = train_clean[feature_cols]
-    
+    train_data_dict = {}
+
     for target in targets:
         y = train_clean[target]
         if target == 'total_cases':
             y = np.log1p(y)
-        
+
         if test_year:
             # Temporal Split
             mask_train = train_clean['year'] < test_year
             mask_test = train_clean['year'] >= test_year
-            
+
             X_train = X[mask_train]
             y_train = y[mask_train]
             X_test = X[mask_test]
             y_test = y[mask_test]
-            
+
             if X_train.empty:
                 # Cannot train
                 models[target] = None
@@ -351,37 +363,99 @@ def train_predictive_models(train_df, test_year=None):
                 X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
             else:
                 X_train, X_test, y_train, y_test = X, X, y, y
-        model = RandomForestRegressor(n_estimators=150, bootstrap=True, oob_score=True, random_state=42, n_jobs=-1)    
-        model.fit(X_train, y_train)
-        
+
+        # Store training data for importance computation
+        train_data_dict[target] = {'X_train': X_train, 'y_train': y_train}
+
+        # Create model based on type
+        if model_type == "lightgbm_quantile":
+            if not HAS_LIGHTGBM:
+                raise ImportError("lightgbm is not installed. Install it with: pip install lightgbm")
+            model = lgb.LGBMRegressor(
+                objective='quantile',
+                alpha=quantile,
+                n_estimators=300,
+                learning_rate=0.05,
+                num_leaves=16,
+                min_child_samples=5,
+                random_state=42,
+                verbose=-1
+            )
+            model.fit(X_train, y_train)
+        elif model_type == "hist_gradient_boosting_quantile":
+            model = HistGradientBoostingRegressor(
+                loss='quantile',
+                quantile=quantile,
+                max_iter=300,
+                learning_rate=0.05,
+                max_depth=5,
+                random_state=42
+            )
+            model.fit(X_train, y_train)
+        else:  # random_forest (default)
+            model = RandomForestRegressor(
+                n_estimators=150, bootstrap=True, oob_score=True, random_state=42, n_jobs=-1
+            )
+            model.fit(X_train, y_train)
+
         # Calculate metrics if test set exists
         if len(y_test) > 0:
             preds = model.predict(X_test)
-            
+
             # Back-transform total_cases for MAE/RMSE calculation
             if target == 'total_cases':
                 p_preds = np.expm1(preds)
                 p_y_test = np.expm1(y_test)
                 mae = mean_absolute_error(p_y_test, p_preds)
                 rmse = np.sqrt(mean_squared_error(p_y_test, p_preds))
+                r2 = r2_score(p_y_test, p_preds) if len(p_y_test) > 1 else 0
+                try:
+                    mape = mean_absolute_percentage_error(p_y_test, p_preds)
+                except:
+                    mape = 0
             else:
                 mae = mean_absolute_error(y_test, preds)
                 rmse = np.sqrt(mean_squared_error(y_test, preds))
-                
-            r2 = r2_score(y_test, preds) if len(y_test) > 1 else 0
-            try:
-                mape = mean_absolute_percentage_error(y_test, preds)
-            except:
-                mape = 0
+                r2 = r2_score(y_test, preds) if len(y_test) > 1 else 0
+                try:
+                    mape = mean_absolute_percentage_error(y_test, preds)
+                except:
+                    mape = 0
+
+            # Pinball loss for quantile models
+            if model_type in ("lightgbm_quantile", "hist_gradient_boosting_quantile"):
+                def pinball_loss(y_true, y_pred, tau):
+                    """Pinball loss for quantile regression."""
+                    diff = y_true - y_pred
+                    return np.mean(np.maximum(tau * diff, (tau - 1) * diff))
+
+                if target == 'total_cases':
+                    pinball = pinball_loss(p_y_test, p_preds, quantile)
+                else:
+                    pinball = pinball_loss(y_test, preds, quantile)
+            else:
+                pinball = None
         else:
             mae, rmse, r2, mape = 0, 0, 0, 0
-            
+            pinball = None
+
+        # OOB R2 is only available for RandomForest
         oob_r2 = model.oob_score_ if hasattr(model, 'oob_score_') else 0
-            
+
+        is_quantile = model_type in ("lightgbm_quantile", "hist_gradient_boosting_quantile")
+
         models[target] = model
-        metrics[target] = {'MAE': mae, 'RMSE': rmse, 'R2': r2, 'MAPE': mape, 'OOB_R2': oob_r2}
-        
-    return models, metrics, feature_cols
+        metrics[target] = {
+            'MAE': mae,
+            'RMSE': rmse,
+            'R2': r2,
+            'MAPE': mape,
+            'OOB_R2': oob_r2 if not is_quantile else None,
+            'Pinball_Loss': pinball if is_quantile else None,
+            'Quantile': quantile if is_quantile else None,
+        }
+
+    return models, metrics, feature_cols, train_data_dict
 
 def predict_future(models, current_data_df, feature_cols):
     """
@@ -400,13 +474,41 @@ def predict_future(models, current_data_df, feature_cols):
             
     return predictions
 
-def get_variable_importance(models, feature_cols):
+def get_variable_importance(models, feature_cols, X_train=None, y_train_dict=None):
     """
-    Extracts variable importance from random forest models.
+    Extracts variable importance from trained models.
+    Uses model.feature_importances_ when available (RF, LightGBM),
+    falls back to permutation importance otherwise (HistGradientBoosting).
     """
     importance_df = pd.DataFrame({'Feature': feature_cols})
-    
+
     for target, model in models.items():
-        importance_df[f'Importance_{target}'] = model.feature_importances_
-        
+        if model is None:
+            importance_df[f'Importance_{target}'] = 0.0
+            continue
+
+        # Try native feature_importances_ first (RF, LightGBM)
+        if hasattr(model, 'feature_importances_') and model.feature_importances_ is not None:
+            imp_values = np.asarray(model.feature_importances_, dtype=float)
+            # Only use if at least some features have non-zero importance
+            if imp_values.sum() > 0:
+                importance_df[f'Importance_{target}'] = imp_values
+                continue
+
+        # Fallback to permutation importance
+        if X_train is not None and y_train_dict is not None and target in y_train_dict:
+            y_t = y_train_dict[target]
+            if y_t is not None and len(y_t) > 0:
+                try:
+                    result = permutation_importance(
+                        model, X_train, y_t,
+                        n_repeats=10, random_state=42, n_jobs=-1
+                    )
+                    importance_df[f'Importance_{target}'] = result.importances_mean
+                    continue
+                except Exception:
+                    pass
+
+        importance_df[f'Importance_{target}'] = 0.0
+
     return importance_df

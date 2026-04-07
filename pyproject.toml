@@ -9,6 +9,7 @@ dependencies = [
     "geopandas>=1.1.2",
     "gradio>=6.0,<6.10",
     "jupyter>=1.1.1",
+    "lightgbm>=4.6.0",
     "matplotlib>=3.10.8",
     "mosqlient>=1.9.3",
     "numpy>=2.4.0",

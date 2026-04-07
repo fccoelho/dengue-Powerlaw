@@ -79,9 +79,10 @@ def create_dashboard():
             alpha_str = (
                 f" - alpha: {row['alpha']:.2f}" if pd.notnull(row["alpha"]) else ""
             )
-            choices.append(f"{row['city_name']} ({row['geocode']}){alpha_str}")
+            choices.append((f"{row['city_name']} ({row['geocode']}){alpha_str}", row['alpha'] if pd.notnull(row['alpha']) else -float('inf')))
 
-        choices = sorted(choices)
+        choices = sorted(choices, key=lambda x: x[1], reverse=True)
+        choices = [c[0] for c in choices]
 
         if "alpha" in merged.columns and not merged["alpha"].dropna().empty:
             best_id = merged["alpha"].idxmax()
@@ -225,17 +226,17 @@ def create_dashboard():
                 gr.Markdown("""
                 **Model Equation:**
 
-                $$Y_t = f_{RF}(X_{t-1})$$
+                $$Y_t = f(X_{t-1})$$
                 """)
                 gr.Markdown(
                     r"""
                 > **Tip**: For improved accuracy, we recommend incorporating climate data (e.g., ERA5 temperature/precipitation) from the [Mosqlimate](https://mosqlimate.org) platform.
-                
-                
-                
 
-                where $f_{RF}$ is a Random Forest Regressor.
-                
+
+
+
+                where $f$ is the selected regression model (Random Forest, LightGBM, or HistGradientBoosting).
+
                 **Target Variables ($Y_t$):**
 
                 $S_t$: Epidemic Size (Total Cases)
@@ -258,12 +259,6 @@ def create_dashboard():
 
                 with gr.Row():
                     with gr.Column(scale=1):
-                        pred_level_radio = gr.Radio(
-                            choices=["State", "City"],
-                            value="State",
-                            label="Prediction Level",
-                        )
-
                         pred_state_dropdown = gr.Dropdown(
                             choices=["BR"] + states,
                             value="BR",
@@ -274,7 +269,7 @@ def create_dashboard():
                         pred_city_dropdown = gr.Dropdown(
                             choices=[],
                             label="City (Select State first)",
-                            visible=False,
+                            visible=True,
                             filterable=True,
                         )
 
@@ -285,6 +280,26 @@ def create_dashboard():
                             value=2024,
                             label="Target Prediction Year",
                         )
+
+                        pred_model_type = gr.Dropdown(
+                            choices=[
+                                ("Random Forest", "random_forest"),
+                                ("LightGBM (Quantile)", "lightgbm_quantile"),
+                                ("HistGradientBoosting (Quantile)", "hist_gradient_boosting_quantile"),
+                            ],
+                            value="random_forest",
+                            label="Model Type",
+                        )
+
+                        pred_quantile_input = gr.Slider(
+                            minimum=0.05,
+                            maximum=0.95,
+                            step=0.05,
+                            value=0.5,
+                            label="Quantile Level (for Quantile Models)",
+                            visible=False,
+                        )
+
                         pred_train_btn = gr.Button("Train & Predict", variant="primary")
 
                         gr.Markdown("### Predicted Values")
@@ -293,7 +308,6 @@ def create_dashboard():
                         )
 
                         pred_metrics_table = gr.Dataframe(
-                            headers=["Metric", "MAE", "RMSE", "OOB R2"],
                             label="Model Performance (Test Set)",
                             interactive=False,
                         )
@@ -313,6 +327,11 @@ def create_dashboard():
                         with gr.Row():
                             pred_feat_imp_plot = gr.Plot(label="Feature Importance")
 
+                        pred_feat_imp_explanation = gr.Markdown(
+                            value="Train a model to see how feature importance is calculated.",
+                            label="Feature Importance Explanation",
+                        )
+
                         gr.Markdown(
                             "### Error Analysis: Population Distribution (>20% absolute error)"
                         )
@@ -327,44 +346,37 @@ def create_dashboard():
                                 label="Pop. Histogram: Peak Week Error > 20%"
                             )
 
-        def update_pred_inputs(level, state):
-            city_visible = level == "City"
+        def update_pred_inputs(state):
             choices = []
-            if city_visible and state and state != "BR":
+            if state and state != "BR":
                 merged, _ = get_merged_data(state)
                 choices = [
                     f"{row['city_name']} ({row['geocode']})"
                     for _, row in merged.iterrows()
                 ]
 
-            return gr.update(visible=city_visible, choices=choices, value=None)
+            return gr.update(visible=True, choices=choices, value=None)
 
-        pred_level_radio.change(
-            fn=update_pred_inputs,
-            inputs=[pred_level_radio, pred_state_dropdown],
-            outputs=[pred_city_dropdown],
-        )
         pred_state_dropdown.change(
             fn=update_pred_inputs,
-            inputs=[pred_level_radio, pred_state_dropdown],
+            inputs=[pred_state_dropdown],
             outputs=[pred_city_dropdown],
         )
 
-        def run_prediction(level, region, city_str, year):
+        def update_quantile_visibility(model_type):
+            is_quantile = model_type in ("lightgbm_quantile", "hist_gradient_boosting_quantile")
+            return gr.update(visible=is_quantile)
+
+        pred_model_type.change(
+            fn=update_quantile_visibility,
+            inputs=[pred_model_type],
+            outputs=[pred_quantile_input],
+        )
+
+        def run_prediction(region, city_str, year, model_type, quantile):
             try:
-                agg_level = (
-                    "city"
-                    if (level == "City" or (level == "State" and region != "BR"))
-                    else "state"
-                )
-
-                if agg_level == "city" and region == "BR":
-                    pass
-
-                feature_level_arg = agg_level
-
                 df_all = predictive_model.prepare_lagged_data(
-                    region, target_year=None, level=feature_level_arg
+                    region, target_year=None, level="city"
                 )
 
                 if not df_all.empty:
@@ -373,10 +385,12 @@ def create_dashboard():
                 if df_all.empty:
                     return [
                         go.Figure().update_layout(title="No data for training")
-                    ] * 4 + ["No data", pd.DataFrame()]
+                    ] * 4 + ["", "No data available for this selection.", pd.DataFrame()] + [go.Figure().update_layout(title="No data")] * 3
 
-                models, metrics, feature_cols = (
-                    predictive_model.train_predictive_models(df_all, test_year=year)
+                models, metrics, feature_cols, train_data = (
+                    predictive_model.train_predictive_models(
+                        df_all, test_year=year, model_type=model_type, quantile=quantile
+                    )
                 )
 
                 val_preds = predictive_model.predict_future(
@@ -448,6 +462,16 @@ def create_dashboard():
                         yaxis_title="Predicted",
                         template="plotly_white",
                     )
+
+                    if target == "total_cases":
+                        fig.update_layout(
+                            xaxis_type="log",
+                            yaxis_type="log",
+                            xaxis_title="Actual (log scale)",
+                            yaxis_title="Predicted (log scale)",
+                            title=f"{target}: Actual vs Predicted (Log-Log)",
+                        )
+
                     plots.append(fig)
 
                     if "population" in df_all.columns:
@@ -463,8 +487,9 @@ def create_dashboard():
                             )
                             fig_hist.update_layout(
                                 title=f"Pop. Distribution of Cities with >20% Error in {target}",
-                                xaxis_title="Population Size",
+                                xaxis_title="Population Size (log scale)",
                                 yaxis_title="Count",
+                                xaxis_type="log",
                                 template="plotly_white",
                             )
                         else:
@@ -479,7 +504,20 @@ def create_dashboard():
                             )
                         )
 
-                imp_df = predictive_model.get_variable_importance(models, feature_cols)
+                # Get X_train from any available target (same for all)
+                x_train_ref = None
+                y_train_ref = {}
+                if train_data:
+                    for t, d in train_data.items():
+                        y_train_ref[t] = d.get('y_train')
+                        if x_train_ref is None and d.get('X_train') is not None:
+                            x_train_ref = d['X_train']
+
+                imp_df = predictive_model.get_variable_importance(
+                    models, feature_cols,
+                    X_train=x_train_ref,
+                    y_train_dict=y_train_ref,
+                )
                 fig_imp = go.Figure()
                 for col in imp_df.columns:
                     if col != "Feature":
@@ -498,14 +536,72 @@ def create_dashboard():
                     height=500,
                 )
 
+                # Build feature importance explanation
+                if model_type == "random_forest":
+                    fi_text = """
+### How Feature Importance is Calculated
+
+- **Model**: Random Forest Regressor
+- **Method**: Mean Decrease in Impurity (MDI), also known as Gini importance.
+  Each tree in the forest tracks how much each feature reduces the variance (impurity) across all its splits. The importances are averaged over all trees and normalized so they sum to 1.
+- **Interpretation**: A higher value means the feature contributes more to reducing prediction error across all decision tree splits.
+"""
+                elif model_type == "lightgbm_quantile":
+                    fi_text = f"""
+### How Feature Importance is Calculated
+
+- **Model**: LightGBM (Quantile Regression, τ={quantile})
+- **Method**: Split-based importance (number of times each feature is used to split nodes across all trees).
+  If all features show zero split importance, **Permutation Importance** is used as fallback: each feature's values are randomly shuffled and the resulting drop in prediction accuracy is measured.
+- **Interpretation**: Features that are used more frequently for splitting (or cause a larger accuracy drop when permuted) are considered more important.
+"""
+                elif model_type == "hist_gradient_boosting_quantile":
+                    fi_text = f"""
+### How Feature Importance is Calculated
+
+- **Model**: HistGradientBoosting Regressor (Quantile Regression, τ={quantile})
+- **Method**: Permutation Importance. Since this model does not expose native `feature_importances_`, each feature is randomly shuffled one at a time and the drop in prediction accuracy is measured. The mean decrease across 10 random permutations is reported.
+- **Interpretation**: A higher value means that shuffling that feature's values causes a larger drop in model accuracy, indicating the model relies on it more heavily.
+"""
+                else:
+                    fi_text = ""
+
+                is_quantile = model_type in ("lightgbm_quantile", "hist_gradient_boosting_quantile")
+
                 metrics_data = []
                 for t, m in metrics.items():
-                    metrics_data.append(
-                        [t, f"{m['MAE']:.2f}", f"{m['RMSE']:.2f}", f"{m['OOB_R2']:.2f}"]
+                    if is_quantile:
+                        pinball_val = m.get('Pinball_Loss')
+                        quantile_val = m.get('Quantile')
+                        metrics_data.append(
+                            [
+                                t,
+                                f"{m['MAE']:.2f}",
+                                f"{m['RMSE']:.2f}",
+                                f"{pinball_val:.4f}" if pinball_val is not None else "N/A",
+                                f"{quantile_val:.2f}" if quantile_val is not None else "N/A",
+                            ]
+                        )
+                    else:
+                        oob = m.get('OOB_R2')
+                        metrics_data.append(
+                            [
+                                t,
+                                f"{m['MAE']:.2f}",
+                                f"{m['RMSE']:.2f}",
+                                f"{oob:.2f}" if oob is not None else "N/A",
+                            ]
+                        )
+
+                if is_quantile:
+                    metrics_df = pd.DataFrame(
+                        metrics_data,
+                        columns=["Metric", "MAE", "RMSE", "Pinball Loss", "Quantile"],
                     )
-                metrics_df = pd.DataFrame(
-                    metrics_data, columns=["Metric", "MAE", "RMSE", "OOB R2"]
-                )
+                else:
+                    metrics_df = pd.DataFrame(
+                        metrics_data, columns=["Metric", "MAE", "RMSE", "OOB R2"]
+                    )
 
                 target_pred_text = f"### Forecast for Year {year}\n"
 
@@ -520,7 +616,10 @@ def create_dashboard():
                     for t in targets:
                         model = models.get(t)
                         if model:
-                            preds_all[t] = model.predict(X_target_all)
+                            preds = model.predict(X_target_all)
+                            if t == "total_cases":
+                                preds = np.expm1(preds)
+                            preds_all[t] = preds
 
                     if region != "BR":
                         pred_cases_total = np.sum(preds_all["total_cases"])
@@ -561,7 +660,7 @@ def create_dashboard():
                         target_pred_text += f"- **Duration (Weighted)**: {pred_dur_agg:.1f} weeks (Observed: {obs_dur_agg:.1f}, Error: {err_dur:+.1f})\n"
                         target_pred_text += f"- **Peak Week (Weighted)**: {pred_peak_agg:.1f} (Observed: {obs_peak_agg:.1f}, Error: {err_peak:+.1f})\n\n"
 
-                    if level == "City" and city_str:
+                    if city_str:
                         geocode = extract_geocode(city_str)
                         if geocode:
                             city_row_idx = df_target_year.index[
@@ -587,7 +686,7 @@ def create_dashboard():
                         f"*No data available for year {year} in {region}.*\n"
                     )
 
-                return plots + [fig_imp, target_pred_text, metrics_df] + hist_plots
+                return plots + [fig_imp, fi_text, target_pred_text, metrics_df] + hist_plots
 
             except Exception as e:
                 print(f"Prediction failed: {e}")
@@ -595,21 +694,27 @@ def create_dashboard():
 
                 traceback.print_exc()
                 empty = go.Figure().update_layout(title=f"Error: {str(e)}")
-                return [empty] * 4 + [f"Error: {str(e)}", pd.DataFrame()] + [empty] * 3
+                return (
+                    [empty] * 4
+                    + [f"### How Feature Importance is Calculated\n\n*Error occurred: {str(e)}*", "", pd.DataFrame()]
+                    + [empty] * 3
+                )
 
         pred_train_btn.click(
             fn=run_prediction,
             inputs=[
-                pred_level_radio,
                 pred_state_dropdown,
                 pred_city_dropdown,
                 pred_target_year,
+                pred_model_type,
+                pred_quantile_input,
             ],
             outputs=[
                 pred_plot_size,
                 pred_plot_dur,
                 pred_plot_peak,
                 pred_feat_imp_plot,
+                pred_feat_imp_explanation,
                 pred_values_output,
                 pred_metrics_table,
                 pred_hist_size,
