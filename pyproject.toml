@@ -8,6 +8,7 @@ dependencies = [
     "duckdb>=1.4.4",
     "geopandas>=1.1.2",
     "gradio>=6.0,<6.10",
+    "imbalanced-learn>=0.14.0",
     "jupyter>=1.1.1",
     "lightgbm>=4.6.0",
     "matplotlib>=3.10.8",
@@ -22,8 +23,10 @@ dependencies = [
     "python-dotenv>=1.2.1",
     "scikit-learn>=1.8.0",
     "seaborn>=0.13.2",
+    "shap>=0.51.0",
     "statsmodels>=0.14.6",
     "uvicorn==0.35.0",
+    "xgboost>=3.0.0",
 ]
 
 [dependency-groups]

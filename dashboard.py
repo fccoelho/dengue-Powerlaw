@@ -33,6 +33,26 @@ from viz_utils import (
     plot_state_residuals_vs_alpha,
 )
 import predictive_model
+import binary_classifier
+from binary_classifier import (
+    prepare_binary_dataset,
+    train_binary_model,
+    get_binary_feature_importance,
+    get_shap_values,
+    predict_future_binary,
+)
+import binary_viz_utils
+from binary_viz_utils import (
+    plot_confusion_matrix_binary,
+    plot_roc_curve_binary,
+    plot_precision_recall_curve_binary,
+    plot_calibration_curve_binary,
+    plot_feature_importance_binary,
+    plot_shap_summary_binary,
+    plot_threshold_tradeoff_binary,
+    plot_prediction_map_binary,
+    plot_cv_folds_metrics_binary,
+)
 
 
 def on_map_select(evt: gr.SelectData):
@@ -300,6 +320,14 @@ def create_dashboard():
                             visible=False,
                         )
 
+                        pred_min_pop = gr.Slider(
+                            minimum=0,
+                            maximum=500000,
+                            step=5000,
+                            value=0,
+                            label="Minimum City Population (filter)",
+                        )
+
                         pred_train_btn = gr.Button("Train & Predict", variant="primary")
 
                         gr.Markdown("### Predicted Values")
@@ -346,6 +374,164 @@ def create_dashboard():
                                 label="Pop. Histogram: Peak Week Error > 20%"
                             )
 
+                        gr.Markdown("### Residual Analysis")
+                        with gr.Row():
+                            pred_resid_size = gr.Plot(
+                                label="Residuals vs Predicted: Total Cases"
+                            )
+                            pred_resid_dur = gr.Plot(
+                                label="Residuals vs Predicted: Duration"
+                            )
+                            pred_resid_peak = gr.Plot(
+                                label="Residuals vs Predicted: Peak Week"
+                            )
+
+                        with gr.Row():
+                            pred_resid_hist_size = gr.Plot(
+                                label="Residual Distribution: Total Cases"
+                            )
+                            pred_resid_hist_dur = gr.Plot(
+                                label="Residual Distribution: Duration"
+                            )
+                            pred_resid_hist_peak = gr.Plot(
+                                label="Residual Distribution: Peak Week"
+                            )
+
+            tab_binary_predictive = gr.TabItem(
+                "Classificação Binária de Epidemia", id="binary_predictive"
+            )
+            with tab_binary_predictive:
+                gr.Markdown("""
+                ## 🎯 Modelo de Classificação Binária — Previsão de Epidemia
+
+                ### Descrição da Metodologia
+
+                Este modelo prevê se o número total anual de casos de dengue em uma unidade geográfica **ultrapassará um percentil histórico configurável**.
+
+                #### Variável Alvo (Target)
+                - **Binária**: `1` se `casos_ano_t > percentil_historico`, `0` caso contrário.
+                - O percentil é calculado **APENAS sobre os dados de treinamento** de cada fold para evitar data leakage.
+
+                #### Features (Variáveis Preditivas)
+                1. **Métricas Epidêmicas Lagadas**: Casos totais, duração e pico da epidemia no ano anterior (t-1)
+                2. **Fatores de Escala**: α (alpha) e x_min do ajuste Power Law do ano anterior
+                3. **Tendência Histórica**: Inclinação de α ao longo dos anos anteriores
+                4. **Driver Epidemiológico**: R₀ (Número Básico de Reprodução) do ano anterior
+                5. **Demografia**: log₁₀(População)
+                6. **Clima Trimestral**: Temperatura mínima e umidade mínima médias por trimestre (Q1-Q4)
+
+                #### Validação e Treinamento
+                - **Validação Temporal**: `TimeSeriesSplit` (sem shuffle) para preservar ordem temporal
+                - **Tratamento de Desbalanceamento**: `scale_pos_weight` (XGBoost) ou `is_unbalance=True` (LightGBM)
+                - **Threshold Ótimo**: Calculado via Youden's J-statistic (maximiza sensibilidade + especificidade - 1)
+                - **Reprodutibilidade**: `random_state=42` em todas as chamadas estocásticas
+
+                #### Métricas de Avaliação
+                - **AUC-ROC**: Área sob a curva ROC (capacidade discriminativa)
+                - **AUC-PR**: Área sob a curva Precision-Recall (melhor para classes desbalanceadas)
+                - **F1-Score**: Média harmônica entre precisão e recall
+                - **Brier Score**: Acurácia probabilística (menor = melhor)
+                - **Curva de Calibração**: Confiabilidade das probabilidades preditivas
+                """)
+
+                with gr.Row():
+                    with gr.Column(scale=1):
+                        binary_state_dropdown = gr.Dropdown(
+                            choices=["BR"] + states,
+                            value="BR",
+                            label="Região (Estado ou BR)",
+                            filterable=True,
+                        )
+
+                        binary_percentile_slider = gr.Slider(
+                            minimum=0.50,
+                            maximum=0.99,
+                            step=0.05,
+                            value=0.75,
+                            label="Percentil Histórico (Threshold do Target)",
+                        )
+
+                        binary_model_type = gr.Dropdown(
+                            choices=[
+                                ("XGBoost Classifier", "xgboost"),
+                                ("LightGBM Classifier", "lightgbm"),
+                            ],
+                            value="xgboost",
+                            label="Tipo de Modelo",
+                        )
+
+                        binary_min_pop = gr.Slider(
+                            minimum=0,
+                            maximum=500000,
+                            step=5000,
+                            value=0,
+                            label="População Mínima da Cidade (filtro)",
+                        )
+
+                        binary_test_year = gr.Slider(
+                            minimum=2015,
+                            maximum=2025,
+                            step=1,
+                            value=2024,
+                            label="Ano de Teste (treino = anos anteriores)",
+                        )
+
+                        binary_train_btn = gr.Button(
+                            "Treinar Modelo Binário", variant="primary"
+                        )
+
+                        gr.Markdown("### 📊 Métricas do Modelo")
+                        binary_metrics_table = gr.Dataframe(
+                            label="Performance do Modelo", interactive=False
+                        )
+
+                        binary_threshold_info = gr.Markdown(
+                            value="Treine o modelo para ver informações sobre o threshold."
+                        )
+
+                        binary_cv_table = gr.Dataframe(
+                            label="Resultados por Fold (TimeSeriesSplit)",
+                            interactive=False,
+                        )
+
+                    with gr.Column(scale=3):
+                        with gr.Row():
+                            binary_conf_matrix = gr.Plot(
+                                label="Matriz de Confusão"
+                            )
+                            binary_roc_plot = gr.Plot(
+                                label="Curva ROC"
+                            )
+
+                        with gr.Row():
+                            binary_pr_plot = gr.Plot(
+                                label="Curva Precision-Recall"
+                            )
+                            binary_calibration_plot = gr.Plot(
+                                label="Curva de Calibração"
+                            )
+
+                        with gr.Row():
+                            binary_feat_imp_plot = gr.Plot(
+                                label="Importância das Features"
+                            )
+                            binary_shap_plot = gr.Plot(
+                                label="SHAP Summary Values"
+                            )
+
+                        with gr.Row():
+                            binary_threshold_plot = gr.Plot(
+                                label="Trade-off do Threshold"
+                            )
+                            binary_cv_plot = gr.Plot(
+                                label="Métricas por Fold (CV)"
+                            )
+
+                        with gr.Row():
+                            binary_pred_map = gr.Plot(
+                                label="Probabilidades Preditivas por Cidade"
+                            )
+
         def update_pred_inputs(state):
             choices = []
             if state and state != "BR":
@@ -373,7 +559,7 @@ def create_dashboard():
             outputs=[pred_quantile_input],
         )
 
-        def run_prediction(region, city_str, year, model_type, quantile):
+        def run_prediction(region, city_str, year, model_type, quantile, min_pop):
             try:
                 df_all = predictive_model.prepare_lagged_data(
                     region, target_year=None, level="city"
@@ -382,19 +568,29 @@ def create_dashboard():
                 if not df_all.empty:
                     df_all = df_all.reset_index(drop=True)
 
+                # Filter by minimum population
+                if min_pop > 0 and "population" in df_all.columns:
+                    count_before = len(df_all)
+                    df_all = df_all[df_all["population"] >= min_pop].copy()
+                    count_after = len(df_all)
+                    print(
+                        f"[Pop Filter] {min_pop}: {count_before} -> {count_after} rows "
+                        f"({count_before - count_after} removed)"
+                    )
+
                 if df_all.empty:
                     return [
                         go.Figure().update_layout(title="No data for training")
-                    ] * 4 + ["", "No data available for this selection.", pd.DataFrame()] + [go.Figure().update_layout(title="No data")] * 3
+                    ] * 4 + ["", "No data available for this selection.", pd.DataFrame()] + [go.Figure().update_layout(title="No data")] * 9
 
-                models, metrics, feature_cols, train_data = (
+                models, metrics, feature_cols, train_data, bias_correction = (
                     predictive_model.train_predictive_models(
                         df_all, test_year=year, model_type=model_type, quantile=quantile
                     )
                 )
 
                 val_preds = predictive_model.predict_future(
-                    models, df_all, feature_cols
+                    models, df_all, feature_cols, bias_correction=bias_correction
                 )
 
                 plots = []
@@ -427,7 +623,7 @@ def create_dashboard():
                         elif "state" in df_all.columns:
                             txt += f"State: {row['state']}"
 
-                        err_val = rel_error.iloc[i] * 100
+                        err_val = rel_error.loc[i] * 100
                         txt += f"<br>Error: {err_val:.1f}%"
                         hover_text.append(txt)
 
@@ -465,12 +661,12 @@ def create_dashboard():
 
                     if target == "total_cases":
                         fig.update_layout(
-                            xaxis_type="log",
-                            yaxis_type="log",
                             xaxis_title="Actual (log scale)",
                             yaxis_title="Predicted (log scale)",
                             title=f"{target}: Actual vs Predicted (Log-Log)",
                         )
+                        fig.update_xaxes(type="log")
+                        fig.update_yaxes(type="log")
 
                     plots.append(fig)
 
@@ -487,9 +683,8 @@ def create_dashboard():
                             )
                             fig_hist.update_layout(
                                 title=f"Pop. Distribution of Cities with >20% Error in {target}",
-                                xaxis_title="Population Size (log scale)",
+                                xaxis_title="Population Size",
                                 yaxis_title="Count",
-                                xaxis_type="log",
                                 template="plotly_white",
                             )
                         else:
@@ -503,6 +698,84 @@ def create_dashboard():
                                 title="Population data not available"
                             )
                         )
+
+                # --- Residual analysis plots ---
+                resid_plots = []
+                resid_hist_plots = []
+                for target in ["total_cases", "ep_dur", "peak_week"]:
+                    if target not in val_preds:
+                        resid_plots.append(
+                            go.Figure().update_layout(
+                                title=f"{target}: Residuals not available"
+                            )
+                        )
+                        resid_hist_plots.append(
+                            go.Figure().update_layout(
+                                title=f"{target}: Residual distribution not available"
+                            )
+                        )
+                        continue
+
+                    y_true = df_all[target]
+                    y_pred = val_preds[target]
+                    residuals = y_true - y_pred
+
+                    # Residuals vs Predicted
+                    fig_resid = go.Figure()
+                    fig_resid.add_trace(
+                        go.Scatter(
+                            x=y_pred,
+                            y=residuals,
+                            mode="markers",
+                            marker=dict(color="steelblue", opacity=0.5),
+                            hovertext=[
+                                f"Year: {int(row['year'])}<br>"
+                                + (
+                                    f"City: {row['city_name']} ({int(row['geocode'])})"
+                                    if "city_name" in df_all.columns
+                                    else f"State: {row['state']}"
+                                )
+                                for _, row in df_all.iterrows()
+                            ],
+                            hoverinfo="text+x+y",
+                        )
+                    )
+                    fig_resid.add_hline(y=0, line_dash="dash", line_color="red")
+                    fig_resid.update_layout(
+                        title=f"{target}: Residuals vs Predicted",
+                        xaxis_title="Predicted",
+                        yaxis_title="Residual (Actual - Predicted)",
+                        template="plotly_white",
+                    )
+                    resid_plots.append(fig_resid)
+
+                    # Residual distribution histogram
+                    fig_resid_hist = go.Figure()
+                    fig_resid_hist.add_trace(
+                        go.Histogram(
+                            x=residuals,
+                            name="Residuals",
+                            marker_color="steelblue",
+                            opacity=0.7,
+                        )
+                    )
+                    mean_resid = residuals.mean()
+                    fig_resid_hist.add_vline(
+                        x=0, line_dash="dash", line_color="green", annotation_text="Zero"
+                    )
+                    fig_resid_hist.add_vline(
+                        x=mean_resid,
+                        line_dash="dot",
+                        line_color="red",
+                        annotation_text=f"Mean: {mean_resid:.1f}",
+                    )
+                    fig_resid_hist.update_layout(
+                        title=f"{target}: Residual Distribution",
+                        xaxis_title="Residual",
+                        yaxis_title="Count",
+                        template="plotly_white",
+                    )
+                    resid_hist_plots.append(fig_resid_hist)
 
                 # Get X_train from any available target (same for all)
                 x_train_ref = None
@@ -619,6 +892,8 @@ def create_dashboard():
                             preds = model.predict(X_target_all)
                             if t == "total_cases":
                                 preds = np.expm1(preds)
+                                if bias_correction and t in bias_correction:
+                                    preds = preds * bias_correction[t]
                             preds_all[t] = preds
 
                     if region != "BR":
@@ -686,7 +961,7 @@ def create_dashboard():
                         f"*No data available for year {year} in {region}.*\n"
                     )
 
-                return plots + [fig_imp, fi_text, target_pred_text, metrics_df] + hist_plots
+                return plots + [fig_imp, fi_text, target_pred_text, metrics_df] + hist_plots + resid_plots + resid_hist_plots
 
             except Exception as e:
                 print(f"Prediction failed: {e}")
@@ -697,7 +972,7 @@ def create_dashboard():
                 return (
                     [empty] * 4
                     + [f"### How Feature Importance is Calculated\n\n*Error occurred: {str(e)}*", "", pd.DataFrame()]
-                    + [empty] * 3
+                    + [empty] * 9
                 )
 
         pred_train_btn.click(
@@ -708,6 +983,7 @@ def create_dashboard():
                 pred_target_year,
                 pred_model_type,
                 pred_quantile_input,
+                pred_min_pop,
             ],
             outputs=[
                 pred_plot_size,
@@ -720,6 +996,242 @@ def create_dashboard():
                 pred_hist_size,
                 pred_hist_dur,
                 pred_hist_peak,
+                pred_resid_size,
+                pred_resid_dur,
+                pred_resid_peak,
+                pred_resid_hist_size,
+                pred_resid_hist_dur,
+                pred_resid_hist_peak,
+            ],
+        )
+
+        def run_binary_training(region, percentile, model_type, min_pop, test_year):
+            """Handler para treinar o modelo de classificação binária."""
+            try:
+                # Prepare dataset
+                df_binary = prepare_binary_dataset(
+                    region=region, level="city", min_pop=min_pop
+                )
+
+                if df_binary.empty:
+                    empty_fig = go.Figure().update_layout(
+                        title="Dados insuficientes para treinamento"
+                    )
+                    return (
+                        pd.DataFrame(),
+                        "Nenhum dado disponível para a seleção.",
+                        pd.DataFrame(),
+                        *[empty_fig] * 7,
+                    )
+
+                # Train model
+                result = train_binary_model(
+                    df=df_binary,
+                    test_year=int(test_year),
+                    percentile=percentile,
+                    model_type=model_type,
+                    random_state=42,
+                )
+
+                if result["model"] is None:
+                    empty_fig = go.Figure().update_layout(
+                        title="Falha no treinamento (dados insuficientes)"
+                    )
+                    return (
+                        pd.DataFrame(),
+                        "Falha no treinamento. Dados insuficientes para o ano de teste selecionado.",
+                        pd.DataFrame(),
+                        *[empty_fig] * 7,
+                    )
+
+                metrics = result["metrics"]
+
+                # --- Build metrics table ---
+                metrics_data = [
+                    ["AUC-ROC (CV)", f"{metrics.get('cv_auc_roc', 0):.4f}"],
+                    ["AUC-PR (CV)", f"{metrics.get('cv_auc_pr', 0):.4f}"],
+                    ["F1-Score (CV)", f"{metrics.get('cv_f1', 0):.4f}"],
+                    ["Precision (CV)", f"{metrics.get('cv_precision', 0):.4f}"],
+                    ["Recall (CV)", f"{metrics.get('cv_recall', 0):.4f}"],
+                    ["Brier Score (CV)", f"{metrics.get('cv_brier', 0):.4f}"],
+                    ["Nº Folds", f"{metrics.get('n_folds', 0)}"],
+                    ["Threshold (casos)", f"{metrics.get('threshold_case_count', 0):.0f}"],
+                    ["Threshold ótimo (prob)", f"{metrics.get('optimal_prob_threshold', 0):.4f}"],
+                    ["Amostras treino", f"{metrics.get('n_train', 0)}"],
+                    ["Positivos treino", f"{metrics.get('n_positive_train', 0)}"],
+                    ["Negativos treino", f"{metrics.get('n_negative_train', 0)}"],
+                    ["scale_pos_weight", f"{metrics.get('scale_pos_weight', 0):.2f}"],
+                ]
+
+                if "f1_at_optimal" in metrics:
+                    metrics_data.append(["F1 (teste, threshold ótimo)", f"{metrics['f1_at_optimal']:.4f}"])
+                if "auc_roc" in metrics and metrics["auc_roc"] > 0:
+                    metrics_data.append(["AUC-ROC (teste)", f"{metrics['auc_roc']:.4f}"])
+                if "auc_pr" in metrics and metrics["auc_pr"] > 0:
+                    metrics_data.append(["AUC-PR (teste)", f"{metrics['auc_pr']:.4f}"])
+                if "n_test_samples" in metrics:
+                    metrics_data.append(["Amostras teste", f"{metrics['n_test_samples']}"])
+
+                metrics_df = pd.DataFrame(metrics_data, columns=["Métrica", "Valor"])
+
+                # --- Build threshold info ---
+                threshold_text = f"""
+                ### Threshold e Balanceamento
+
+                - **Percentil configurado**: {percentile * 100:.0f}º
+                - **Threshold de casos**: {metrics.get('threshold_case_count', 0):.0f} casos anuais
+                - **Threshold ótimo de probabilidade**: {metrics.get('optimal_prob_threshold', 0):.4f}
+                - **Ratio de balanceamento**: {metrics.get('scale_pos_weight', 0):.2f}
+
+                O threshold ótimo foi calculado via **Youden's J-statistic**, maximizando:
+                `J = Sensibilidade + Especificidade - 1`
+                """
+
+                # --- Build CV folds table ---
+                cv_results = result.get("cv_results", [])
+                if cv_results:
+                    cv_df = pd.DataFrame(cv_results)
+                    cv_display_cols = ["fold", "auc_roc", "auc_pr", "f1", "precision", "recall", "brier"]
+                    cv_display_cols = [c for c in cv_display_cols if c in cv_df.columns]
+                    cv_display = cv_df[cv_display_cols].copy()
+                else:
+                    cv_display = pd.DataFrame({"Info": ["Sem resultados de CV"]})
+
+                # --- Visualization: Confusion Matrix ---
+                if result.get("y_test") is not None and len(result["y_test"]) > 0:
+                    y_pred_test = (result["y_prob_test"] >= result["optimal_threshold"]).astype(int)
+                    conf_fig = binary_viz_utils.plot_confusion_matrix_binary(
+                        result["y_test"], y_pred_test
+                    )
+                else:
+                    conf_fig = go.Figure().update_layout(title="Matriz de Confusão (sem dados de teste)")
+
+                # --- ROC Curve ---
+                if result.get("fpr") is not None:
+                    auc_roc_test = metrics.get("auc_roc", metrics.get("cv_auc_roc", 0))
+                    roc_fig = binary_viz_utils.plot_roc_curve_binary(
+                        result["fpr"], result["tpr"], result["roc_thresholds"],
+                        auc_roc=auc_roc_test
+                    )
+                else:
+                    roc_fig = go.Figure().update_layout(title="Curva ROC não disponível")
+
+                # --- PR Curve ---
+                if result.get("prec") is not None:
+                    auc_pr_test = metrics.get("auc_pr", metrics.get("cv_auc_pr", 0))
+                    pr_fig = binary_viz_utils.plot_precision_recall_curve_binary(
+                        result["prec"], result["rec"], result["pr_thresholds"],
+                        auc_pr=auc_pr_test
+                    )
+                else:
+                    pr_fig = go.Figure().update_layout(title="Curva PR não disponível")
+
+                # --- Calibration Curve ---
+                if result.get("y_train") is not None and result.get("y_prob_train") is not None:
+                    cal_fig = binary_viz_utils.plot_calibration_curve_binary(
+                        result["y_train"], result["y_prob_train"]
+                    )
+                else:
+                    cal_fig = go.Figure().update_layout(title="Curva de Calibração não disponível")
+
+                # --- Feature Importance ---
+                feat_imp_df = get_binary_feature_importance(result)
+                if not feat_imp_df.empty:
+                    feat_fig = binary_viz_utils.plot_feature_importance_binary(
+                        feat_imp_df, top_n=20
+                    )
+                else:
+                    feat_fig = go.Figure().update_layout(title="Feature Importance não disponível")
+
+                # --- SHAP Summary ---
+                shap_data = get_shap_values(result)
+                if shap_data is not None:
+                    shap_fig = binary_viz_utils.plot_shap_summary_binary(
+                        shap_data, result["feature_cols"], max_display=20
+                    )
+                else:
+                    shap_fig = go.Figure().update_layout(
+                        title="SHAP values não disponíveis (instale shap ou verifique os dados)"
+                    )
+
+                # --- Threshold Trade-off ---
+                if result.get("fpr") is not None:
+                    thresh_fig = binary_viz_utils.plot_threshold_tradeoff_binary(
+                        result["fpr"], result["tpr"], result["roc_thresholds"],
+                        result["optimal_threshold"]
+                    )
+                else:
+                    thresh_fig = go.Figure().update_layout(title="Trade-off do Threshold não disponível")
+
+                # --- CV Folds Metrics ---
+                if cv_results:
+                    cv_fig = binary_viz_utils.plot_cv_folds_metrics_binary(cv_results)
+                else:
+                    cv_fig = go.Figure().update_layout(title="Métricas por Fold não disponíveis")
+
+                # --- Prediction Map ---
+                df_test = result.get("df_test")
+                if df_test is not None and not df_test.empty and result.get("y_prob_test") is not None:
+                    df_pred_map = df_test.copy()
+                    df_pred_map["y_prob"] = result["y_prob_test"]
+                    pred_map_fig = binary_viz_utils.plot_prediction_map_binary(
+                        df_pred_map, threshold=result["optimal_threshold"]
+                    )
+                else:
+                    pred_map_fig = go.Figure().update_layout(
+                        title="Mapa de Predições não disponível (sem dados de teste)"
+                    )
+
+                return (
+                    metrics_df,
+                    threshold_text,
+                    cv_display,
+                    conf_fig,
+                    roc_fig,
+                    pr_fig,
+                    cal_fig,
+                    feat_fig,
+                    shap_fig,
+                    thresh_fig,
+                    cv_fig,
+                    pred_map_fig,
+                )
+
+            except Exception as e:
+                print(f"Binary training failed: {e}")
+                import traceback
+                traceback.print_exc()
+
+                empty_fig = go.Figure().update_layout(title=f"Erro: {str(e)}")
+                return (
+                    pd.DataFrame(),
+                    f"Erro no treinamento: {str(e)}",
+                    pd.DataFrame(),
+                    *[empty_fig] * 7,
+                )
+
+        binary_train_btn.click(
+            fn=run_binary_training,
+            inputs=[
+                binary_state_dropdown,
+                binary_percentile_slider,
+                binary_model_type,
+                binary_min_pop,
+                binary_test_year,
+            ],
+            outputs=[
+                binary_metrics_table,
+                binary_threshold_info,
+                binary_cv_table,
+                binary_conf_matrix,
+                binary_roc_plot,
+                binary_pr_plot,
+                binary_calibration_plot,
+                binary_feat_imp_plot,
+                binary_shap_plot,
+                binary_threshold_plot,
+                binary_cv_plot,
+                binary_pred_map,
             ],
         )
 

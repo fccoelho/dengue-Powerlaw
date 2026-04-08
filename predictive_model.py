@@ -336,6 +336,7 @@ def train_predictive_models(train_df, test_year=None, model_type="random_forest"
 
     X = train_clean[feature_cols]
     train_data_dict = {}
+    bias_correction_dict = {}
 
     for target in targets:
         y = train_clean[target]
@@ -398,6 +399,16 @@ def train_predictive_models(train_df, test_year=None, model_type="random_forest"
             )
             model.fit(X_train, y_train)
 
+        # Compute bias correction for log-space models (Jensen's inequality)
+        if target == 'total_cases':
+            train_preds_log = model.predict(X_train)
+            train_preds_raw = np.expm1(train_preds_log)
+            y_train_raw = np.expm1(y_train)
+            if train_preds_raw.mean() > 0 and y_train_raw.mean() > 0:
+                bias_correction_dict[target] = y_train_raw.mean() / train_preds_raw.mean()
+            else:
+                bias_correction_dict[target] = 1.0
+
         # Calculate metrics if test set exists
         if len(y_test) > 0:
             preds = model.predict(X_test)
@@ -455,23 +466,29 @@ def train_predictive_models(train_df, test_year=None, model_type="random_forest"
             'Quantile': quantile if is_quantile else None,
         }
 
-    return models, metrics, feature_cols, train_data_dict
+    return models, metrics, feature_cols, train_data_dict, bias_correction_dict
 
-def predict_future(models, current_data_df, feature_cols):
+def predict_future(models, current_data_df, feature_cols, bias_correction=None):
     """
     Predicts for the rows in current_data_df using trained models.
+    
+    bias_correction: dict mapping target -> multiplicative correction factor
+                     for log-space models (total_cases). Computed as
+                     mean(actual) / mean(expm1(pred)) on training data.
     """
     X = current_data_df[feature_cols]
     predictions = {}
-    
+
     for target, model in models.items():
         if model:
             preds = model.predict(X)
             if target == 'total_cases':
-                predictions[target] = np.expm1(preds)
-            else:
-                predictions[target] = preds
-            
+                preds = np.expm1(preds)
+                # Apply bias correction if available
+                if bias_correction and target in bias_correction:
+                    preds = preds * bias_correction[target]
+            predictions[target] = preds
+
     return predictions
 
 def get_variable_importance(models, feature_cols, X_train=None, y_train_dict=None):
