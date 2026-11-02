@@ -1,0 +1,658 @@
+"""
+Binary classification pipeline for predicting epidemic threshold exceedance.
+
+Predicts whether total annual dengue cases in a geographic unit will exceed
+a configurable historical percentile (e.g., 75th, 90th, 95th).
+
+Uses temporal cross-validation (TimeSeriesSplit) to prevent data leakage,
+with threshold optimization via Youden's J-statistic.
+"""
+
+import numpy as np
+import pandas as pd
+from sklearn.model_selection import TimeSeriesSplit
+from sklearn.pipeline import Pipeline
+from sklearn.compose import ColumnTransformer
+from sklearn.preprocessing import StandardScaler
+from sklearn.metrics import (
+    roc_auc_score,
+    average_precision_score,
+    f1_score,
+    precision_score,
+    recall_score,
+    brier_score_loss,
+    confusion_matrix,
+    roc_curve,
+    precision_recall_curve,
+)
+
+try:
+    import xgboost as xgb
+    HAS_XGBOOST = True
+except ImportError:
+    HAS_XGBOOST = False
+
+try:
+    import lightgbm as lgb
+    HAS_LIGHTGBM = True
+except ImportError:
+    HAS_LIGHTGBM = False
+
+from predictive_model import prepare_lagged_data
+from data_utils import GEO_STATE_MAP
+try:
+    from _mun_by_geocode import NAME_BY_GEOCODE
+except ImportError:
+    NAME_BY_GEOCODE = {}
+
+
+def compute_percentile_threshold(train_cases, percentile=0.75):
+    """
+    Compute the case count threshold from training data at the given percentile.
+
+    Parameters
+    ----------
+    train_cases : array-like
+        Historical total cases from training folds only.
+    percentile : float
+        Percentile threshold (0-1), default 0.75.
+
+    Returns
+    -------
+    float
+        Case count threshold.
+    """
+    return float(np.percentile(train_cases, percentile * 100))
+
+
+def create_binary_target(cases, threshold):
+    """
+    Create binary target: 1 if cases > threshold, 0 otherwise.
+    """
+    return (np.asarray(cases) > threshold).astype(int)
+
+
+def prepare_binary_dataset(region="BR", level="city", min_pop=0):
+    """
+    Prepare dataset for binary classification.
+
+    Reuses prepare_lagged_data() and adds binary target column.
+    The threshold is NOT computed here — it is computed per-fold
+    during cross-validation to prevent leakage.
+
+    Parameters
+    ----------
+    region : str
+        "BR" for all Brazil or state abbreviation (e.g., "SP").
+    level : str
+        "city" or "state".
+    min_pop : int
+        Minimum city population filter.
+
+    Returns
+    -------
+    pd.DataFrame
+        Dataset with features + 'total_cases' + metadata columns.
+    """
+    df = prepare_lagged_data(region, target_year=None, level=level)
+
+    if df.empty:
+        return df
+
+    # Filter by minimum population
+    if min_pop > 0 and "population" in df.columns:
+        df = df[df["population"] >= min_pop].copy()
+
+    return df
+
+
+def _get_feature_columns(df):
+    """
+    Identify feature columns from the lagged dataset.
+    Returns list of column names to use as features.
+    """
+    all_prev_cols = [c for c in df.columns if c.startswith("prev_")]
+    # Also include static and climate features
+    static_features = ["log_pop"] if "log_pop" in df.columns else []
+    climate_features = [
+        c for c in df.columns if "avg_temp" in c or "avg_umid" in c
+    ]
+    feature_cols = all_prev_cols + static_features + climate_features
+    # Only keep columns that exist and have at least some non-null values
+    feature_cols = [
+        c for c in feature_cols
+        if c in df.columns and not df[c].isnull().all()
+    ]
+    return feature_cols
+
+
+def _get_numerical_and_categorical_features(feature_cols, df):
+    """
+    Separate features into numerical and categorical lists for ColumnTransformer.
+    """
+    # In current pipeline, all features are numerical (lags of metrics)
+    # If categorical features are added later, this handles them.
+    numerical = []
+    categorical = []
+    for col in feature_cols:
+        if col in df.columns:
+            if df[col].dtype in ["object", "category", "bool"]:
+                categorical.append(col)
+            else:
+                numerical.append(col)
+    return numerical, categorical
+
+
+def compute_optimal_threshold(fpr, tpr, thresholds):
+    """
+    Compute optimal threshold using Youden's J-statistic.
+
+    J = sensitivity + specificity - 1 = tpr - fpr
+
+    Parameters
+    ----------
+    fpr, tpr, thresholds : array-like
+        From sklearn roc_curve.
+
+    Returns
+    -------
+    float
+        Optimal threshold maximizing Youden's J.
+    """
+    j_scores = tpr - fpr
+    optimal_idx = np.argmax(j_scores)
+    return float(thresholds[optimal_idx])
+
+
+def build_model_pipeline(model_type="xgboost", scale_pos_weight=1.0, random_state=42):
+    """
+    Build a scikit-learn Pipeline with ColumnTransformer + Classifier.
+
+    Parameters
+    ----------
+    model_type : str
+        "xgboost" or "lightgbm".
+    scale_pos_weight : float
+        Weight for positive class to handle imbalance.
+    random_state : int
+        Random seed for reproducibility.
+
+    Returns
+    -------
+    sklearn.pipeline.Pipeline
+        Fitted pipeline.
+    """
+    preprocessor = ColumnTransformer(
+        transformers=[
+            ("num", StandardScaler(), "__numerical__"),
+        ],
+        remainder="passthrough",
+    )
+
+    if model_type == "xgboost" and HAS_XGBOOST:
+        classifier = xgb.XGBClassifier(
+            n_estimators=300,
+            max_depth=5,
+            learning_rate=0.05,
+            scale_pos_weight=scale_pos_weight,
+            eval_metric="logloss",
+            random_state=random_state,
+            use_label_encoder=False,
+            tree_method="hist",
+            n_jobs=-1,
+        )
+    elif model_type == "lightgbm" and HAS_LIGHTGBM:
+        classifier = lgb.LGBMClassifier(
+            n_estimators=300,
+            max_depth=5,
+            learning_rate=0.05,
+            is_unbalance=True,  # handles class imbalance
+            random_state=random_state,
+            verbose=-1,
+            n_jobs=-1,
+        )
+    else:
+        # Fallback: LightGBM if XGBoost not available
+        if HAS_LIGHTGBM:
+            classifier = lgb.LGBMClassifier(
+                n_estimators=300,
+                max_depth=5,
+                learning_rate=0.05,
+                is_unbalance=True,
+                random_state=random_state,
+                verbose=-1,
+                n_jobs=-1,
+            )
+        else:
+            raise ValueError(
+                "Neither XGBoost nor LightGBM is available. "
+                "Install one of them: pip install xgboost lightgbm"
+            )
+
+    pipeline = Pipeline([
+        ("classifier", classifier),
+    ])
+
+    return pipeline
+
+
+def train_binary_model(
+    df, test_year=2024, percentile=0.75, model_type="xgboost", random_state=42
+):
+    """
+    Train binary classification model with temporal cross-validation.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Output of prepare_binary_dataset().
+    test_year : int
+        Year to use as test set (data >= test_year).
+        Training uses data < test_year.
+    percentile : float
+        Percentile threshold for binary target (0-1).
+    model_type : str
+        "xgboost" or "lightgbm".
+    random_state : int
+        Random seed.
+
+    Returns
+    -------
+    dict with keys:
+        - model: trained Pipeline
+        - metrics: dict of evaluation metrics
+        - feature_cols: list of feature names
+        - threshold: computed case count threshold
+        - optimal_threshold: optimal prediction threshold (0-1)
+        - X_train, X_test, y_train, y_test: data splits
+        - y_prob_train, y_prob_test: predicted probabilities
+        - fpr, tpr, roc_thresholds: ROC curve data
+        - prec, rec, pr_thresholds: PR curve data
+        - cv_results: list of per-fold CV metrics
+    """
+    if df.empty:
+        return {
+            "model": None,
+            "metrics": {},
+            "feature_cols": [],
+            "threshold": None,
+            "optimal_threshold": None,
+            "X_train": None,
+            "X_test": None,
+            "y_train": None,
+            "y_test": None,
+            "y_prob_train": None,
+            "y_prob_test": None,
+            "fpr": None,
+            "tpr": None,
+            "roc_thresholds": None,
+            "prec": None,
+            "rec": None,
+            "pr_thresholds": None,
+            "cv_results": [],
+        }
+
+    feature_cols = _get_feature_columns(df)
+    targets = ["total_cases"]
+
+    # Use only rows with non-null features and target
+    df_clean = df.dropna(subset=feature_cols + targets).copy()
+
+    if df_clean.empty:
+        return {
+            "model": None,
+            "metrics": {},
+            "feature_cols": feature_cols,
+            "threshold": None,
+            "optimal_threshold": None,
+            "X_train": None,
+            "X_test": None,
+            "y_train": None,
+            "y_test": None,
+            "y_prob_train": None,
+            "y_prob_test": None,
+            "fpr": None,
+            "tpr": None,
+            "roc_thresholds": None,
+            "prec": None,
+            "rec": None,
+            "pr_thresholds": None,
+            "cv_results": [],
+        }
+
+    # --- Temporal split ---
+    mask_train = df_clean["year"] < test_year
+    mask_test = df_clean["year"] >= test_year
+
+    df_train = df_clean[mask_train].copy()
+    df_test = df_clean[mask_test].copy()
+
+    if df_train.empty:
+        return {
+            "model": None,
+            "metrics": {},
+            "feature_cols": feature_cols,
+            "threshold": None,
+            "optimal_threshold": None,
+            "X_train": None,
+            "X_test": df_test[feature_cols].values if not df_test.empty else None,
+            "y_train": None,
+            "y_test": None,
+            "y_prob_train": None,
+            "y_prob_test": None,
+            "fpr": None,
+            "tpr": None,
+            "roc_thresholds": None,
+            "prec": None,
+            "rec": None,
+            "pr_thresholds": None,
+            "cv_results": [],
+        }
+
+    # --- Compute threshold ONLY from training data ---
+    threshold = compute_percentile_threshold(
+        df_train["total_cases"].values, percentile=percentile
+    )
+
+    # Create binary targets
+    y_train = create_binary_target(df_train["total_cases"].values, threshold)
+    y_test = create_binary_target(df_test["total_cases"].values, threshold) if not df_test.empty else None
+
+    X_train = df_train[feature_cols].values
+    X_test = df_test[feature_cols].values if not df_test.empty else None
+
+    # Handle any remaining NaNs in features (impute with median of train)
+    from sklearn.impute import SimpleImputer
+    imputer = SimpleImputer(strategy="median")
+    X_train = imputer.fit_transform(X_train)
+    if X_test is not None:
+        X_test = imputer.transform(X_test)
+
+    # --- Compute class imbalance weight ---
+    n_negative = np.sum(y_train == 0)
+    n_positive = np.sum(y_train == 1)
+    if n_positive > 0:
+        scale_pos_weight = n_negative / n_positive
+    else:
+        scale_pos_weight = 1.0
+
+    # --- TimeSeriesSplit Cross-Validation ---
+    n_splits = min(5, max(2, len(df_train["year"].unique()) - 1))
+    tscv = TimeSeriesSplit(n_splits=n_splits)
+
+    cv_results = []
+    cv_y_true_all = []
+    cv_y_prob_all = []
+
+    for fold_idx, (train_idx, val_idx) in enumerate(tscv.split(X_train)):
+        X_tr, X_val = X_train[train_idx], X_train[val_idx]
+        y_tr, y_val = y_train[train_idx], y_train[val_idx]
+
+        pipeline = build_model_pipeline(
+            model_type=model_type,
+            scale_pos_weight=scale_pos_weight,
+            random_state=random_state,
+        )
+
+        pipeline.fit(X_tr, y_tr)
+        y_prob_val = pipeline.predict_proba(X_val)[:, 1]
+
+        fold_metrics = _compute_fold_metrics(y_val, y_prob_val)
+        fold_metrics["fold"] = fold_idx + 1
+        cv_results.append(fold_metrics)
+
+        cv_y_true_all.extend(y_val.tolist())
+        cv_y_prob_all.extend(y_prob_val.tolist())
+
+    # --- Train final model on ALL training data ---
+    final_pipeline = build_model_pipeline(
+        model_type=model_type,
+        scale_pos_weight=scale_pos_weight,
+        random_state=random_state,
+    )
+    final_pipeline.fit(X_train, y_train)
+
+    # Predictions
+    y_prob_train = final_pipeline.predict_proba(X_train)[:, 1]
+    y_prob_test = final_pipeline.predict_proba(X_test)[:, 1] if X_test is not None else None
+
+    # --- Use CV out-of-fold predictions for ROC/PR curves (honest estimate) ---
+    if len(cv_y_true_all) > 0 and len(np.unique(cv_y_true_all)) > 1:
+        cv_y_true_arr = np.array(cv_y_true_all)
+        cv_y_prob_arr = np.array(cv_y_prob_all)
+        fpr_cv, tpr_cv, roc_thresholds_cv = roc_curve(cv_y_true_arr, cv_y_prob_arr)
+        prec_cv, rec_cv, pr_thresholds_cv = precision_recall_curve(cv_y_true_arr, cv_y_prob_arr)
+        optimal_threshold = compute_optimal_threshold(fpr_cv, tpr_cv, roc_thresholds_cv)
+    else:
+        # Fallback to training predictions if CV predictions are insufficient
+        fpr_cv, tpr_cv, roc_thresholds_cv = roc_curve(y_train, y_prob_train)
+        prec_cv, rec_cv, pr_thresholds_cv = precision_recall_curve(y_train, y_prob_train)
+        optimal_threshold = compute_optimal_threshold(fpr_cv, tpr_cv, roc_thresholds_cv)
+
+    # --- Final metrics on test set ---
+    test_metrics = {}
+    if y_test is not None and len(y_test) > 0:
+        y_pred_test = (y_prob_test >= optimal_threshold).astype(int)
+        test_metrics = _compute_fold_metrics(y_test, y_prob_test)
+        test_metrics["f1_at_optimal"] = f1_score(y_test, y_pred_test)
+        test_metrics["confusion_matrix"] = confusion_matrix(y_test, y_pred_test).tolist()
+        test_metrics["n_test_samples"] = len(y_test)
+        test_metrics["n_positive_test"] = int(np.sum(y_test))
+        test_metrics["n_negative_test"] = int(np.sum(y_test == 0))
+
+    # CV aggregate metrics
+    if cv_results:
+        cv_metrics = {
+            "cv_auc_roc": np.mean([r["auc_roc"] for r in cv_results]),
+            "cv_auc_pr": np.mean([r["auc_pr"] for r in cv_results]),
+            "cv_f1": np.mean([r["f1"] for r in cv_results]),
+            "cv_precision": np.mean([r["precision"] for r in cv_results]),
+            "cv_recall": np.mean([r["recall"] for r in cv_results]),
+            "cv_brier": np.mean([r["brier"] for r in cv_results]),
+            "n_folds": len(cv_results),
+        }
+    else:
+        cv_metrics = {}
+
+    # --- Combine metrics ---
+    all_metrics = {
+        "threshold_case_count": threshold,
+        "percentile": percentile,
+        "optimal_prob_threshold": optimal_threshold,
+        "n_train": len(y_train),
+        "n_positive_train": int(np.sum(y_train)),
+        "n_negative_train": int(np.sum(y_train == 0)),
+        "scale_pos_weight": scale_pos_weight,
+        **cv_metrics,
+        **test_metrics,
+    }
+
+    return {
+        "model": final_pipeline,
+        "metrics": all_metrics,
+        "feature_cols": feature_cols,
+        "threshold": threshold,
+        "optimal_threshold": optimal_threshold,
+        "X_train": X_train,
+        "X_test": X_test,
+        "y_train": y_train,
+        "y_test": y_test,
+        "y_prob_train": y_prob_train,
+        "y_prob_test": y_prob_test,
+        # CV-based curves (honest out-of-fold estimates)
+        "fpr": fpr_cv,
+        "tpr": tpr_cv,
+        "roc_thresholds": roc_thresholds_cv,
+        "prec": prec_cv,
+        "rec": rec_cv,
+        "pr_thresholds": pr_thresholds_cv,
+        "cv_results": cv_results,
+        "cv_y_true": cv_y_true_all,
+        "cv_y_prob": cv_y_prob_all,
+        # Metadata for predictions
+        "df_train": df_train,
+        "df_test": df_test,
+        "imputer": imputer,
+    }
+
+
+def _compute_fold_metrics(y_true, y_prob):
+    """
+    Compute metrics for a single fold or dataset.
+    """
+    y_pred = (y_prob >= 0.5).astype(int)
+
+    metrics = {
+        "auc_roc": roc_auc_score(y_true, y_prob) if len(np.unique(y_true)) > 1 else 0.0,
+        "auc_pr": average_precision_score(y_true, y_prob),
+        "f1": f1_score(y_true, y_pred, zero_division=0),
+        "precision": precision_score(y_true, y_pred, zero_division=0),
+        "recall": recall_score(y_true, y_pred, zero_division=0),
+        "brier": brier_score_loss(y_true, y_prob),
+    }
+
+    return metrics
+
+
+def get_binary_feature_importance(result_dict):
+    """
+    Extract feature importance from trained binary model.
+
+    Parameters
+    ----------
+    result_dict : dict
+        Output of train_binary_model().
+
+    Returns
+    -------
+    pd.DataFrame
+        DataFrame with 'Feature' and 'Importance' columns.
+    """
+    model = result_dict.get("model")
+    feature_cols = result_dict.get("feature_cols", [])
+
+    if model is None or feature_cols is None:
+        return pd.DataFrame(columns=["Feature", "Importance"])
+
+    classifier = model.named_steps["classifier"]
+
+    if hasattr(classifier, "feature_importances_") and classifier.feature_importances_ is not None:
+        importances = np.asarray(classifier.feature_importances_, dtype=float)
+    else:
+        # Fallback: return zeros
+        importances = np.zeros(len(feature_cols))
+
+    df_imp = pd.DataFrame({
+        "Feature": feature_cols,
+        "Importance": importances,
+    }).sort_values("Importance", ascending=False).reset_index(drop=True)
+
+    return df_imp
+
+
+def get_shap_values(result_dict, max_samples=1000):
+    """
+    Compute SHAP values for the trained model.
+
+    Parameters
+    ----------
+    result_dict : dict
+        Output of train_binary_model().
+    max_samples : int
+        Max samples to use for SHAP computation (for performance).
+
+    Returns
+    -------
+    dict with keys:
+        - shap_values: np.ndarray
+        - expected_value: float
+        - X_background: pd.DataFrame (background data)
+        - feature_names: list
+    """
+    try:
+        import shap
+    except ImportError:
+        return None
+
+    model = result_dict.get("model")
+    X_train = result_dict.get("X_train")
+    feature_cols = result_dict.get("feature_cols", [])
+
+    if model is None or X_train is None:
+        return None
+
+    classifier = model.named_steps["classifier"]
+
+    # Sample background data for efficiency
+    if len(X_train) > max_samples:
+        rng = np.random.RandomState(42)
+        indices = rng.choice(len(X_train), max_samples, replace=False)
+        X_background = X_train[indices]
+    else:
+        X_background = X_train
+
+    try:
+        # Create a wrapper function that returns probability of class 1
+        def model_predict_proba(X):
+            return model.predict_proba(X)[:, 1]
+
+        explainer = shap.KernelExplainer(model_predict_proba, X_background)
+
+        # Use a sample of training data for SHAP computation
+        n_shap_samples = min(200, len(X_train))
+        rng = np.random.RandomState(42)
+        shap_indices = rng.choice(len(X_train), n_shap_samples, replace=False)
+        X_to_explain = X_train[shap_indices]
+
+        shap_values = explainer.shap_values(X_to_explain)
+
+        return {
+            "shap_values": shap_values,
+            "expected_value": explainer.expected_value,
+            "X_background": X_background,
+            "X_explained": X_to_explain,
+            "feature_names": feature_cols,
+        }
+    except Exception as e:
+        print(f"SHAP computation failed: {e}")
+        return None
+
+
+def predict_future_binary(model, df_future, imputer=None):
+    """
+    Predict binary outcome for future data.
+
+    Parameters
+    ----------
+    model : sklearn.Pipeline
+        Trained binary classification pipeline.
+    df_future : pd.DataFrame
+        DataFrame with feature columns for prediction.
+    imputer : SimpleImputer, optional
+        Fitted imputer from training.
+
+    Returns
+    -------
+    dict with keys:
+        - y_prob: predicted probabilities
+        - y_pred_default: predictions at default 0.5 threshold
+        - y_pred_optimal: predictions at optimal threshold (if provided)
+    """
+    feature_cols = [c for c in df_future.columns if c.startswith("prev_")]
+    feature_cols += [c for c in ["log_pop"] if c in df_future.columns]
+    feature_cols += [c for c in df_future.columns if "avg_temp" in c or "avg_umid" in c]
+    feature_cols = [c for c in feature_cols if c in df_future.columns]
+
+    X = df_future[feature_cols].values
+
+    if imputer is not None:
+        X = imputer.transform(X)
+
+    y_prob = model.predict_proba(X)[:, 1]
+    y_pred_default = (y_prob >= 0.5).astype(int)
+
+    return {
+        "y_prob": y_prob,
+        "y_pred_default": y_pred_default,
+        "feature_cols": feature_cols,
+    }

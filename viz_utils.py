@@ -240,14 +240,93 @@ def plot_episcanner_region_timeseries(region):
         if combined.empty:
             return go.Figure().update_layout(title=f"No data for {region}")
 
-        fig = px.line(
-            combined,
-            x="data_iniSE",
-            y="casos_est",
+        combined = combined.sort_values("data_iniSE").reset_index(drop=True)
+
+        # Compute percentile areas if multiple years available
+        combined["EW"] = combined["data_iniSE"].dt.isocalendar().week.astype(int)
+        combined["yr"] = combined["data_iniSE"].dt.year
+
+        fig = go.Figure()
+
+        pcts = [50, 75, 90]
+        colors_pct = {"50": "green", "75": "orange", "90": "red"}
+
+        if combined["yr"].nunique() >= 2:
+            df_weekly = combined[["EW", "yr", "casos_est"]].dropna().copy()
+            df_pcts = df_weekly.groupby("EW")["casos_est"].quantile(
+                [p / 100 for p in pcts]
+            ).unstack().reset_index()
+            df_pcts.columns = ["EW"] + [f"p{p}" for p in pcts]
+
+            df_with_pcts = combined[["data_iniSE", "EW"]].merge(df_pcts, on="EW", how="left")
+            df_with_pcts = df_with_pcts.sort_values("data_iniSE")
+
+            # 90th percentile area
+            if "p90" in df_with_pcts.columns and df_with_pcts["p90"].notna().any():
+                fig.add_trace(go.Scatter(
+                    x=df_with_pcts["data_iniSE"],
+                    y=df_with_pcts["p90"],
+                    mode="lines",
+                    name="90th Percentile",
+                    line=dict(color="red", width=1, dash="dot"),
+                    fill="tozeroy",
+                    fillcolor="rgba(255, 0, 0, 0.08)",
+                    opacity=0.7,
+                ))
+
+            # 75th percentile area
+            if "p75" in df_with_pcts.columns and df_with_pcts["p75"].notna().any():
+                fig.add_trace(go.Scatter(
+                    x=df_with_pcts["data_iniSE"],
+                    y=df_with_pcts["p75"],
+                    mode="lines",
+                    name="75th Percentile",
+                    line=dict(color="orange", width=1, dash="dot"),
+                    fill="tozeroy",
+                    fillcolor="rgba(255, 165, 0, 0.08)",
+                    opacity=0.7,
+                ))
+
+            # 50th percentile area
+            if "p50" in df_with_pcts.columns and df_with_pcts["p50"].notna().any():
+                fig.add_trace(go.Scatter(
+                    x=df_with_pcts["data_iniSE"],
+                    y=df_with_pcts["p50"],
+                    mode="lines",
+                    name="50th Percentile (Median)",
+                    line=dict(color="green", width=1.5, dash="dash"),
+                    fill="tozeroy",
+                    fillcolor="rgba(0, 128, 0, 0.1)",
+                    opacity=0.7,
+                ))
+
+        # Main series on top
+        fig.add_trace(go.Scatter(
+            x=combined["data_iniSE"],
+            y=combined["casos_est"],
+            mode="lines",
+            name="Estimated Cases",
+            line=dict(color="darkblue", width=2.5),
+            fill="tozeroy",
+            fillcolor="rgba(0, 51, 102, 0.12)",
+        ))
+
+        fig.update_layout(
             title=title,
-            labels={"data_iniSE": "Date", "casos_est": "Estimated weekly cases"},
+            xaxis_title="Date",
+            yaxis_title="Estimated weekly cases",
+            template="plotly_white",
+            showlegend=True,
+            legend=dict(
+                yanchor="top",
+                y=0.99,
+                xanchor="left",
+                x=0.01,
+                bgcolor="rgba(255,255,255,0.8)",
+                bordercolor="rgba(0,0,0,0.2)",
+                borderwidth=1,
+            ),
         )
-        fig.update_layout(template="plotly_white")
         return fig
 
     except Exception as e:
@@ -365,6 +444,80 @@ def plot_state_residuals_vs_alpha(region):
 
     fig.update_layout(template="plotly_white", height=400)
     return fig
+
+
+def plot_epidemic_years_map(state_abbrev=None):
+    """
+    Plot a choropleth map showing the number of epidemic years with data per city.
+
+    Parameters
+    ----------
+    state_abbrev : str or None
+        State abbreviation (e.g., "SP") or None for state-level aggregate.
+
+    Returns
+    -------
+    plotly.graph_objects.Figure
+    """
+    try:
+        region_query = state_abbrev if state_abbrev else "BR"
+        df_epi = data_utils.get_duckdb_episcanner_data(region_query)
+        if df_epi.empty:
+            return go.Figure().update_layout(title="No episcanner data available")
+
+        # Count distinct years per city
+        n_years = df_epi.groupby("geocode")["year"].nunique().reset_index()
+        n_years.columns = ["geocode", "n_years"]
+
+        # Merge with geography
+        gdf = load_geography()
+        if gdf is None or gdf.empty:
+            return go.Figure().update_layout(title="Geography data not available")
+
+        gdf["geocode"] = pd.to_numeric(gdf["code_muni"], errors="coerce")
+        merged = gdf.merge(n_years, on="geocode", how="left")
+        merged["n_years"] = merged["n_years"].fillna(0).astype(int)
+
+        # Filter by state if specified
+        if state_abbrev:
+            merged = merged[merged["abbrev_state"] == state_abbrev]
+
+        if merged.empty:
+            return go.Figure().update_layout(title="No data for selected state")
+
+        if merged.crs is None or merged.crs.to_epsg() != 4326:
+            merged = merged.to_crs(epsg=4326)
+
+        centroid_lat, centroid_lon = _get_centroid_lat_lon(merged)
+
+        fig = px.choropleth_map(
+            merged,
+            geojson=merged.__geo_interface__,
+            locations="code_muni",
+            featureidkey="properties.code_muni",
+            color="n_years",
+            hover_name="name_muni",
+            hover_data={"n_years": True, "geocode": True},
+            map_style="carto-positron",
+            center={"lat": centroid_lat, "lon": centroid_lon},
+            zoom=6,
+            opacity=0.8,
+            title=f"Epidemic Years with Data — {state_abbrev or 'All Brazil'}",
+            color_continuous_scale="Viridis",
+            labels={"n_years": "Epidemic Years"},
+        )
+
+        fig.update_layout(
+            margin={"r": 0, "t": 40, "l": 0, "b": 0},
+            width=800,
+            height=600,
+            autosize=True,
+        )
+        return fig
+
+    except Exception as e:
+        print(f"Error plotting epidemic years map: {e}")
+        return go.Figure().update_layout(title=f"Error: {str(e)}")
 
 
 def plot_map(state_abbrev=None):
@@ -744,14 +897,90 @@ def plot_timeseries(geocode_str):
     df = df.sort_values("data_iniSE")
     df.reset_index(inplace=True)
 
-    fig = px.line(
-        df,
-        x="data_iniSE",
-        y="casos_est",
-        title=f"Weekly Estimated Cases - {geocode_str}",
-        labels={"data_iniSE": "Date", "casos_est": "Estimated weekly cases"},
+    fig = go.Figure()
+
+    # Compute historical percentiles by epidemiological week (EW)
+    if "EW" in df.columns and "year" in df.columns and len(df["year"].unique()) >= 2:
+        df_weekly = df[["EW", "year", "casos_est"]].dropna().copy()
+        pcts = [50, 75, 90]
+        colors_pct = {"50": "green", "75": "orange", "90": "red"}
+
+        # Compute percentiles per EW across all years
+        df_pcts = df_weekly.groupby("EW")["casos_est"].quantile(
+            [p / 100 for p in pcts]
+        ).unstack().reset_index()
+        df_pcts.columns = ["EW"] + [f"p{p}" for p in pcts]
+
+        # Map each row in df to its percentile values via EW
+        df_with_pcts = df[["data_iniSE", "EW"]].merge(df_pcts, on="EW", how="left")
+        df_with_pcts = df_with_pcts.sort_values("data_iniSE")
+
+        # 90th percentile filled area (from 0 to 90th)
+        if "p90" in df_with_pcts.columns and df_with_pcts["p90"].notna().any():
+            fig.add_trace(go.Scatter(
+                x=df_with_pcts["data_iniSE"],
+                y=df_with_pcts["p90"],
+                mode="lines",
+                name="90th Percentile",
+                line=dict(color="red", width=1, dash="dot"),
+                fill="tozeroy",
+                fillcolor="rgba(255, 0, 0, 0.08)",
+                opacity=0.7,
+            ))
+
+        # 75th percentile filled area (from 0 to 75th)
+        if "p75" in df_with_pcts.columns and df_with_pcts["p75"].notna().any():
+            fig.add_trace(go.Scatter(
+                x=df_with_pcts["data_iniSE"],
+                y=df_with_pcts["p75"],
+                mode="lines",
+                name="75th Percentile",
+                line=dict(color="orange", width=1, dash="dot"),
+                fill="tozeroy",
+                fillcolor="rgba(255, 165, 0, 0.08)",
+                opacity=0.7,
+            ))
+
+        # 50th percentile filled area (from 0 to 50th)
+        if "p50" in df_with_pcts.columns and df_with_pcts["p50"].notna().any():
+            fig.add_trace(go.Scatter(
+                x=df_with_pcts["data_iniSE"],
+                y=df_with_pcts["p50"],
+                mode="lines",
+                name="50th Percentile (Median)",
+                line=dict(color="green", width=1.5, dash="dash"),
+                fill="tozeroy",
+                fillcolor="rgba(0, 128, 0, 0.1)",
+                opacity=0.7,
+            ))
+
+    # Main line: estimated weekly cases (on top of percentile areas)
+    fig.add_trace(go.Scatter(
+        x=df["data_iniSE"],
+        y=df["casos_est"],
+        mode="lines",
+        name="Estimated Cases",
+        line=dict(color="darkblue", width=2.5),
+        fill="tozeroy",
+        fillcolor="rgba(0, 51, 102, 0.12)",
+    ))
+
+    fig.update_layout(
+        title=f"Weekly Estimated Cases — {geocode_str}",
+        xaxis_title="Date",
+        yaxis_title="Estimated weekly cases",
+        template="plotly_white",
+        showlegend=True,
+        legend=dict(
+            yanchor="top",
+            y=0.99,
+            xanchor="left",
+            x=0.01,
+            bgcolor="rgba(255,255,255,0.8)",
+            bordercolor="rgba(0,0,0,0.2)",
+            borderwidth=1,
+        ),
     )
-    fig.update_layout(template="plotly_white")
     return fig
 
 

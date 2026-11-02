@@ -19,6 +19,7 @@ from data_utils import (
 import viz_utils
 from viz_utils import (
     plot_map,
+    plot_epidemic_years_map,
     plot_trend_map,
     plot_local_moran,
     plot_alpha_histogram,
@@ -130,7 +131,9 @@ def create_dashboard():
                             label="Alpha Distribution (Weekly Cases)", min_width=300
                         )
                     with gr.Column(scale=4):
-                        map_plot = gr.Plot(label="Alpha Parameter Map (Weekly Cases)")
+                        with gr.Row():
+                            map_plot = gr.Plot(label="Alpha Parameter Map (Weekly Cases)")
+                            epi_years_map_plot = gr.Plot(label="Epidemic Years by City")
                         alpha_incidence_plot = gr.Plot(
                             label="Alpha vs Incidence (Weekly Cases)"
                         )
@@ -403,7 +406,7 @@ def create_dashboard():
             )
             with tab_binary_predictive:
                 gr.Markdown("""
-                ## 🎯 Binary Classification Model — Epidemic Forecasting
+                ## 🎯 Size Classification Model — Epidemic Forecasting
 
                 ### Methodology Description
 
@@ -624,34 +627,68 @@ def create_dashboard():
                     rel_error = np.abs(y_true - y_pred) / (y_true.replace(0, 1e-5))
                     high_error_mask = rel_error > 0.2
 
+                    # Split into train and test for different marker shapes
+                    is_test = df_all["year"] >= year
+                    is_train = ~is_test
+
                     fig = go.Figure()
 
-                    hover_text = []
-                    for i, row in df_all.iterrows():
-                        txt = f"Year: {int(row['year'])}<br>"
-                        if "city_name" in df_all.columns:
-                            txt += f"City: {row['city_name']} ({int(row['geocode'])})"
-                        elif "state" in df_all.columns:
-                            txt += f"State: {row['state']}"
+                    # Train set markers
+                    if is_train.any():
+                        train_hover = []
+                        for i, row in df_all[is_train].iterrows():
+                            txt = f"Year: {int(row['year'])} (Train)<br>"
+                            if "city_name" in df_all.columns:
+                                txt += f"City: {row['city_name']} ({int(row['geocode'])})"
+                            elif "state" in df_all.columns:
+                                txt += f"State: {row['state']}"
+                            err_val = rel_error.loc[i] * 100
+                            txt += f"<br>Error: {err_val:.1f}%"
+                            train_hover.append(txt)
 
-                        err_val = rel_error.loc[i] * 100
-                        txt += f"<br>Error: {err_val:.1f}%"
-                        hover_text.append(txt)
-
-                    fig.add_trace(
-                        go.Scatter(
-                            x=y_true,
-                            y=y_pred,
+                        fig.add_trace(go.Scatter(
+                            x=y_true[is_train],
+                            y=y_pred[is_train],
                             mode="markers",
-                            name="Data Points",
+                            name="Train",
                             marker=dict(
-                                color=high_error_mask.map({True: "red", False: "blue"}),
+                                symbol="circle",
+                                size=8,
+                                color=high_error_mask[is_train].map({True: "red", False: "steelblue"}),
                                 opacity=0.6,
                             ),
-                            hovertext=hover_text,
+                            hovertext=train_hover,
                             hoverinfo="text+x+y",
-                        )
-                    )
+                        ))
+
+                    # Test set markers
+                    if is_test.any():
+                        test_hover = []
+                        for i, row in df_all[is_test].iterrows():
+                            txt = f"Year: {int(row['year'])} (Test)<br>"
+                            if "city_name" in df_all.columns:
+                                txt += f"City: {row['city_name']} ({int(row['geocode'])})"
+                            elif "state" in df_all.columns:
+                                txt += f"State: {row['state']}"
+                            err_val = rel_error.loc[i] * 100
+                            txt += f"<br>Error: {err_val:.1f}%"
+                            test_hover.append(txt)
+
+                        fig.add_trace(go.Scatter(
+                            x=y_true[is_test],
+                            y=y_pred[is_test],
+                            mode="markers",
+                            name="Test",
+                            marker=dict(
+                                symbol="diamond",
+                                size=10,
+                                color=high_error_mask[is_test].map({True: "darkred", False: "darkgreen"}),
+                                opacity=0.8,
+                            ),
+                            hovertext=test_hover,
+                            hoverinfo="text+x+y",
+                        ))
+
                     min_val = min(y_true.min(), y_pred.min())
                     max_val = max(y_true.max(), y_pred.max())
                     fig.add_trace(
@@ -1017,7 +1054,7 @@ def create_dashboard():
         )
 
         def run_binary_training(region, percentile, model_type, min_pop, test_year):
-            """Handler for training the binary classification model."""
+            """Handler for training the size classification model."""
             try:
                 # Prepare dataset
                 df_binary = prepare_binary_dataset(
@@ -1316,12 +1353,14 @@ def create_dashboard():
 
             if base_state:
                 map_fig = plot_map(base_state)
+                epi_years_fig = plot_epidemic_years_map(base_state)
                 hist_fig = plot_alpha_histogram(base_state)
                 incidence_fig = plot_alpha_vs_incidence(base_state)
                 trend_fig = plot_trend_map(base_state)
                 moran_fig = plot_local_moran(base_state)
             else:
                 map_fig = plot_map(None)
+                epi_years_fig = plot_epidemic_years_map(None)
                 hist_fig = plot_alpha_histogram(None)
                 incidence_fig = plot_alpha_vs_incidence(None)
                 trend_fig = go.Figure().update_layout(
@@ -1333,6 +1372,7 @@ def create_dashboard():
 
             return (
                 map_fig,
+                epi_years_fig,
                 incidence_fig,
                 trend_fig,
                 moran_fig,
@@ -1409,6 +1449,7 @@ def create_dashboard():
             inputs=[state_dropdown_overview],
             outputs=[
                 map_plot,
+                epi_years_map_plot,
                 alpha_incidence_plot,
                 trend_map_plot,
                 moran_plot,
