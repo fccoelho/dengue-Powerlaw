@@ -11,6 +11,14 @@ environment, not a placeholder: captions in main.tex describe exactly what is
 drawn. Predictive figures (10-15) retrain the models described in the Methods;
 their numbers therefore move when the database is refreshed, and the figures
 should be regenerated after every data update.
+
+One exception, deliberately: Figure 11 (the ablation ladder) is *read* from
+``ablation_results.csv`` / ``ablation_results.meta.json`` written by
+``run_ablation.py``, not recomputed here. Recomputing it was the defect: the
+previous version ran its own ladder at city level with a random forest, a raw
+persistence baseline and a substring-discovered climate block, so it could
+disagree with Table 4 -- and did, once the climate block silently came up
+empty. A figure that is a view of the same artefact cannot disagree with it.
 """
 import json
 import sqlite3
@@ -30,16 +38,24 @@ import pandas as pd  # noqa: E402
 HERE = Path(__file__).resolve().parent
 ROOT = HERE.parents[1]
 sys.path.insert(0, str(ROOT))
+import os  # noqa: E402
+
 os_cwd = Path.cwd()
 if str(ROOT) != str(os_cwd):
-    import os
-
     os.chdir(ROOT)  # the data layer uses relative paths ("data/...", "muni_br.gpkg")
 
 warnings.filterwarnings("ignore")
 
 OUT = HERE
 PANEL_CACHE = HERE / "_panel_city_BR.parquet"
+
+#: The ablation artefacts written by ``run_ablation.py`` at the repository root.
+#: Figure 11 is a *view* of these files, not a recomputation: the numbers in the
+#: manuscript, in the CSV and in the figure are then the same numbers by
+#: construction. Set ``EPIDEMIC_ABLATION_CSV`` to point elsewhere.
+ABLATION_CSV = Path(os.environ.get("EPIDEMIC_ABLATION_CSV",
+                                   ROOT / "ablation_results.csv"))
+ABLATION_META = ABLATION_CSV.with_suffix("").with_suffix(".meta.json")
 
 mpl.rcParams.update({
     "figure.dpi": 150,
@@ -102,6 +118,102 @@ def _city_panel():
     df = prepare_lagged_data("BR", target_year=None, level="city")
     df.to_parquet(PANEL_CACHE)
     return df
+
+
+# ---------------------------------------------------------------------------
+# shared: the ablation artefact (fig 11)
+# ---------------------------------------------------------------------------
+ABL_REQUIRED = ("record_type", "task", "target", "origin", "rung", "contrast",
+                "loss", "tau", "value", "ci_low", "ci_high")
+
+TASK_LABEL = {
+    "total_cases": "size $S_t$",
+    "ep_dur": "duration $D_t$",
+    "peak_week": "peak week $P_t$",
+}
+RUNG_COLORS = {"M1": "#9ecae1", "M2": "#4292c6", "M3": "#08519c"}
+
+
+def _load_ablation(csv_path=None):
+    """Read and *validate* the ablation artefact. Never recompute it here.
+
+    The validation is the point of this function. The defect that produced a
+    full column of zeros -- M2 silently identical to M1 because the climate
+    block was discovered by substring and came up empty -- is exactly the kind
+    of failure that is invisible in a figure. Each check below converts it into
+    a loud abort with an actionable message.
+    """
+    csv_path = Path(csv_path or ABLATION_CSV)
+    meta_path = csv_path.with_suffix("").with_suffix(".meta.json")
+    if not csv_path.exists():
+        raise FileNotFoundError(
+            f"{csv_path} not found. Run `python run_ablation.py` first; this "
+            "figure is a view of that artefact, it does not recompute it.")
+
+    raw = pd.read_csv(csv_path)
+    missing = [c for c in ABL_REQUIRED if c not in raw.columns]
+    if missing:
+        raise ValueError(f"{csv_path} is missing columns {missing}")
+
+    meta = {}
+    if meta_path.exists():
+        meta = json.loads(meta_path.read_text())
+    else:
+        warnings.warn(f"{meta_path} not found; cannot check the ladder.", stacklevel=2)
+
+    # -- guard 1: M2 must add something to M1 ------------------------------
+    ladder = meta.get("ladder", {})
+    if ladder:
+        m1, m2, m3 = (list(ladder.get(k, [])) for k in ("M1", "M2", "M3"))
+        if m2 and m1 and set(m2) == set(m1):
+            raise RuntimeError(
+                "ablation artefact is defective: rung M2 has exactly the same "
+                f"features as M1 ({len(m1)} columns). The M2-M1 contrast is "
+                "then identically zero and the figure would read 'climate adds "
+                "nothing' when climate never entered. Re-run `python "
+                "run_ablation.py --attach-climate`.")
+        if m3 and m2 and set(m3) == set(m2):
+            raise RuntimeError(
+                "ablation artefact is defective: M3 adds nothing to M2, so the "
+                "scaling block this figure exists to report is absent.")
+        if m1 and m2 and not set(m1) < set(m2):
+            raise RuntimeError("ladder is not nested: M1 is not a subset of M2.")
+
+    # -- guard 2: the climate block must be populated -----------------------
+    climate = meta.get("climate", {})
+    if climate and not climate.get("available"):
+        raise RuntimeError(
+            "ablation artefact reports an empty climate block "
+            f"(missing: {climate.get('missing')}). M2 is undefined; the figure "
+            "would misattribute the M3-M2 contrast to scaling alone.")
+
+    # -- guard 3: the M2-M1 contrast must actually vary ----------------------
+    m21 = raw[(raw.record_type == "contrast") & (raw.contrast == "M2-M1")]
+    if len(m21) and float(np.nanmax(np.abs(m21.value))) == 0.0:
+        raise RuntimeError(
+            "every M2-M1 contrast is exactly 0.0 with a [0, 0] interval: this "
+            "is the 'climate never entered' signature, not a result.")
+
+    return {"raw": raw, "meta": meta, "path": csv_path}
+
+
+def _ablation_skill(abl, tau=0.5):
+    """Median skill vs M0 per (target, rung), plus the per-origin scatter."""
+    sk = abl["raw"]
+    sk = sk[(sk.record_type == "skill") & (sk.loss == "pinball")
+            & np.isclose(sk.tau, tau)]
+    return sk
+
+
+def _ablation_relative(abl):
+    """100 * (L_M2 - L_M3) / L_M2 per (target, tau, origin); positive = M3 better."""
+    lo = abl["raw"]
+    lo = lo[(lo.record_type == "loss") & (lo.loss == "pinball")]
+    piv = lo.pivot_table(index=["target", "tau", "origin"],
+                         columns="rung", values="value").reset_index()
+    piv = piv.dropna(subset=["M2", "M3"])
+    piv["rel"] = (piv["M2"] - piv["M3"]) / piv["M2"] * 100.0
+    return piv
 
 
 # ---------------------------------------------------------------------------
@@ -449,7 +561,18 @@ def _regression_oof(origins=(2023, 2024, 2025)):
     from sklearn.ensemble import RandomForestRegressor
 
     df = _city_panel()
-    climate = [c for c in df.columns if c.startswith("prev_avg_")]
+    # Declared block, not a substring scan: a silent empty match would make M2
+    # a copy of M1 in this pass too. run_ablation owns the definition.
+    from run_ablation import CLIMATE_BLOCK
+
+    climate = [c for c in CLIMATE_BLOCK if c in df.columns]
+    if not climate:
+        warnings.warn(
+            "figs 10/14: the panel carries none of the declared climate "
+            f"columns {CLIMATE_BLOCK}; the M2 block of this pass equals M1. "
+            "These figures do not report the ablation, so this does not "
+            "invalidate Table 4, but the M2 labels are not climate-controlled.",
+            stacklevel=2)
     static = ["prev_log_pop"]
     lags = ["prev_total_cases", "prev_ep_dur", "prev_peak_week", "prev_R0"]
     scaling = ["prev_alpha_size", "prev_xmin_size", "prev_alpha_trend"]
@@ -559,41 +682,89 @@ def fig10(oof):
     plt.close(fig)
 
 
-def fig11(oof, pinball):
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.0, 3.6))
-    # (a) skill vs M0 (persistence: predict S_{t-1})
-    df = _city_panel()
-    m0_rows = []
-    for origin in (2023, 2024, 2025):
-        d = df[df["year"] == origin].dropna(subset=["prev_total_cases", "total_cases"])
-        m0_rows.append(d.assign(model="M0", y_pred=d["prev_total_cases"],
-                                y_true=d["total_cases"])[
-            ["model", "y_true", "y_pred"]])
-    m0 = pd.concat(m0_rows)
-    mae = oof.groupby("model").apply(
-        lambda g: np.mean(np.abs(g["y_pred"] - g["y_true"])),
-        include_groups=False,
-    )
-    mae0 = np.mean(np.abs(m0["y_pred"] - m0["y_true"]))
-    skill = {m: 1 - mae[m] / mae0 for m in mae.index}
-    ax1.bar(skill.keys(), skill.values(),
-            color=["#9ecae1", "#4292c6", "#08519c"])
-    ax1.axhline(0, color="k", lw=0.8)
-    ax1.set_ylabel("skill score vs persistence M0")
-    ax1.set_xlabel("predictor blocks")
-    ax1.set_title("(a) epidemic size, MAE skill", fontsize=9)
-    for i, (k, v) in enumerate(skill.items()):
-        ax1.text(i, v + (0.01 if v >= 0 else -0.02), f"{v:.2f}", ha="center",
-                 fontsize=8)
-    # (b) pinball vs tau
-    for name, color in (("M2", "#fdae6b"), ("M3", "#e6550d")):
-        taus = sorted(pinball[name].keys())
-        vals = [np.mean(pinball[name][t]) for t in taus]
-        ax2.plot(taus, vals, "o-", color=color, label=name)
+def fig11(abl):
+    """The ablation ladder, read from ablation_results.csv (not recomputed).
+
+    (a) skill against the calibrated-persistence benchmark M0 for the three
+        regression targets, bar = median over the five forecast origins,
+        dot = one origin, at the primary loss (pinball, tau = 0.5);
+    (b) the quantity the decision rule turns on: the relative change in
+        pinball loss from M2 to M3 against tau. A scaling block that carries
+        tail information should help at high tau; negative values mean it
+        hurts. No tau reaches the 3/5 threshold in this run, which is stated
+        on the panel rather than left to the reader.
+    """
+    sk = _ablation_skill(abl)
+    rel = _ablation_relative(abl)
+    targets = [t for t in ("total_cases", "ep_dur", "peak_week")
+               if t in set(sk["target"])]
+    rungs = ["M1", "M2", "M3"]
+    origins = sorted(sk["origin"].unique())
+
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.4, 3.8),
+                                   gridspec_kw={"width_ratios": [1.15, 1]})
+
+    # ---------------- (a) skill vs M0 -------------------------------------
+    width, gap = 0.24, 0.26
+    rng = np.random.RandomState(0)
+    for i, tgt in enumerate(targets):
+        for j, rung in enumerate(rungs):
+            v = sk[(sk.target == tgt) & (sk.rung == rung)]["value"].dropna()
+            if v.empty:
+                continue
+            x = i + (j - 1) * gap
+            ax1.bar(x, v.median(), width=width, color=RUNG_COLORS[rung],
+                    edgecolor="0.25", linewidth=0.5,
+                    label=rung if i == 0 else None, zorder=2)
+            ax1.scatter(np.full(len(v), x) + rng.uniform(-0.05, 0.05, len(v)),
+                        v.values, s=9, color="0.15", zorder=3,
+                        linewidths=0)
+    ax1.axhline(0, color="k", lw=0.9, zorder=1)
+    ax1.set_xticks(range(len(targets)),
+                   [TASK_LABEL.get(t, t) for t in targets])
+    ax1.set_ylabel(r"skill score $1-L(\mathrm{rung})/L(\mathrm{M0})$")
+    ax1.set_title("(a) skill vs persistence, pinball at $\\tau=0.5$", fontsize=9)
+    ax1.legend(fontsize=7, ncol=3, loc="upper left")
+    ax1.text(0.99, 0.02, f"bar = median of {len(origins)} origins, dot = origin",
+             transform=ax1.transAxes, fontsize=6.5, color="0.35",
+             ha="right", va="bottom")
+
+    # ---------------- (b) M3 - M2 vs tau ----------------------------------
+    colors = {"total_cases": "#08519c", "ep_dur": "#c62828",
+              "peak_week": "#2e7d32"}
+    for tgt in targets:
+        d = rel[rel.target == tgt]
+        med = d.groupby("tau")["rel"].median().sort_index()
+        ax2.plot(med.index, med.values, "o-", ms=3.5, lw=1.4,
+                 color=colors.get(tgt, "0.3"),
+                 label=TASK_LABEL.get(tgt, tgt))
+        if tgt == "total_cases":
+            lo = d.groupby("tau")["rel"].min().sort_index()
+            hi = d.groupby("tau")["rel"].max().sort_index()
+            ax2.fill_between(med.index, lo.values, hi.values,
+                             color=colors[tgt], alpha=0.12, lw=0,
+                             label="range over origins")
+    ax2.axhline(0, color="k", lw=0.9)
+    ax2.axhspan(ax2.get_ylim()[0], 0, color="0.9", zorder=0)
     ax2.set_xlabel(r"quantile level $\tau$")
-    ax2.set_ylabel("pinball loss (cases)")
-    ax2.set_title("(b) quantile loss, epidemic size", fontsize=9)
-    ax2.legend()
+    ax2.set_ylabel(r"$100\,(L_{M2}-L_{M3})/L_{M2}$  (%)")
+    ax2.set_title("(b) scaling block vs $\\tau$: negative = M3 worse",
+                  fontsize=9)
+    ax2.legend(fontsize=7, loc="lower left")
+
+    # the headline number, stated on the panel
+    d95 = rel[(rel.target == "total_cases") & np.isclose(rel.tau, 0.95)]["rel"]
+    if len(d95):
+        ax2.annotate(
+            f"$\\tau=0.95$: median {d95.median():+.1f}%\n"
+            f"({int((d95 < 0).sum())}/{len(d95)} origins worse)",
+            xy=(0.95, d95.median()), xytext=(0.55, 0.12),
+            textcoords="axes fraction", fontsize=6.5,
+            arrowprops=dict(arrowstyle="->", lw=0.7, color="0.3"),
+            bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="0.7", lw=0.5))
+    ax2.text(0.02, 0.03, "no $\\tau$ meets the 3/5 criterion",
+             transform=ax2.transAxes, fontsize=6.5, color="0.35")
+
     fig.tight_layout()
     fig.savefig(OUT / "fig11_ablation_skill.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig11_ablation_skill.png", bbox_inches="tight")
@@ -865,22 +1036,35 @@ def main(which=None):
         "fig13": fig13, "fig14": fig14, "fig15": fig15,
     }
     todo = which or list(everything)
-    # figs 10, 11, 14 share one out-of-sample pass
-    need_oof = any(f in todo for f in ("fig10", "fig11", "fig14"))
-    oof = pinball = None
+
+    # figs 10 and 14 share one out-of-sample pass, at CITY level. It is a
+    # separate experiment from the ablation and must stay that way: the
+    # artefact only carries aggregate losses, not row-level predictions, so it
+    # cannot drive a scatter of predictions.
+    need_oof = any(f in todo for f in ("fig10", "fig14"))
+    oof = None
     if need_oof:
         t0 = time.time()
-        print("retraining out-of-sample regression pass (origins 2023–2025)...",
+        print("retraining out-of-sample regression pass (origins 2023-2025, "
+              "city level, random forest) -- this is NOT the ablation...",
               flush=True)
-        oof, pinball = _regression_oof()
+        oof, _pinball_unused = _regression_oof()
         print(f"  done in {time.time() - t0:.0f}s", flush=True)
+
+    # fig 11 reads the ablation artefact written by run_ablation.py.
+    abl = None
+    if "fig11" in todo:
+        abl = _load_ablation()
+        print(f"[fig11] reading {abl['path'].name} "
+              f"({len(abl['raw'])} rows); not recomputing the ladder.", flush=True)
+
     for name in todo:
         t0 = time.time()
         print(f"[{name}] generating...", flush=True)
         if name == "fig10":
             everything[name](oof)
         elif name == "fig11":
-            everything[name](oof, pinball)
+            everything[name](abl)
         elif name == "fig14":
             everything[name](oof)
         else:

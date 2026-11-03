@@ -63,9 +63,22 @@ losses dominated by a few tail events, evaluation is on proper scoring rules
 five forecast origins, and a four-rung ablation ladder isolates the
 incremental contribution of the scaling block from that of lagged metrics,
 population and climate.
-% TODO: insert the measured M3-M2 skill contrast once the ablation runs are
-% complete; the abstract must not assert a predictive gain before it is
-% measured.
+
+The predictive half returns a negative result, and a sharp one. On a
+rolling-origin design with five forecast origins at state level, and a decision
+rule fixed in advance, the scaling block never improves on the predictors it is
+added to: it gains on the preceding rung with a 95\% bootstrap interval
+excluding zero in 0 of 5 origins for epidemic size, 0 of 5 for duration and 1 of
+5 for peak week, against the 3 of 5 required. It is also worst where it was
+expected to be best: at the 95th percentile of the size forecast it
+\emph{worsens} the pinball loss in all five origins, by 0.2\% to 25\% (median
+$18\%$), consistent with $\hat\alpha$ and $\hat{x}_{\min}$ acting as a noisier
+duplicate of the lagged case count. No rung beats calibrated persistence for
+size, whereas duration is genuinely forecastable (median skill $0.27$); an
+apparent $R^2$ of $0.35$ for size, reported by an earlier run of the same
+pipeline, was computed on the pooled cross-section on the log scale against no
+benchmark, and reflected between-unit differences that persistence reproduces
+trivially.
 
 We conclude that the heavy-tail literature on dengue conflates at least three
 distinct random variables, that scale claims are only interpretable where
@@ -171,14 +184,18 @@ epidemic \emph{duration} is not heavy-tailed and is better described by an
 exponential. The two variables are frequently conflated in the literature,
 which explains a large part of the apparent contradiction.
 
-\item \textbf{A predictive test of the scaling description.} We do not stop at
-the exponent. Treating $(\alpha,x_{\min})$ and the historical trend of
-$\alpha$ as lagged features, we fit regression and classification models for
-epidemic size, duration and peak timing under a rolling-origin design, and use
-a four-rung ablation ladder to measure whether the scaling block adds
-out-of-sample skill over lagged counts, population and climate --- and at
-which aggregation level it does so. This converts a descriptive controversy
-into a falsifiable claim about forecast skill.
+\item \textbf{A predictive test of the scaling description, and its answer.} We
+do not stop at the exponent. Treating $(\alpha,x_{\min})$ and the historical
+trend of $\alpha$ as lagged features, we fit gradient-boosted quantile
+regression models for epidemic size, duration and peak timing under a
+rolling-origin design with five forecast origins, and use a four-rung ablation
+ladder to measure whether the scaling block adds out-of-sample skill over lagged
+counts, population and climate. It does not: the block fails the
+pre-registered rule on all three targets, and at the upper quantile of the size
+forecast it is measurably harmful, which is what the measured coupling between
+$\alpha$ and $x_{\min}$ predicts. The ablation converts a descriptive
+controversy into a falsifiable claim about forecast skill, and the claim is
+falsified.
 \end{enumerate}
 
 \section{Methods}
@@ -569,6 +586,13 @@ M3 & \quad + scaling   & M2 + $\alpha_{S,t-1}$, $x_{\min,S,t-1}$, $\dot\alpha_{t
 \end{tabular}
 \end{table}
 
+Operationally, M0 forecast values are scaled by the empirical $\tau$-quantile of
+the within-unit year-on-year ratio, estimated on the training years, so that the
+same benchmark can be evaluated at every quantile level rather than only at the
+median. At $\tau=0.5$ the scale factor is close to unity and M0 reduces to plain
+persistence; at the other levels this is the honest analogue of persistence,
+not a straw man.
+
 M0 is deliberately naive, because a benchmark that is already sophisticated
 manufactures skill for whatever is added to it. Skill is reported as
 %
@@ -576,8 +600,9 @@ manufactures skill for whatever is added to it. Skill is reported as
 \mathrm{SS} \;=\; 1-\frac{L(\text{model})}{L(\mathrm{M0})},
 \end{equation}
 %
-on the primary loss of each task --- pinball loss at $\tau=0.5$ for size, and
-the Brier score for the classifier, both proper scoring rules
+on the primary loss of each task --- the pinball loss at $\tau=0.5$ for each
+of the three regression targets, and the Brier score for the classifier, both
+proper scoring rules
 \citep{gneiting2007strictly}. Secondary losses are MAE and RMSE of the point
 forecasts, the mean absolute scaled error of \citet{hyndman2006another} to make
 errors comparable across units of very different size, and the pinball loss at
@@ -912,30 +937,80 @@ season.
 \subsection{Predictive skill}
 \label{sec:prediction}
 
-% TODO: numbers below must be regenerated from the ablation runs before
-% submission. The only fit statistics available at the time of writing come
-% from an earlier full-pipeline run (all features, state level, years
-% 2022--2024), and are reported as such.
+% Numbers in this subsection are read from ablation_results.csv and
+% ablation_results.meta.json: state level, panel 2012-2025, origins 2021-2025,
+% 19 quantile levels, hist_gradient_boosting with 300 iterations, seed 42, 2000
+% bootstrap replicates resampling units. The M2 rung carries the eight quarterly
+% climate columns; the M3 rung adds prev_alpha_size, prev_xmin_size and
+% prev_alpha_trend and nothing else.
 
-An earlier run of the complete pipeline at state level, with all predictor
-blocks present, reached a mean out-of-bag $R^2$ for epidemic size of 0.345
-(2022), 0.348 (2023) and 0.374 (2024). For duration and peak week only a single
-figure is on record rather than one per origin --- 0.165 and 0.068 respectively
---- and the per-origin values are among the quantities to be regenerated. These
-figures must also be read with care: the out-of-bag score is
-computed on the log scale on which size is fitted, whereas the $R^2$ reported
-alongside the test metrics is computed after the back-transformation to cases,
-and the two are not interchangeable. A log-scale $R^2$ of 0.35 corresponds to a
-rather worse fit in case space, because the log compresses exactly the large
-outbreaks that matter. All losses in this paper are therefore reported on the
-case scale. On this evidence, size is the target that the available covariates
-actually describe; duration and peak timing are substantially harder, which is
-consistent with the descriptive finding that duration is the variable whose
-distribution carries no scale information to exploit.
+Table~\ref{tab:ablation_results} reports the ablation ladder over the five
+forecast origins 2021--2025 at state level (26 units, 23--25 evaluated per
+origin). Three results organise the remainder of the paper.
+
+\emph{The scaling block adds no predictive information.} The M3$\to$M2 contrast
+is null for every target under the rule fixed in Section~\ref{sec:ablation}: the
+block improves on the preceding rung with a 95\% bootstrap interval excluding
+zero in 0 of 5 origins for size, 0 of 5 for duration and 1 of 5 for peak week,
+against the 3 of 5 required. For epidemic size the median relative change in
+pinball loss at $\tau=0.5$ is $-1.5\%$ --- weakly harmful --- and the five
+per-origin differentials carry no consistent sign (two favour M3, three favour
+M2). The same ordering holds on every other case-scale loss: on MAE at
+$\tau=0.5$ the median across origins is $1.18\times10^{5}$ cases for M2 against
+$1.20\times10^{5}$ for M3, and the RMSE is $2.86\times10^{5}$ against
+$2.95\times10^{5}$.
+
+\emph{It is worst exactly where it was supposed to be best.} The argument for
+$\alpha_{t-1}$ is that it encodes how much of the risk sits in the tail, so any
+gain should concentrate at high $\tau$; Figure~\ref{fig:ablation}b was drawn to
+test precisely that. At $\tau=0.95$ the point estimate of the M3$-$M2
+differential is negative in \emph{all five} origins --- $-24.9\%$, $-23.7\%$,
+$-0.2\%$, $-1.6\%$ and $-18.3\%$ of the M2 loss, median $-18.3\%$ --- although
+with 23--25 units per origin no individual interval excludes zero. Adding
+$\hat\alpha_{t-1}$ and $\hat{x}_{\min,t-1}$ makes the upper quantile of the size
+forecast worse. This is what the coupling of Section~\ref{sec:coupling}
+predicts: both statistics are themselves functions of the magnitude of the
+previous season, so at the upper tail the model is handed a second and noisier
+copy of $S_{t-1}$ and weights it as if it were independent information.
+
+\emph{The model's only real skill is in duration.} Against calibrated
+persistence, the lagged-epidemiological rung M1 is useful for duration (median
+skill $0.27$, positive in 4 of 5 origins, 3 of 5 with an interval excluding zero:
+supported) and carries almost nothing for size (median $0.10$, positive in 3 of
+5, 2 of 5 excluding zero: not supported). Climate (M2$\to$M1) adds nothing on
+any target (0 of 5, 1 of 5 and 0 of 5) and is actively harmful for peak week in
+two origins, where skill falls to $-0.69$ in 2023 against $-0.16$ for M1. Peak
+week is essentially unpredictable at this level of aggregation under every rung.
+A cell-level diagnostic supports the reading that these are absences of effect
+rather than absences of power: over the $19\times5$ cells of the contrast grid,
+the interval excludes zero in 37\% of cells for M1$-$M0 on size and in only 15\%
+for M3$-$M2, so the design does detect effects of the size the ladder was built
+to find.
+
+This inverts an impression created by an earlier full-pipeline run, which
+reported an out-of-bag $R^2$ for size of 0.345, 0.348 and 0.374 for 2022, 2023
+and 2024; we report those figures now only to explain the discrepancy. That
+$R^2$ was computed on the pooled cross-section, on the log scale on which size is
+fitted, and it is dominated by \emph{between}-unit differences in mean epidemic
+size --- which a persistence forecast reproduces trivially, because the ordering
+of states by typical size is stable from year to year. It is not a statement
+about year-on-year change, which is what a forecast has to deliver. Once the loss
+is evaluated on the case scale against a persistence benchmark, the apparent
+skill evaporates. The lesson is the one this paper keeps repeating: the number
+depends on the benchmark, on the scale and on the comparison set, and a high
+$R^2$ against no benchmark is not evidence of forecastability.
+
+Two origins dominate the size column and need separate mention. The 2024 season
+was the largest on record and 2025 fell back sharply; persistence extrapolated
+the record into 2025, and in absolute terms lost there much of what it had gained
+in 2024. The pinball losses for size are accordingly an order of magnitude larger
+in those two origins ($1.5$--$1.7\times10^{5}$ cases) than in the other three
+($1.2$--$3.2\times10^{4}$), so a pooled mean over origins would mostly describe
+how each rung behaves across a regime shift. We therefore report the median
+across origins and the sign of the per-origin differential, not a pooled average.
 
 Figure~\ref{fig:predobs} shows the out-of-sample forecasts in the form in which
-their errors are interpretable, and Figure~\ref{fig:ablation} shows the
-ablation ladder that isolates the contribution of the scaling block.
+their errors are interpretable, and Figure~\ref{fig:ablation} the ladder itself.
 
 \begin{figure}[htbp]
 \centering
@@ -954,14 +1029,23 @@ Table~\ref{tab:ablation_results} is the pinball loss rather than the RMSE.}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig11_ablation_skill}
-\caption{The ablation ladder. (a) Skill score relative to the persistence
-benchmark (M0) for epidemic size, duration and peak week, as predictor blocks
-are added from M1 to M3; the M2$\to$M3 step isolates the contribution of the
-scaling descriptors $(\alpha_{t-1},x_{\min,t-1},\dot\alpha_{t-1})$. (b) Pinball
-loss as a function of the quantile level $\tau$ for M2 and M3: a gain confined
-to high $\tau$ would mean the scaling information concerns extreme seasons
-specifically, which is what a heavy-tail description should deliver. Bars are
-95\% bootstrap intervals from resampling units.}
+\caption{The ablation ladder, drawn directly from \texttt{ablation\_results.csv}
+rather than recomputed. (a) Skill score relative to the calibrated persistence
+benchmark (M0) for epidemic size, duration and peak week at the primary loss
+(pinball, $\tau=0.5$); bar height is the median over the five forecast origins
+and each dot is a single origin. The M2$\to$M3 step isolates the contribution of
+the scaling descriptors $(\alpha_{t-1},x_{\min,t-1},\dot\alpha_{t-1})$.
+(b) The quantity the decision rule turns on, $100\,(L_{M2}-L_{M3})/L_{M2}$,
+against $\tau$: a gain confined to high $\tau$ would mean the scaling
+information concerns extreme seasons specifically, which is what a heavy-tail
+description should deliver, so negative values here are the opposite of the
+intended effect. Lines are medians over origins and the band is the range across
+origins for epidemic size. The block degrades the extreme quantile of the size
+forecast, with a median loss of $18.3\%$ at $\tau=0.95$ and a negative
+differential in all five origins, and no $\tau$ on any target reaches the 3/5
+criterion of Section~\ref{sec:ablation}. Skill scores carry no interval of their
+own: the unit-bootstrap interval in this analysis belongs to the paired
+differential, which is what Table~\ref{tab:ablation_results} reports.}
 \label{fig:ablation}
 \end{figure}
 
@@ -969,20 +1053,29 @@ specifically, which is what a heavy-tail description should deliver. Bars are
 \centering
 \small
 \setlength{\tabcolsep}{4pt}
-\caption{Ablation results, forecast origins 2021--2025 pooled. Skill is measured
-against the persistence benchmark on the primary loss of each task (pinball at
-$\tau=0.5$ for size and duration, Brier for the classifier). Intervals are 95\%
-bootstrap intervals from resampling units. \textbf{To be filled from the
-ablation runs.}}
+\caption{Ablation ladder over the five forecast origins 2021--2025, state level
+(26 units, 23--25 evaluated per origin). Cells give the median across origins of
+the skill score $1-L(\text{rung})/L(\text{M0})$ against calibrated persistence,
+with the range over origins in brackets; the primary loss is the pinball loss at
+$\tau=0.5$ for all three targets. The last column is the M3$-$M2 differential at
+that loss: median relative change, negative meaning that the scaling block
+worsens the forecast, and in parentheses the number of origins in which M3
+improves on M2 by sign alone; in at most one of those origins does the
+bootstrap interval exclude zero, so the count in parentheses is not the one
+the decision rule scores. The decision rule of Section~\ref{sec:ablation} grants the rung
+no credit unless the improvement holds in the same direction with a 95\%
+unit-bootstrap interval excluding zero in at least 3 of the 5 origins; no
+contrast involving the scaling block reaches that threshold, and no rung at all
+beats persistence for epidemic size. The large-season classifier is not
+tabulated: it was not part of this run (Section~\ref{sec:predtest}).}
 \label{tab:ablation_results}
-\begin{tabular}{@{}llrrrr@{}}
+\begin{tabular}{@{}lrrrr@{}}
 \toprule
-Target & Loss & M1 & M2 & M3 & M3$-$M2 [95\% CI]\\
+Target & M1 & M2 & M3 & M3$-$M2 \\
 \midrule
-Size $S_t$      & pinball$_{0.5}$ & \emph{tbd} & \emph{tbd} & \emph{tbd} & \emph{tbd}\\
-Duration $D_t$  & pinball$_{0.5}$ & \emph{tbd} & \emph{tbd} & \emph{tbd} & \emph{tbd}\\
-Peak week $P_t$ & MAE             & \emph{tbd} & \emph{tbd} & \emph{tbd} & \emph{tbd}\\
-Large-season classifier & Brier   & \emph{tbd} & \emph{tbd} & \emph{tbd} & \emph{tbd}\\
+Size $S_t$      & $0.10$ [$-$0.59, $0.71$] & $-0.01$ [$-$0.75, $0.71$] & $-0.14$ [$-$0.56, $0.71$] & $-1.5\%$ (2/5)\\
+Duration $D_t$  & $0.27$ [$-$0.01, $0.43$] & $0.29$ [$0.06$, $0.52$]  & $0.26$ [$-$0.06, $0.48$] & $-3.9\%$ (1/5)\\
+Peak week $P_t$ & $0.08$ [$-$0.16, $0.26$] & $-0.03$ [$-$0.69, $0.26$] & $0.06$ [$-$0.55, $0.26$] & $+1.4\%$ (3/5)\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -996,6 +1089,16 @@ unit's own history. Under Equation~\eqref{eq:exceed} that is a question about
 the tail probability directly, which makes it the natural place to look for
 value in the scaling descriptors. Figures~\ref{fig:roc} and~\ref{fig:shap}
 report discrimination, calibration and attribution.
+
+This rung was not part of the ablation pass reported in
+Table~\ref{tab:ablation_results}: the classification run requires its own flag in
+the runner and was executed separately. What follows therefore describes the
+fitted classifier and its attribution, and claims no ablation verdict for the
+scaling block on the classification task. Since the exceedance formulation is the
+most natural use of $(\alpha,x_{\min})$, and since the regression ladder returned
+a null for the same block (Section~\ref{sec:predtest}), the classification row is
+the one place where a positive result would still be compatible with the
+descriptive half of the paper. It is reported as an open question, not as support.
 
 \begin{figure}[htbp]
 \centering
@@ -1214,22 +1317,78 @@ point forecasts. With $\alpha\approx2$ the latter is dominated by the few larges
 outbreaks and can be moved from excellent to poor by a single season.
 
 \subsection{The predictive test}
+\label{sec:predtest}
 
-% TODO: insert the ablation outcome here once the rolling-origin runs are
-% complete (Table~\ref{tab:ablation_results}, Figures~\ref{fig:ablation},
-% \ref{fig:roc}, \ref{fig:shap}). The decision rule is fixed in
-% Section~\ref{sec:ablation}: the scaling block is credited only if M3 improves
-% on M2 on the primary loss with a 95\% bootstrap interval excluding zero, in the
-% same direction, in at least three of the five forecast origins. Both outcomes
-% are informative and both must be reported as found:
-%  - If M3 beats M2 on pinball loss for size, with the gain concentrated at high
-%    tau, the description has forecasting content and alpha_{t-1} carries
-%    tail information beyond S_{t-1}.
-%  - If M3 is indistinguishable from M2, the exponent is redundant given the
-%    lagged counts -- which is the outcome the coupling in the previous
-%    subsection predicts, and which would make the descriptive result
-%    predictively empty while leaving the methodological argument intact.
-% Neither outcome may be described in the abstract before the runs exist.
+The ablation returns a negative answer, and it is worth being precise about what
+it rules out. The block
+$(\hat\alpha_{t-1},\hat{x}_{\min,t-1},\dot\alpha_{t-1})$ does not improve on the
+covariates it is added to, on any of the three targets, under a rule fixed before
+the runs existed; and where it has an effect at all, that effect is at the
+extreme upper quantile and it is a loss rather than a gain. What this does
+\emph{not} say is that $\alpha$ is uninformative. The exponent remains a
+low-dimensional description of the exceedance curve that reproduces the observed
+frequency of extreme seasons (Section~\ref{sec:riskmodel}). It says that whatever
+information the exponent carries is already contained in $S_{t-1}$, and reaches
+the model there in a form that is easier to use.
+
+The direction of the failure is what makes that reading credible. A feature block
+that is merely irrelevant should be close to ignored by a boosted tree: the split
+search does not select it, and the loss neither improves nor degrades much. What
+we observe at $\tau=0.95$ is degradation in five origins out of five, between
+0.2\% and 25\% of the M2 loss. That is the signature of a variable which is
+\emph{selected} and then misused --- what a noisy proxy for a quantity already in
+the model produces. The tree cannot tell $\hat\alpha_{t-1}$ from a second, genuine
+measurement of last season's magnitude, so it splits on it, and at the upper
+quantile, where the fit is least constrained by data, the error compounds. The
+coupling measured in Section~\ref{sec:coupling} is therefore not merely a caveat
+about correlated predictors; it predicts the sign of the observed degradation, and
+the prediction is met without adjustment.
+
+The honest summary of the predictive half is narrower than the section title
+suggests. The scaling description is not \emph{forecast-useful} against a
+benchmark that already knows the previous season, and no amount of reporting of
+$\alpha$ will make it so, because the redundancy is structural rather than a
+matter of model choice or hyperparameter. It is \emph{decision-useful} in another
+sense: it converts a cross-section of one season into an exceedance curve for the
+next, which is what a service needs in order to set a threshold, and it does so
+without requiring a fitted case count for the unit in question. Those two claims
+have been run together in the literature; separating them is the substantive
+contribution here.
+
+The negative result is also a statement about the benchmark, and that should not
+be buried. Calibrated persistence is a strong competitor for epidemic size at
+state level: annual counts are dominated by a slowly varying unit-level mean, and
+the year-to-year innovation is small by comparison with the between-unit spread.
+Any model that reports only a cross-sectional $R^2$ --- as the earlier run of this
+pipeline did --- will appear successful while adding nothing over the last
+observation. We would put the point more strongly: for a target with this
+autocorrelation structure, a study that reports forecast skill without a
+persistence benchmark has not reported forecast skill.
+
+Two refinements keep the conclusion from overreaching. First, $\alpha$ becoming
+uninformative \emph{as a lagged single-season estimate} is not the same as the
+exceedance description being uninformative, and the two were not tested by the
+same instrument: the ladder tests the former, and the reproduction of the
+observed frequency of extreme seasons tests the latter. Second, persistence being
+hard to beat is not a defect of the models but a property of the target. For
+epidemic size the predictable component is largely the unit's own level, which is
+already known; what is left is the innovation, and no covariate in the panel --
+climate included, at state level -- captured it.
+
+Three qualifications bound all of this. The panel is at state level, so 26 units
+and 23--25 per origin; the bootstrap intervals are correspondingly wide, and the
+\emph{absence} of a significant M3$-$M2 interval is weaker evidence than its
+presence would have been. The classification rung --- the task for which the
+exceedance formulation is the most natural use of the fitted pair --- was not part
+of these runs, so the negative result applies to the quantile regressions and is
+silent about the classifier. And the block was tested in the form the pipeline
+produces it: an exponent estimated on a single season, whose $x_{\min}$ therefore
+tracks that season's magnitude. A block built to avoid the coupling --- an
+exponent estimated over a rolling multi-year window that excludes the target year,
+with $x_{\min}$ held fixed across years so that it is a property of the unit
+rather than of the season --- is a different feature set, and nothing here speaks
+to it. That is the version worth testing next, and the ladder as built would test
+it without modification.
 
 \subsection{Limitations}
 
@@ -1275,6 +1434,16 @@ a unit's own history defines a large season; at the 90th percentile the positive
 class becomes small enough that the balanced accuracy of any classifier falls,
 and the comparison between rungs loses power. The threshold is therefore a
 design parameter, fixed before the runs and reported with them.
+
+\emph{The classification rung was not evaluated here.} The ablation in
+Table~\ref{tab:ablation_results} covers the three quantile regressions. The rung
+that adds the scaling descriptors to the large-season classifier requires a
+separate flag in the runner and was not part of the run that produced these
+numbers, so the negative result of Section~\ref{sec:predtest} applies to the
+regressions and is silent about the classifier. Since the exceedance formulation
+is the most natural use of $(\alpha,x_{\min})$, this is the gap most worth
+closing, and closing it means re-running the same script with the classifier
+enabled.
 
 \emph{The exponent cannot exceed three.} The fitting routine bounds $\alpha$
 above by $3$, so a tail steeper than that is reported as $3$ rather than as its
@@ -1326,16 +1495,22 @@ before it is biological, and reporting $\alpha$ without its lower bound, its
 unit, its sample size and its comparison model makes the disagreement
 unresolvable.
 
-Two consequences follow for forecasting. The encouraging one is that
-$(\alpha,x_{\min})$ fixes the entire exceedance curve of a municipality, and the
-national fits reproduce the observed frequency of extreme seasons over two
-decades of epidemic size using two parameters. The cautionary one is that the
-estimated exponent co-varies with the scale of the season within units, so a
-model carrying $\alpha_{t-1}$ may be re-encoding $S_{t-1}$; whether it adds
-information is an empirical question that the ablation ladder was built to
-answer, and its answer is not presumed here.
+Two consequences follow for forecasting, and the ablation settles the second. The
+encouraging one is that $(\alpha,x_{\min})$ fixes the entire exceedance curve of a
+municipality, and the national fits reproduce the observed frequency of extreme
+seasons over two decades of epidemic size using two parameters. The cautionary one
+was that the estimated exponent co-varies with the scale of the season within
+units, so a model carrying $\alpha_{t-1}$ might be re-encoding $S_{t-1}$. The
+ladder was built to answer that question and the answer is that it is. Against a
+benchmark that already knows the previous season, the scaling block fails the
+pre-registered test on size, on duration and on peak week --- 0, 0 and 1 of the 5
+origins against the 3 required --- and at the 95th percentile of the size forecast
+it degrades the loss in every origin tested, by up to a quarter of the benchmark
+loss. The exponent describes the tail; it does not help to forecast it once the
+last observation is in the model.
 
-What we can state is the form the answer must take. The claim that a scaling
+What generalises beyond this dataset is the form the question must take. The
+claim that a scaling
 description improves forecasts is only meaningful against a specified benchmark,
 on a proper scoring rule, out of sample, with the scaling block isolated from the
 blocks it is added to, and with every leakage channel closed --- including the
