@@ -491,7 +491,7 @@ def plot_cv_folds_metrics_binary(cv_results):
             ))
 
     fig.update_layout(
-        title="Per-Fold Metrics (TimeSeriesSplit)",
+        title="Per-Fold Metrics (held-out calendar year)",
         xaxis_title="Fold",
         yaxis_title="Metric Value",
         template="plotly_white",

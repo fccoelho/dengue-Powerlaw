@@ -425,7 +425,8 @@ def create_dashboard():
                 6. **Quarterly Climate**: Mean minimum temperature and minimum humidity per quarter (Q1–Q4)
 
                 #### Validation & Training
-                - **Temporal Validation**: `TimeSeriesSplit` (no shuffle) to preserve temporal ordering
+                - **Temporal Validation**: year-based forward chaining (expanding window, one held-out
+  calendar year per fold); no fold trains on a year at or after its validation year
                 - **Imbalance Handling**: `scale_pos_weight` (XGBoost) or `is_unbalance=True` (LightGBM)
                 - **Optimal Threshold**: Computed via Youden's J-statistic (maximizes sensitivity + specificity − 1)
                 - **Reproducibility**: `random_state=42` in all stochastic calls
@@ -494,7 +495,7 @@ def create_dashboard():
                         )
 
                         binary_cv_table = gr.Dataframe(
-                            label="Per-Fold Results (TimeSeriesSplit)",
+                            label="Per-Fold Results (held-out year)",
                             interactive=False,
                         )
 
@@ -1141,7 +1142,10 @@ def create_dashboard():
                 cv_results = result.get("cv_results", [])
                 if cv_results:
                     cv_df = pd.DataFrame(cv_results)
-                    cv_display_cols = ["fold", "auc_roc", "auc_pr", "f1", "precision", "recall", "brier"]
+                    cv_display_cols = [
+        "fold", "val_year", "auc_roc", "auc_pr",
+        "f1", "precision", "recall", "brier",
+    ]
                     cv_display_cols = [c for c in cv_display_cols if c in cv_df.columns]
                     cv_display = cv_df[cv_display_cols].copy()
                 else:

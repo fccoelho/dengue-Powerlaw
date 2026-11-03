@@ -4,13 +4,14 @@ Binary classification pipeline for predicting epidemic threshold exceedance.
 Predicts whether total annual dengue cases in a geographic unit will exceed
 a configurable historical percentile (e.g., 75th, 90th, 95th).
 
-Uses temporal cross-validation (TimeSeriesSplit) to prevent data leakage,
-with threshold optimization via Youden's J-statistic.
+Uses year-based forward-chaining cross-validation (see ``temporal_split``) so
+that no fold trains on a year at or after its validation year, with threshold
+optimization via Youden's J-statistic.
 """
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import TimeSeriesSplit
+from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
 from sklearn.compose import ColumnTransformer
 from sklearn.preprocessing import StandardScaler
@@ -39,6 +40,11 @@ except ImportError:
     HAS_LIGHTGBM = False
 
 from predictive_model import prepare_lagged_data
+from temporal_split import (
+    assert_forward_in_time,
+    summarize_folds,
+    year_forward_chain_folds,
+)
 from data_utils import GEO_STATE_MAP
 try:
     from _mun_by_geocode import NAME_BY_GEOCODE
@@ -401,60 +407,114 @@ def train_binary_model(
             "cv_results": [],
         }
 
-    # --- Compute threshold ONLY from training data ---
+    # --- Threshold, labels and weights for the held-out test years ---
+    # This threshold labels the test years (>= test_year, never used for
+    # fitting) and the final model. The CV folds below recompute their own
+    # threshold from their own training years, so a fold's validation labels
+    # can never depend on the year being validated.
     threshold = compute_percentile_threshold(
         df_train["total_cases"].values, percentile=percentile
     )
+    cases_train = df_train["total_cases"].to_numpy(dtype=float)
 
-    # Create binary targets
-    y_train = create_binary_target(df_train["total_cases"].values, threshold)
-    y_test = create_binary_target(df_test["total_cases"].values, threshold) if not df_test.empty else None
+    y_train = create_binary_target(cases_train, threshold)
+    y_test = (
+        create_binary_target(df_test["total_cases"].values, threshold)
+        if not df_test.empty
+        else None
+    )
 
-    X_train = df_train[feature_cols].values
-    X_test = df_test[feature_cols].values if not df_test.empty else None
+    X_train_raw = df_train[feature_cols].to_numpy(dtype=float)
+    X_test_raw = (
+        df_test[feature_cols].to_numpy(dtype=float) if not df_test.empty else None
+    )
 
-    # Handle any remaining NaNs in features (impute with median of train)
-    from sklearn.impute import SimpleImputer
-    imputer = SimpleImputer(strategy="median")
-    X_train = imputer.fit_transform(X_train)
-    if X_test is not None:
-        X_test = imputer.transform(X_test)
-
-    # --- Compute class imbalance weight ---
+    # --- Class imbalance weight (training years only) ---
     n_negative = np.sum(y_train == 0)
     n_positive = np.sum(y_train == 1)
-    if n_positive > 0:
-        scale_pos_weight = n_negative / n_positive
-    else:
-        scale_pos_weight = 1.0
+    scale_pos_weight = float(n_negative / n_positive) if n_positive > 0 else 1.0
 
-    # --- TimeSeriesSplit Cross-Validation ---
-    n_splits = min(5, max(2, len(df_train["year"].unique()) - 1))
-    tscv = TimeSeriesSplit(n_splits=n_splits)
+    # --- Year-based forward-chaining cross-validation ---
+    # Rows arrive sorted by unit, so a row-position split (TimeSeriesSplit)
+    # would hold out municipalities over the whole calendar instead of years:
+    # every validation row would then carry a year already seen in training.
+    # The split is defined on the year index with an expanding window -- fold
+    # j trains on year < v_j and validates on year v_j.
+    train_years = df_train["year"].to_numpy()
+    n_splits = min(5, max(2, len(np.unique(train_years)) - 1))
+    cv_skipped = []
+    try:
+        folds = year_forward_chain_folds(
+            train_years, n_splits=n_splits, min_train_years=2
+        )
+        assert_forward_in_time(train_years, folds)  # structural guard
+    except ValueError as exc:
+        # Too few training years (a short series, not a coding error). We skip
+        # the CV rather than silently fall back to a row-position split, which
+        # would be reported as temporal validation while holding out units.
+        folds = []
+        cv_skipped.append({"fold": 0, "reason": f"insufficient_years: {exc}"})
 
     cv_results = []
     cv_y_true_all = []
     cv_y_prob_all = []
 
-    for fold_idx, (train_idx, val_idx) in enumerate(tscv.split(X_train)):
-        X_tr, X_val = X_train[train_idx], X_train[val_idx]
-        y_tr, y_val = y_train[train_idx], y_train[val_idx]
+    for fold_idx, (tr_idx, val_idx) in enumerate(folds, start=1):
+        # Everything that defines this fold's labels and class weight is
+        # recomputed from the fold's training years only.
+        fold_threshold = compute_percentile_threshold(
+            cases_train[tr_idx], percentile=percentile
+        )
+        y_tr = create_binary_target(cases_train[tr_idx], fold_threshold)
+        y_val = create_binary_target(cases_train[val_idx], fold_threshold)
+
+        if len(np.unique(y_tr)) < 2:
+            cv_skipped.append(
+                {"fold": fold_idx, "reason": "single_class_in_training_years"}
+            )
+            continue
+
+        fold_imputer = SimpleImputer(strategy="median")
+        X_tr = fold_imputer.fit_transform(X_train_raw[tr_idx])
+        X_val = fold_imputer.transform(X_train_raw[val_idx])
+
+        fold_n_neg = float(np.sum(y_tr == 0))
+        fold_n_pos = float(np.sum(y_tr == 1))
+        fold_pos_weight = fold_n_neg / fold_n_pos if fold_n_pos > 0 else 1.0
 
         pipeline = build_model_pipeline(
             model_type=model_type,
-            scale_pos_weight=scale_pos_weight,
+            scale_pos_weight=fold_pos_weight,
             random_state=random_state,
         )
-
         pipeline.fit(X_tr, y_tr)
         y_prob_val = pipeline.predict_proba(X_val)[:, 1]
 
         fold_metrics = _compute_fold_metrics(y_val, y_prob_val)
-        fold_metrics["fold"] = fold_idx + 1
+        fold_metrics.update(
+            {
+                "fold": fold_idx,
+                "val_year": int(np.max(train_years[val_idx])),
+                "train_years": "{}-{}".format(
+                    int(np.min(train_years[tr_idx])),
+                    int(np.max(train_years[tr_idx])),
+                ),
+                "n_train_fold": int(np.size(tr_idx)),
+                "n_val_fold": int(np.size(val_idx)),
+                "n_positive_val": int(np.sum(y_val)),
+                "threshold_case_count_fold": float(fold_threshold),
+                "scale_pos_weight_fold": float(fold_pos_weight),
+            }
+        )
         cv_results.append(fold_metrics)
 
         cv_y_true_all.extend(y_val.tolist())
         cv_y_prob_all.extend(y_prob_val.tolist())
+
+    # --- Imputer for the deployable model (fitted on ALL training rows) ---
+    imputer = SimpleImputer(strategy="median")
+    X_train = imputer.fit_transform(X_train_raw)
+    X_test = imputer.transform(X_test_raw) if X_test_raw is not None else None
 
     # --- Train final model on ALL training data ---
     final_pipeline = build_model_pipeline(
@@ -475,11 +535,15 @@ def train_binary_model(
         fpr_cv, tpr_cv, roc_thresholds_cv = roc_curve(cv_y_true_arr, cv_y_prob_arr)
         prec_cv, rec_cv, pr_thresholds_cv = precision_recall_curve(cv_y_true_arr, cv_y_prob_arr)
         optimal_threshold = compute_optimal_threshold(fpr_cv, tpr_cv, roc_thresholds_cv)
+        threshold_source = "out_of_fold"
     else:
-        # Fallback to training predictions if CV predictions are insufficient
+        # No usable out-of-fold predictions (too few years, or a single class
+        # in every fold). The curves below are then in-sample and optimistic;
+        # the flag records that instead of silently reporting them as CV.
         fpr_cv, tpr_cv, roc_thresholds_cv = roc_curve(y_train, y_prob_train)
         prec_cv, rec_cv, pr_thresholds_cv = precision_recall_curve(y_train, y_prob_train)
         optimal_threshold = compute_optimal_threshold(fpr_cv, tpr_cv, roc_thresholds_cv)
+        threshold_source = "in_sample_fallback"
 
     # --- Final metrics on test set ---
     test_metrics = {}
@@ -515,6 +579,9 @@ def train_binary_model(
         "n_positive_train": int(np.sum(y_train)),
         "n_negative_train": int(np.sum(y_train == 0)),
         "scale_pos_weight": scale_pos_weight,
+        "cv_scheme": "year_forward_chain",
+        "cv_threshold_source": threshold_source,
+        "cv_n_skipped_folds": len(cv_skipped),
         **cv_metrics,
         **test_metrics,
     }
@@ -539,6 +606,8 @@ def train_binary_model(
         "rec": rec_cv,
         "pr_thresholds": pr_thresholds_cv,
         "cv_results": cv_results,
+        "cv_skipped_folds": cv_skipped,
+        "cv_fold_summary": summarize_folds(train_years, folds),
         "cv_y_true": cv_y_true_all,
         "cv_y_prob": cv_y_prob_all,
         # Metadata for predictions
