@@ -284,7 +284,7 @@ class FitPL:
                     xmin REAL,
                     xmax REAL,
                     R REAL,
-                    p REAL,Alpha Parameter
+                    p REAL,
                     PRIMARY KEY (state, metric, year)
                 )
             """)
