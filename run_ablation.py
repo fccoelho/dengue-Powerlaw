@@ -120,6 +120,24 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+# Building the climate block globs over thousands of cached parquet files
+# (data/[0-9]*.parquet, ~5,570 files) and DuckDB opens many of them
+# concurrently while reading footers. Environments that inherit the
+# historical 1024-file-descriptor cap (IDE run configurations, Jupyter
+# kernels launched by systemd, some terminal multiplexers) then fail
+# mid-glob with "IOException: ... Too many open files". Raise the soft
+# limit as far as the hard limit allows -- unprivileged and a no-op where
+# the limit is already high.
+try:
+    import resource
+
+    _soft, _hard = resource.getrlimit(resource.RLIMIT_NOFILE)
+    _target = min(_hard, max(_soft, 65536))
+    if _soft < _target:
+        resource.setrlimit(resource.RLIMIT_NOFILE, (_target, _hard))
+except (ImportError, ValueError, OSError):
+    pass
+
 SEED = 42
 
 # --------------------------------------------------------------------------
