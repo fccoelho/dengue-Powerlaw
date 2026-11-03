@@ -34,3 +34,8 @@ test_powerlaw*.db
 
 # figure-generation panel cache
 Manuscript/figures/_panel_*.parquet
+
+# run_ablation.py outputs and its optional panel cache
+ablation_results.csv
+ablation_results.meta.json
+_ablation_panel*.parquet

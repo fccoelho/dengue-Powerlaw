@@ -138,7 +138,7 @@ def main(strict=False):
               "manuscript flags them as pending regeneration (see the TODO in "
               "section 'Predictive skill'); update them from the recomputed "
               "values above before submission.")
-    if strict and (n_drift or failures):
+    if strict and (n_drift or n_missing):
         return 1
     return 0
 
