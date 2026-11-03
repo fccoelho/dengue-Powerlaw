@@ -50,7 +50,10 @@ The predictive half turns the description into a testable one. A power law
 with $\alpha\approx2$ fixes the whole exceedance curve, so the fitted pair
 $(\alpha, x_{\min})$ is a two-parameter statement about how often extreme
 seasons occur --- and, unlike the case counts themselves, the exponent is
-empirically stable across years, states and population size. We therefore use
+empirically stable relative to their two-order-of-magnitude variation, even
+though it is not independent of the scale of the season: within units,
+$\alpha$ and $x_{\min}$ are strongly rank-correlated, so a scaling block may
+be re-encoding the lagged case count rather than adding to it. We therefore use
 the lagged scaling descriptors as features in (i) random-forest and
 gradient-boosted quantile regressions of epidemic size, duration and peak
 timing, and (ii) a classifier of whether a municipality will exceed its
@@ -68,7 +71,10 @@ We conclude that the heavy-tail literature on dengue conflates at least three
 distinct random variables, that scale claims are only interpretable where
 $x_{\min}$ lies far above the bulk, and that reporting $\alpha$ without the
 $(\text{unit},\ x_{\min},\ \text{comparison model})$ tuple is uninformative
---- descriptive or predictive.
+--- descriptive or predictive. A heavy tail is not, by itself, evidence that
+epidemics cannot be anticipated: it bounds how well the largest event's
+magnitude can be estimated from second moments, and leaves the probability of
+exceeding any level fully specified.
 \end{abstract}
 
 \section{Introduction}
@@ -142,7 +148,7 @@ among the predictors or be shown to be redundant.
 
 \subsection{Contributions}
 
-This paper makes three contributions.
+This paper makes four contributions.
 
 \begin{enumerate}
 \item \textbf{A systematic seven-level comparison on one dataset.} We fit the
@@ -200,8 +206,10 @@ each national year, a cross-section of municipal epidemics.
 
 Municipal population figures were taken from the estimates distributed with
 the platform (\texttt{city\_stats} table; 5{,}571 municipalities, one with a
-zero entry excluded) and used only for descriptive correlation. Population is
-not used in any fit.
+zero entry excluded). Population enters no power-law fit; it is used to compute
+the descriptive correlations of Section~\ref{sec:verdicts} and, as
+$\log_{10}$ population, as one predictor in the forecasting models of
+Section~\ref{sec:targets}.
 
 \subsection{Seven aggregation levels}
 
@@ -260,6 +268,7 @@ than to a change of data source, period or software.}
 \end{figure}
 
 \subsection{Discrete power-law estimation}
+\label{sec:estimation}
 
 For each sample we fit a discrete power law by maximum likelihood following
 \citet{clauset2009power}. The fitted density for integer $x \ge x_{\min}$ is
@@ -276,6 +285,19 @@ empirical and fitted cumulative distributions over all candidate values of
 $x_{\min}$. Because the data are counts, the discrete formulation is used
 throughout (\texttt{discrete=True}); the continuous approximation is not
 employed at any level.
+
+One property of the estimator has to be stated because it bears on the duration
+results. The numerical fit constrains $\alpha$ to $(1,3]$: the upper limit of
+the optimiser's default parameter range is $3$, so an estimate cannot exceed it
+and a sample whose likelihood is maximised beyond that value returns $\alpha=3$
+rather than its unconstrained maximum. The bound is immaterial where the fitted
+exponents lie well inside the range. At the cross-sectional size levels the
+largest value is $2.99$ (L4) and $2.27$ (L6); at the two weekly levels it is
+reached by 2 and 5 fits respectively, under $0.05\%$ of each. It binds
+materially only for durations, where the upper quartile of the 330 state-year
+fits lies above $2.92$ and 11 of them ($3.3\%$) sit at the ceiling. Those fits
+should be read as \emph{at least} $3$, not as $3$, and a genuinely scale-free
+body would not systematically exhaust the upper bound of the estimator.
 
 The choice of $x_{\min}$ is not a nuisance parameter. It determines which
 fraction of the data the model actually describes, and therefore whether the
@@ -345,14 +367,17 @@ between 0.3\% and 2.7\% exceed one hundred times $x_{\min}$. Those are
 falsifiable implications of the description, and Figure~\ref{fig:exceed}
 confronts them with the empirical exceedance frequencies.
 
-Second, $\alpha$ is empirically a low-variance quantity. Across the national
-cross-sections it takes values between 1.78 and 2.27, its distribution across
-municipalities is stable from year to year, and it is essentially unrelated to
-city size ($r=-0.065$). Annual case counts over the same period vary by two
-orders of magnitude. A quantity that is stable along precisely the dimension
-in which the target is volatile is a plausible source of signal, and that is
-the specific reason to carry $\alpha$ into the predictive models instead of
-treating it as a descriptive curiosity.
+Second, $\alpha$ is a low-variance quantity \emph{relative to its target}.
+Across the national cross-sections it takes values between 1.78 and 2.27, and it
+is essentially unrelated to city size ($r=-0.065$). Annual case counts over the
+same period vary by two orders of magnitude. The dispersion of $\hat\alpha$ is
+not zero --- it exceeds sampling noise by about a factor of five in standard
+deviation, and it co-varies with the selected $x_{\min}$
+(Section~\ref{sec:coupling}) --- but it is small along precisely the dimension
+in which the target is volatile. That is the specific reason to carry $\alpha$
+into the predictive models rather than treating it as a descriptive curiosity,
+and the same coupling is the reason the ablation, not the correlation, has to
+decide the question.
 
 Third, $\alpha\approx2$ has a direct methodological consequence for
 evaluation. The second moment of a power law with $\alpha\le 2$ does not exist
@@ -678,10 +703,13 @@ significant in 52\%, and $\alpha$ has a median of 1.97 across the 26 states
 duration of the same municipal epidemics behaves in the opposite way. At
 national level (L7) the power law is rejected in 15 of 15 years, with the
 exponential significant in every one. The estimated exponent piles up at
-$2.95$ (range 2.90--2.96, SD 0.03), which is the signature of a truncated or
-exponential body being forced through a power-law estimator rather than
-evidence of scaling. At state level (L5) the exponential is significant in
-95\% of fits. Figure~\ref{fig:verdicts} summarises these shares across all
+$2.95$ (full range 2.88--2.99, interquartile range 2.90--2.96, SD 0.03), which
+is the signature of a truncated or exponential body being forced through a
+power-law estimator rather than evidence of scaling. The estimator's ceiling of
+$\alpha=3$ (Section~\ref{sec:estimation}) is also in play: the upper quartile
+of the 330 state-year duration fits lies above $2.92$ and 11 of them (3.3\%) sit
+exactly at the bound, whereas no national size fit exceeds $2.27$. At state
+level (L5) the exponential is significant in 95\% of fits. Figure~\ref{fig:verdicts} summarises these shares across all
 levels, and Figure~\ref{fig:ccdf} shows the shape that produces them.
 
 \begin{figure}[htbp]
@@ -778,8 +806,9 @@ $\mathrm{corr}(\alpha, \log_{10}\text{population}) = -0.065$ (Spearman
 $-0.072$; $n=5{,}244$). The association with incidence is weak and negative
 (Pearson $-0.136$, Spearman $-0.248$; $n=4{,}663$). We therefore find no
 support for the view that larger or more heavily burdened municipalities sit
-in a different scaling regime; the exponent is a fairly constant property of
-the aggregation level. Figure~\ref{fig:stability} shows both the stability and
+in a different scaling regime. The exponent is a property of the aggregation
+level and, within a unit, of the scale of the season
+(Section~\ref{sec:coupling}), not of the municipality. Figure~\ref{fig:stability} shows both the stability and
 the absence of association.
 
 \begin{figure}[htbp]
@@ -794,6 +823,59 @@ is the empirical reason the exponent is a candidate predictor: it varies slowly
 along exactly the axis in which the observables do not.}
 \label{fig:stability}
 \end{figure}
+
+\subsection{The exponent is coupled to the scale of the season}
+\label{sec:coupling}
+
+The fitted pair $(\alpha,x_{\min})$ is not a pair of independent coefficients.
+Table~\ref{tab:coupling} collects the association between the two estimates at
+the levels where it can be measured, together with the association recovered from
+simulated data in which the true exponent was held fixed.
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{Association between the estimated exponent and the selected lower
+bound. Rows 1--3 are the surveillance data; the last row is a control in which
+data were generated from a power law with true $\alpha=2.0$ while the true lower
+bound was varied over the same range, so that any association recovered there is
+an artefact of the estimator. Values are Spearman rank correlations between
+$\alpha$ and $\log_{10}x_{\min}$.}
+\label{tab:coupling}
+\begin{tabular}{@{}llrr@{}}
+\toprule
+Stratum & Sample & $\rho$ & $n$\\
+\midrule
+National cross-section, year to year & 15 years              & $0.87$ & 15\\
+Within state, year to year            & median of 24 states   & $0.65$ & --\\
+Between states                        & state means           & $0.22$ & 26\\
+\midrule
+Simulated, $\alpha$ fixed at $2.0$    & control               & $-0.20$ & 40\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Three features of the table matter. The surveillance association is strong at
+national level and strong \emph{within} states over time --- positive in 88\% of
+the 24 states with at least six years of data, and significantly positive in
+67\% --- but weak between states. The coupling is therefore a within-unit,
+over-time relationship rather than a contrast between places. Second, the control
+recovers no such association, so the estimator does not manufacture it. Third,
+the control places the sampling dispersion of $\hat\alpha$ at $0.03$ (40
+replicates, samples of 800--4{,}000 points, true exponent fixed at $2.0$),
+against an observed standard deviation of $0.154$ across the 15 national fits:
+the year-to-year movement in $\alpha$ is real, roughly five times the sampling
+noise in standard deviation, even though it remains small next to the
+two-order-of-magnitude variation in the case counts themselves. The sizes of the
+actual national cross-sections are not recorded in the results database, so the
+8--4{,}000 range is chosen to bracket them rather than estimated from them.
+
+Because $x_{\min}$ is measured in cases, it tracks the magnitude of the season,
+and an exponent that co-varies with the magnitude of the season is to that extent
+a re-encoding of it. This is the reason the ablation of
+Section~\ref{sec:ablation} is the decisive test of the scaling block rather than
+an optional addition to the descriptive result.
 
 \subsection{The fitted law as a risk model}
 \label{sec:riskmodel}
@@ -837,15 +919,17 @@ season.
 
 An earlier run of the complete pipeline at state level, with all predictor
 blocks present, reached a mean out-of-bag $R^2$ for epidemic size of 0.345
-(2022), 0.348 (2023) and 0.374 (2024), against 0.165 for duration and 0.068 for
-peak week. These figures must be read with care: the out-of-bag score is
+(2022), 0.348 (2023) and 0.374 (2024). For duration and peak week only a single
+figure is on record rather than one per origin --- 0.165 and 0.068 respectively
+--- and the per-origin values are among the quantities to be regenerated. These
+figures must also be read with care: the out-of-bag score is
 computed on the log scale on which size is fitted, whereas the $R^2$ reported
 alongside the test metrics is computed after the back-transformation to cases,
 and the two are not interchangeable. A log-scale $R^2$ of 0.35 corresponds to a
 rather worse fit in case space, because the log compresses exactly the large
 outbreaks that matter. All losses in this paper are therefore reported on the
-case scale. Size is therefore the target that the available covariates actually
-describe; duration and peak timing are substantially harder, which is
+case scale. On this evidence, size is the target that the available covariates
+actually describe; duration and peak timing are substantially harder, which is
 consistent with the descriptive finding that duration is the variable whose
 distribution carries no scale information to exploit.
 
@@ -974,13 +1058,291 @@ surveillance service would act on, and it is falsifiable season by season.}
 
 \section{Discussion}
 
-% TODO: draft
-\emph{[To be written.]}
+\subsection{The verdict belongs to the construction}
+
+One estimator, one body of surveillance data, seven ways of cutting it, and
+verdicts ranging from unanimous support for a power law (L6, 15 of 15 years) to
+unanimous rejection in favour of an exponential (L7). Median exponents span
+$1.95$ to $2.95$ across the levels, and the selected lower bounds run from a
+single case to about $1.5\times 10^{5}$, five orders of magnitude. Nothing
+distinguished the analyses except the construction: there was
+no second data source, no rival estimator and no software difference to which
+the disagreement could be attributed.
+
+The sharpest form of the argument is the L1/L2 pair, which differ in nothing but
+the length of the window applied to the same weekly counts. Pooled over a decade
+the power law is preferred in 75\% of municipalities; cut into single seasons the
+same counts prefer it in 23\%, while significant support for the exponential
+rises from 4\% to 21\%. Between those two numbers not a single transmission
+parameter changes. An analysis that reports the first without the second has
+reported a property of its window.
+
+We do not read this as showing that the published exponents are erroneous. The
+individual estimates may each be correct arithmetic. What does not survive is the
+inference from an exponent to a regime: the step that treats $\alpha$ as a
+property of the pathogen or the place, when it is a property of the tuple
+$(\text{unit},\ \text{window},\ \text{variable},\ \text{comparison model})$.
+
+\subsection{Size and duration are different random variables}
+
+The cross-sectional levels settle a second, quieter disagreement. Epidemic
+\emph{size} and epidemic \emph{duration} are computed from the same municipal
+episodes, and they give opposite verdicts under the same estimator. Size is
+power-law with $\alpha\approx 2.0$ at national level and $1.97$ at state level.
+Duration is not: the power law is rejected in all 15 national fits and in 95\% of
+the 330 state-year fits, and the estimated exponent collapses onto a narrow band
+($2.88$--$2.99$, SD $0.03$) that presses against the estimator's ceiling of $3$
+in 11 of the 330 fits. That is what a bounded or exponential body returns when
+forced through a power-law estimator. A near-constant fitted exponent
+across independent cross-sections is not evidence of universality; it is evidence
+that the model is being asked the wrong question.
+
+Because both variables are routinely described as ``epidemic size'' or
+``outbreak magnitude'' in the literature, part of the apparent contradiction
+between published dengue exponents is plausibly the mixing of these two
+distributions. The relevant distinction is not biological before it is
+mathematical: a quantity bounded below by one week and above by the length of a
+season cannot have the support that a scale-free law requires.
+
+\subsection{What $\alpha$ is worth without its tuple}
+
+The practical consequence is a reporting convention, and it is cheap to adopt.
+An exponent should travel with the lower bound that produced it, the unit of
+analysis, the number of observations, and the alternative model it was tested
+against. Of these, $x_{\min}$ is the most informative and the most frequently
+omitted, because it separates two analyses that look identical in a table of
+results. At $x_{\min}=2$ the fitted power law describes counts of one and two
+cases and the heavy-tail language is vacuous; at $x_{\min}=762$ it describes the
+upper decade of a distribution and the language is warranted. The L1 and L3
+constructions illustrate the point in a single line: their median exponents are
+almost the same ($1.95$ and $2.09$, a difference of $0.14$) while their median
+lower bounds differ by a factor of $170$ ($2$ versus $341$ cases). Two analyses
+that would be reported as agreeing on the exponent are not describing the same
+object.
+
+The diagnostic is easy to apply and hard to game, since $x_{\min}$ is chosen by
+the same goodness-of-fit criterion that selects the model and cannot be tuned to
+produce a desired $\alpha$. We would go further: an $\alpha$ reported without
+$x_{\min}$ should be treated as an incomplete statistic, in the same way that a
+correlation is incomplete without its sample size.
+
+\subsection{Why the coupling matters for prediction}
+
+Two properties of the fitted pair must be separated, because the forecasting
+argument depends on the first and is threatened by the second.
+
+The first is that $\alpha$ is low-variance relative to its target. Across the 15
+national cross-sections it ranges from 1.78 to 2.27, while annual case counts
+over the same years vary by two orders of magnitude. On simulated samples of
+800--4{,}000 points with the true exponent fixed at $2.0$, the sampling
+dispersion of $\hat\alpha$ is about $0.03$ (Section~\ref{sec:coupling}); the
+observed dispersion is roughly five times larger, so the year-to-year variation is real rather than noise, but it remains
+small on the scale on which the target varies. That is the specific reason a
+shape parameter can be a candidate predictor in a setting where the observables
+are volatile.
+
+The second is that $\alpha$ is not independent of $x_{\min}$. At the national
+cross-section the rank correlation between the two is $0.87$ ($n=15$,
+$p<0.001$). Within states it is $0.65$ at the median across the 24 states with at
+least six years of data, positive in 88\% of them and significantly so in 67\%,
+whereas between states it is only $0.22$. The coupling is therefore a within-unit
+relationship over time, not a contrast between places.
+
+This is not an artefact of the estimator. Repeating the fit on simulated data
+drawn from a power law whose true exponent is held fixed at $2.0$, while the true
+lower bound is varied across the same range, recovers no positive coupling
+(Pearson $r=-0.20$, $n=40$) and an essentially unbiased exponent
+(mean $2.012$). The correlation in the surveillance data is a property of the
+data, not of the method.
+
+The consequence for prediction is direct and uncomfortable. Because $x_{\min}$ is
+measured in cases, it tracks the magnitude of the season: years in which
+municipalities produce large epidemics place the cut higher. An exponent that
+co-varies with the scale of the season is, to that extent, a re-encoding of the
+scale of the season --- and the scale of the previous season is exactly
+$S_{t-1}$, which is already present in the M2 rung. The descriptive case for
+carrying $(\alpha,x_{\min})$ into a forecasting model is therefore weakened by
+the same analysis that supports it: the block may be redundant with the lagged
+counts it is meant to improve upon. This is a testable expectation, not an
+objection, and it is the expectation with which the ablation ladder was designed.
+If the scaling block earns its place, it must do so on the primary loss and
+against a model that already knows how large last season was.
+
+\subsection{What the descriptive result does license}
+
+The exceedance curve, however, is not affected by that caveat, and it is the
+part of the description that carries practical content. Equation~\eqref{eq:exceed}
+turns $(\alpha,x_{\min})$ into a probability for every epidemic size, and the
+15 national fits imply that between 5.4\% and 16.5\% of municipalities exceed ten
+times $x_{\min}$ in a given year, and between 0.3\% and 2.7\% exceed a hundred
+times it. Those are statements a surveillance service can act on and that a
+subsequent season can falsify, and they require no fitted case count, only the
+current cross-section.
+
+It is worth being explicit about what follows, and what does not, from
+$\alpha\approx2$. The familiar inference --- that a divergent second moment makes
+extreme seasons unpredictable --- is too strong. It is a statement about second
+moments and about squared-error loss, not about information, and an exponent
+remains a scaling statement even where the variance diverges: branching-process
+analysis shows that a power-law-tailed offspring distribution yields a
+finite-time scaling law governed by the exponent alone \citep{falco2022finite}.
+A power law with
+$\alpha=2$ assigns a definite probability to every exceedance level; what it
+denies is that the \emph{magnitude} of the largest event can be estimated from
+the variance. Prediction of the tail event and prediction of its size are
+different problems, and proper scoring rules keep them separate. The literature
+that reads $\alpha\approx2$ as a verdict on forecastability conflates the two.
+
+\subsection{Relation to existing forecast systems}
+
+Operational dengue forecasting in Brazil has largely been built on climate and
+population susceptibility, with machine-learning models predicting municipal
+epidemics months ahead from weather and immunity proxies
+\citep{mcgough2021dynamic}, and with nowcasting platforms supplying the adjusted
+case series used here \citep{araujo2025large}. Those approaches ask what
+covariates precede an outbreak. The question posed here is orthogonal: whether
+the \emph{shape} of the size distribution carries information that the covariates
+do not. The two are complementary rather than competing, and the ablation design
+is deliberately constructed so that the scaling block is judged against a model
+that already contains the climate and lagged-metric blocks.
+
+There is also a methodological debt to the forecasting literature that the
+power-law literature has not settled. Skill has to be measured with proper
+scoring rules \citep{gneiting2007strictly} on paired loss differentials
+\citep{diebold1995comparing}, not with the correlation of predicted and observed
+point forecasts. With $\alpha\approx2$ the latter is dominated by the few largest
+outbreaks and can be moved from excellent to poor by a single season.
+
+\subsection{The predictive test}
+
+% TODO: insert the ablation outcome here once the rolling-origin runs are
+% complete (Table~\ref{tab:ablation_results}, Figures~\ref{fig:ablation},
+% \ref{fig:roc}, \ref{fig:shap}). The decision rule is fixed in
+% Section~\ref{sec:ablation}: the scaling block is credited only if M3 improves
+% on M2 on the primary loss with a 95\% bootstrap interval excluding zero, in the
+% same direction, in at least three of the five forecast origins. Both outcomes
+% are informative and both must be reported as found:
+%  - If M3 beats M2 on pinball loss for size, with the gain concentrated at high
+%    tau, the description has forecasting content and alpha_{t-1} carries
+%    tail information beyond S_{t-1}.
+%  - If M3 is indistinguishable from M2, the exponent is redundant given the
+%    lagged counts -- which is the outcome the coupling in the previous
+%    subsection predicts, and which would make the descriptive result
+%    predictively empty while leaving the methodological argument intact.
+% Neither outcome may be described in the abstract before the runs exist.
+
+\subsection{Limitations}
+
+Several limitations bound these conclusions.
+
+\emph{The case series are nowcast-adjusted.} The variable analysed is the
+estimated case count produced by the platform's nowcasting model, not the raw
+notification count. This is the right series for a retrospective description,
+because raw notifications are incomplete in recent weeks, but it means that the
+upper tail inherits whatever smoothing the nowcast applies. If the nowcast
+shrinks extreme values, the fitted exponents are biased towards the bulk, and the
+size distribution reported here is somewhat less heavy than the notification
+distribution would be.
+
+\emph{The state level is an arithmetic aggregate.} State-level duration is the
+mean of municipal durations and state peak week is the median of municipal peaks.
+Neither is the duration or the peak of the aggregate epidemic, which is the
+quantity a state health secretariat actually experiences. The state-level
+results should be read as properties of the municipality distribution within a
+state, not as properties of the state epidemic.
+
+\emph{The cross-sections are short.} The national levels rest on 15 annual fits
+and the state levels on three to 15 years per state, so the correlations reported
+in Section~\ref{sec:coupling} are estimated on small samples even where the
+underlying cross-sections contain thousands of municipalities. The
+within-state estimates are more robust than the national ones because they pool
+over 24 states.
+
+\emph{The trees cannot extrapolate.} This limitation cuts across both halves of
+the paper and deserves emphasis. Tree ensembles predict within the support of
+their training responses. The season of greatest public-health interest is the
+exceptional one, and under $\alpha\approx2$ the largest season a municipality
+will experience is systematically outside the support of its observed history.
+The models are therefore weakest precisely where the heavy tail places the risk,
+and no amount of feature engineering removes that: it is a property of the
+estimator class. It is also the reason the quantile models are reported alongside
+the point forecasts, since a quantile regression at $\tau=0.95$ at least attempts
+to represent the upper region rather than interpolating within the observed
+range.
+
+\emph{The classification threshold is a choice.} Exceeding the 75th percentile of
+a unit's own history defines a large season; at the 90th percentile the positive
+class becomes small enough that the balanced accuracy of any classifier falls,
+and the comparison between rungs loses power. The threshold is therefore a
+design parameter, fixed before the runs and reported with them.
+
+\emph{The exponent cannot exceed three.} The fitting routine bounds $\alpha$
+above by $3$, so a tail steeper than that is reported as $3$ rather than as its
+unconstrained maximum. For the size results this is immaterial, since no
+national size fit exceeds $2.27$; for durations it is not, and 11 of the 330
+state-year fits sit at the bound. This does not weaken the conclusion that
+durations are not power-law distributed --- a bound that the data press against
+is itself evidence against the fitted family --- but the numerical value of those
+particular exponents should not be read as an estimate.
+
+\emph{Predictors are ecological and coarse.} No serotype composition, no
+seroprevalence and no vector index enters the model, although all three are
+plausible determinants of season size. To the extent that these are stable within
+a unit, they are absorbed by unit-level effects; to the extent that they vary by
+year, they are unmodelled heterogeneity that the scaling block may be
+inadvertently proxying.
+
+\subsection{Implications for surveillance practice}
+
+Three practices follow, none of them expensive.
+
+First, report the tuple. An exponent accompanied by its unit, its $x_{\min}$, its
+sample size and its comparison model can be assessed by a reader; an exponent
+alone cannot, and the seven levels here show that the same exponent can mean
+opposite things.
+
+Second, use $x_{\min}$ as a screening diagnostic before interpreting any heavy
+tail, and treat $x_{\min}$ within the bulk of the data as a signal that the
+question needs restating rather than a small technical detail.
+
+Third, do not translate a heavy tail into a claim of unpredictability without
+specifying the loss. A distribution without a finite variance constrains
+squared-error point forecasts and leaves probabilistic exceedance statements
+intact --- and the exceedance statement is usually the one a health service
+needs, since it is the basis for deciding how many beds to hold in reserve.
 
 \section{Conclusion}
 
-% TODO: draft
-\emph{[To be written.]}
+The distribution of dengue epidemic size in Brazil is heavy-tailed with an
+exponent close to two, and this is one of the few robust facts in the applied
+literature on epidemic scaling. The distribution of epidemic duration is not
+heavy-tailed at all. Which of these statements a study reports, and whether it
+reports a power law or an exponential, is determined by the construction it
+imposes on the data: seven levels applied to one dataset produced median
+exponents between 1.95 and 2.95, unanimous support for a power law at one level
+and unanimous rejection at another, with a single change of temporal window sufficient to move
+the verdict from 75\% to 23\% support. That heterogeneity is methodological
+before it is biological, and reporting $\alpha$ without its lower bound, its
+unit, its sample size and its comparison model makes the disagreement
+unresolvable.
+
+Two consequences follow for forecasting. The encouraging one is that
+$(\alpha,x_{\min})$ fixes the entire exceedance curve of a municipality, and the
+national fits reproduce the observed frequency of extreme seasons over two
+decades of epidemic size using two parameters. The cautionary one is that the
+estimated exponent co-varies with the scale of the season within units, so a
+model carrying $\alpha_{t-1}$ may be re-encoding $S_{t-1}$; whether it adds
+information is an empirical question that the ablation ladder was built to
+answer, and its answer is not presumed here.
+
+What we can state is the form the answer must take. The claim that a scaling
+description improves forecasts is only meaningful against a specified benchmark,
+on a proper scoring rule, out of sample, with the scaling block isolated from the
+blocks it is added to, and with every leakage channel closed --- including the
+validation split, which fails silently. And the claim that a heavy tail makes
+epidemics unpredictable should be retired in favour of the narrower one it
+actually supports: that the size of the largest event is not estimable from the
+second moment, while its probability is.
 
 \appendix
 \section{Verification of reported quantities}
