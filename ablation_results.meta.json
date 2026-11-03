@@ -1,6 +1,7 @@
 {
   "argv": [
-    "--attach-climate"
+    "--attach-climate",
+    "--include-classifier"
   ],
   "level": "state",
   "region": "BR",
@@ -149,6 +150,6 @@
     "numpy": "2.5.4",
     "sklearn": "1.9.1"
   },
-  "elapsed_seconds": 336.7,
+  "elapsed_seconds": 341.3,
   "output": "/mnt/Datos/MEGAsync/Papers/2026-PowerLaw/dengue-Powerlaw/ablation_results.csv"
 }
