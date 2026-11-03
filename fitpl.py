@@ -2,7 +2,9 @@ import pandas as pd
 import numpy as np
 from datetime import date
 import os
+import json
 import traceback
+import warnings
 from functools import lru_cache
 import dotenv
 from mosqlient.datastore import Infodengue
@@ -85,6 +87,132 @@ STATE_TO_GEO = {v: k for k, v in GEO_STATE_MAP.items()}
 STATES = list(GEO_STATE_MAP.values())
 
 
+def _coerce_year(value):
+    """Coerce a year coming from any upstream source into a plain ``int``.
+
+    SQLite has per-value typing: a year bound as ``bytes`` is stored with the
+    BLOB storage class even when the column is declared ``INTEGER``. That
+    happened in ``powerlaw_fits_yearly`` (years stored as 4-byte little-endian
+    blobs), after which ``pd.read_sql_query`` yields an object-dtype column and
+    every downstream consumer crashes on ``sort_values`` -- mixed ``int`` and
+    ``bytes`` are not comparable. Binding through this helper guarantees the
+    INTEGER storage class regardless of upstream dtype (numpy integers, group
+    keys, or a blob recovered from a corrupted cache).
+    """
+    if isinstance(value, (bytes, bytearray)):
+        return int.from_bytes(value, "little")
+    return int(value)
+
+
+# ---------------------------------------------------------------------------
+# Parquet cache keys and metadata (B6)
+# ---------------------------------------------------------------------------
+# The cache key must contain every parameter that changes the API payload.
+# The pre-2026 key was just the geocode, so a request for a different window
+# or a different arbovirus could silently be served an unrelated cached file.
+#
+# Backwards compatibility: for the default request (disease="dengue",
+# start="2010-01-01", end="up to now") the historical filename
+# ``data/{geocode}.parquet`` is kept, because its semantics ("everything from
+# 2010-01-01 until written") match it exactly and thousands of caches were
+# built with it. Any non-default window or disease gets a fully parameterised
+# name under ``data/cache/`` -- a subdirectory on purpose, so those files
+# never pollute the ``data/[0-9]*.parquet`` DuckDB globs used by the climate
+# aggregation.
+LEGACY_WINDOW_START = "2010-01-01"
+LEGACY_DISEASE = "dengue"
+CACHE_SUBDIR = os.path.join("data", "cache")
+
+_REQUEST_META_KEY = b"mosqlimate_request"
+
+
+def _is_default_window(disease: str, start_date: str) -> bool:
+    return disease == LEGACY_DISEASE and start_date == LEGACY_WINDOW_START
+
+
+def _cache_path(geocode, disease: str, start_date: str, end_date: str) -> str:
+    """Cache file for a request; encodes every payload-affecting parameter."""
+    if _is_default_window(disease, start_date):
+        return os.path.join("data", f"{geocode}.parquet")
+    os.makedirs(CACHE_SUBDIR, exist_ok=True)
+    return os.path.join(
+        CACHE_SUBDIR, f"{geocode}_{disease}_{start_date}_{end_date}.parquet"
+    )
+
+
+def _write_cache_with_metadata(path, df, request: dict) -> None:
+    """Write the cache frame with the request embedded in the Arrow schema."""
+    import pyarrow as pa
+    import pyarrow.parquet as pq
+
+    table = pa.Table.from_pandas(df, preserve_index=True)
+    meta = dict(table.schema.metadata or {})
+    meta[_REQUEST_META_KEY] = json.dumps(request, sort_keys=True).encode("utf-8")
+    pq.write_table(table.replace_schema_metadata(meta), path)
+
+
+def _read_cache(path: str, request: dict):
+    """Load a cached frame, warning and missing when metadata disagrees.
+
+    Returns the DataFrame (reset index, as the callers expect) or ``None``
+    when the cache must be bypassed. Legacy files without embedded metadata
+    are accepted only for the default window/disease request, where their
+    semantics are known to match; for explicit windows or other diseases a
+    metadata-less file cannot be trusted and is bypassed with a warning.
+    """
+    import pyarrow.parquet as pq
+
+    disease = request["disease"]
+    start_date = request["start_date"]
+    default_window = _is_default_window(disease, start_date)
+
+    try:
+        meta = pq.read_schema(path).metadata or {}
+    except Exception:
+        meta = {}
+    raw = meta.get(_REQUEST_META_KEY)
+
+    if raw is None:
+        if default_window:
+            return pd.read_parquet(path).reset_index()
+        warnings.warn(
+            f"Cached file {path} carries no request metadata and cannot be "
+            f"verified against a non-default request (disease={disease}, "
+            f"start={start_date}, end={request['end_date']}); re-downloading."
+        )
+        return None
+
+    cached = json.loads(raw)
+    if cached.get("disease") != disease:
+        warnings.warn(
+            f"Cached file {path} was downloaded for disease="
+            f"{cached.get('disease')!r} but the request is disease="
+            f"{disease!r}; re-downloading."
+        )
+        return None
+    if cached.get("geocode") not in (None, request["geocode"]):
+        warnings.warn(
+            f"Cached file {path} was downloaded for geocode="
+            f"{cached.get('geocode')!r} but the request is "
+            f"{request['geocode']!r}; re-downloading."
+        )
+        return None
+    if not default_window and (
+        cached.get("start_date") != start_date
+        or cached.get("end_date") != request["end_date"]
+    ):
+        warnings.warn(
+            f"Cached file {path} covers {cached.get('start_date')}.."
+            f"{cached.get('end_date')} but the request is "
+            f"{start_date}..{request['end_date']}; re-downloading."
+        )
+        return None
+    # Default window: end_date grows daily by design, so a cached file whose
+    # recorded end precedes today stays valid (resume semantics), and the
+    # yearly-chunk download logic re-fetches whole years as the range grows.
+    return pd.read_parquet(path).reset_index()
+
+
 def fetch_infodengue(
     geocode,
     start_date="2010-01-01",
@@ -95,12 +223,18 @@ def fetch_infodengue(
     if end_date is None:
         end_date = date.today().strftime("%Y-%m-%d")
 
-    file_path = f"data/{geocode}.parquet"
+    request = {
+        "geocode": geocode,
+        "disease": disease,
+        "start_date": start_date,
+        "end_date": end_date,
+    }
+    file_path = _cache_path(geocode, disease, start_date, end_date)
 
     if not force_download and os.path.exists(file_path):
-        df = pd.read_parquet(file_path)
-        # print(f"Loaded cached data for {geocode}")
-        return df.reset_index()
+        cached = _read_cache(file_path, request)
+        if cached is not None:
+            return cached
 
     try:
         # Determine if geocode is a state abbreviation or a numeric geocode
@@ -166,8 +300,8 @@ def fetch_infodengue(
         df["year"] = df.index.isocalendar().year
         df["EW"] = df.index.isocalendar().week
 
-        os.makedirs("data", exist_ok=True)
-        df.to_parquet(file_path)
+        os.makedirs(os.path.dirname(file_path) or "data", exist_ok=True)
+        _write_cache_with_metadata(file_path, df, request)
         return df.reset_index()
     except Exception as e:
         print(f"Error fetching data for {geocode}: {traceback.print_exc()}")
@@ -186,11 +320,35 @@ def fetch_episcanner(disease: str = "dengue", state: str = "RS", year: int = 202
     Returns:
         pd.DataFrame: The fetched data.
     """
-    file_path = f"data/episcanner_{state}_{year}.parquet"
+    file_path = (
+        f"data/episcanner_{state}_{year}.parquet"
+        if disease == "dengue"
+        else os.path.join(
+            CACHE_SUBDIR, f"episcanner_{disease}_{state}_{year}.parquet"
+        )
+    )
 
     if os.path.exists(file_path):
-        df = pd.read_parquet(file_path)
-        return df
+        if disease != "dengue":
+            # Non-default disease: the historical dengue-only filename could
+            # serve an unrelated arbovirus's file silently.
+            try:
+                import pyarrow.parquet as pq
+
+                meta = pq.read_schema(file_path).metadata or {}
+                raw = json.loads(meta.get(_REQUEST_META_KEY, b"{}"))
+                if raw.get("disease") != disease:
+                    warnings.warn(
+                        f"Cached file {file_path} was downloaded for "
+                        f"disease={raw.get('disease')!r}, not {disease!r}; "
+                        "re-downloading."
+                    )
+                else:
+                    return pd.read_parquet(file_path)
+            except Exception:
+                pass
+        else:
+            return pd.read_parquet(file_path)
 
     try:
         df = get_episcanner(
@@ -203,8 +361,15 @@ def fetch_episcanner(disease: str = "dengue", state: str = "RS", year: int = 202
         if df.empty:
             return None
 
-        os.makedirs("data", exist_ok=True)
-        df.to_parquet(file_path)
+        os.makedirs(os.path.dirname(file_path) or "data", exist_ok=True)
+        if disease == "dengue":
+            df.to_parquet(file_path)
+        else:
+            _write_cache_with_metadata(
+                file_path,
+                df,
+                {"disease": disease, "state": state, "year": int(year)},
+            )
         return df
     except Exception as e:
         # Check if it's a 404 error from requests (mosqlient usually uses requests)
@@ -368,7 +533,7 @@ class FitPL:
                     INSERT OR REPLACE INTO powerlaw_fits_yearly (geocode, city_name, year, alpha, xmin, xmax, R, p)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                    (geocode, city_name, year, alpha, xmin, xmax, R, p),
+                    (geocode, city_name, _coerce_year(year), alpha, xmin, xmax, R, p),
                 )
                 conn.commit()
         except Exception as e:
@@ -510,7 +675,7 @@ class FitPL:
                     INSERT OR REPLACE INTO episcanner_state_fits (state, metric, year, alpha, xmin, xmax, R, p)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """,
-                    (state, "total_cases", year, alpha, xmin, xmax, R, p),
+                    (state, "total_cases", _coerce_year(year), alpha, xmin, xmax, R, p),
                 )
                 conn.commit()
         except Exception as e:
@@ -554,7 +719,7 @@ class FitPL:
                     INSERT OR REPLACE INTO episcanner_fits (metric, year, alpha, xmin, xmax, R, p)
                     VALUES (?, ?, ?, ?, ?, ?, ?)
                 """,
-                    ("total_cases", year, alpha, xmin, xmax, R, p),
+                    ("total_cases", _coerce_year(year), alpha, xmin, xmax, R, p),
                 )
                 conn.commit()
         except Exception as e:

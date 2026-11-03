@@ -131,15 +131,18 @@ def test_train_models():
         'prev_peak_week': np.random.rand(30)*52,
         'prev_alpha_size': np.random.rand(30)*3
     })
-    
-    models, metrics, features = predictive_model.train_predictive_models(df_train)
-    
+
+    # Return contract (B2): every path returns the same 5-tuple.
+    (models, metrics, features, train_data, bias_correction) = (
+        predictive_model.train_predictive_models(df_train)
+    )
+
     assert 'total_cases' in models
     assert 'ep_dur' in models
     assert 'peak_week' in models
     assert 'MAE' in metrics['total_cases']
     assert 'MAPE' in metrics['total_cases']
-    
+
     preds = predictive_model.predict_future(models, df_train.iloc[:5], features)
     assert len(preds['total_cases']) == 5
 
@@ -155,14 +158,67 @@ def test_train_models_temporal():
         'prev_peak_week': np.random.rand(40)*52,
         'prev_alpha_size': np.random.rand(40)*3
     })
-    
+
     # Train with split at 2022. Train: 2020, 2021. Test: 2022, 2023.
-    models, metrics, features = predictive_model.train_predictive_models(df_train, test_year=2022)
-    
+    (models, metrics, features, train_data, bias_correction) = (
+        predictive_model.train_predictive_models(df_train, test_year=2022)
+    )
+
     assert 'total_cases' in models
     assert metrics['total_cases']['MAE'] >= 0
     # Ideally checking that it didn't crash.
-    
-    # Test with split beyond data
-    models_empty, metrics_empty, _ = predictive_model.train_predictive_models(df_train, test_year=2025)
-    assert metrics_empty['total_cases']['MAE'] == 0
+
+    # Test with split beyond data. There are no test rows, so the metrics
+    # must be NaN (missing), NOT 0 (a measurement) -- B5.
+    (models_empty, metrics_empty, _, _, _) = (
+        predictive_model.train_predictive_models(df_train, test_year=2025)
+    )
+    assert models_empty['total_cases'] is not None
+    assert np.isnan(metrics_empty['total_cases']['MAE'])
+    assert np.isnan(metrics_empty['total_cases']['RMSE'])
+    assert np.isnan(metrics_empty['total_cases']['R2'])
+    assert np.isnan(metrics_empty['total_cases']['MAPE'])
+
+def test_train_models_return_contract_on_empty_input():
+    """B2: the early-exit path must return the same 5-tuple as the main path."""
+    df_empty = pd.DataFrame({
+        'year': [2021],
+        'total_cases': [np.nan],
+        'ep_dur': [np.nan],
+        'peak_week': [np.nan],
+    })
+    out = predictive_model.train_predictive_models(df_empty)
+    assert isinstance(out, tuple) and len(out) == 5
+    models, metrics, feature_cols, train_data, bias_correction = out
+    assert models == {}
+    assert train_data == {}
+    assert bias_correction == {}
+
+def test_year_guard_names_offending_table():
+    """B1: a non-numeric year column must fail with the table named."""
+    df_bad = pd.DataFrame({
+        'geocode': [4300001, 4300001],
+        'year': [2020, b'\xe7\x07\x00\x00'],
+        'alpha': [1.5, 1.6],
+        'xmin': [10.0, 11.0],
+        'xmax': [100.0, 100.0],
+    })
+    with pytest.raises(TypeError) as excinfo:
+        predictive_model._ensure_numeric_years(
+            df_bad, "powerlaw_results.db:powerlaw_fits_yearly"
+        )
+    msg = str(excinfo.value)
+    assert "powerlaw_fits_yearly" in msg
+    assert "int.from_bytes" in msg  # tells you how to repair
+
+def test_year_guard_accepts_object_column_of_python_ints():
+    """Object dtype holding plain ints is comparable; guard normalises it."""
+    df_ok = pd.DataFrame({
+        'geocode': [4300001, 4300001],
+        'year': [2020, 2021],          # python ints -> object dtype
+        'alpha': [1.5, 1.6],
+    })
+    out = predictive_model._ensure_numeric_years(
+        df_ok, "powerlaw_results.db:powerlaw_fits_yearly"
+    )
+    assert pd.api.types.is_numeric_dtype(out['year'])

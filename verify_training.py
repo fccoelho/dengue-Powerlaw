@@ -12,8 +12,10 @@ def test_training_flow():
     df_all = predictive_model.prepare_lagged_data(region, level=level)
     print(f"Data prepared: {len(df_all)} rows.")
     
-    # 2. Train
-    models, metrics, feature_cols = predictive_model.train_predictive_models(df_all, test_year=test_year)
+    # 2. Train (return contract: 5-tuple on every path)
+    models, metrics, feature_cols, train_data, bias_correction = (
+        predictive_model.train_predictive_models(df_all, test_year=test_year)
+    )
     
     print(f"Training complete. Models found for: {list(models.keys())}")
     for target, model in models.items():

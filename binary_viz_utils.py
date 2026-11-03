@@ -477,8 +477,8 @@ def plot_cv_folds_metrics_binary(cv_results):
     df_cv = pd.DataFrame(cv_results)
     folds = df_cv["fold"].astype(str).tolist()
 
-    metrics_to_plot = ["auc_roc", "auc_pr", "f1", "precision", "recall", "brier"]
-    labels = ["AUC-ROC", "AUC-PR", "F1-Score", "Precision", "Recall", "Brier Score"]
+    metrics_to_plot = ["auc_roc", "auc_pr", "f1_at_0.5", "precision", "recall", "brier"]
+    labels = ["AUC-ROC", "AUC-PR", "F1 (0.5 rule)", "Precision", "Recall", "Brier Score"]
 
     fig = go.Figure()
 

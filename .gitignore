@@ -28,3 +28,6 @@ data/
 *.ind
 
 
+
+# Test droppings from tests/test_fitpl.py (created in cwd, not cleaned up)
+test_powerlaw*.db

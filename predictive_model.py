@@ -89,6 +89,54 @@ def get_quarterly_climate(region, level="state"):
         print(f"Error fetching climate data: {e}")
         return pd.DataFrame()
 
+def _ensure_numeric_years(df, source):
+    """Raise a clear, table-naming error if a ``year`` column arrives non-numeric.
+
+    SQLite types per *value*, so a writer that binds bytes stores years with
+    the BLOB storage class even when the column is declared INTEGER, and
+    ``pd.read_sql_query`` then returns an object-dtype column in which ``int``
+    and ``bytes`` are mixed. ``sort_values`` crashes on such a column with a
+    bare ``TypeError`` that does not name the table. This guard converts that
+    failure into an actionable error instead.
+    """
+    if df is None or df.empty or "year" not in df.columns:
+        return df
+    years = df["year"]
+    if pd.api.types.is_numeric_dtype(years):
+        return df
+
+    def _is_year_like(v):
+        return isinstance(v, (int, float, np.integer, np.floating)) and not (
+            isinstance(v, float) and np.isnan(v)
+        )
+
+    bad_mask = ~years.map(_is_year_like)
+    if not bad_mask.any():
+        # Object dtype but every value is a number (e.g. python ints read
+        # from SQL): comparable, so just normalise the dtype.
+        df = df.copy()
+        df["year"] = pd.to_numeric(years)
+        return df
+
+    offenders = years[bad_mask].head(5)
+    details = []
+    for v in offenders:
+        if isinstance(v, (bytes, bytearray)):
+            details.append(
+                f"{v!r} (decodes to {int.from_bytes(v, 'little')} "
+                "via int.from_bytes(b, 'little'))"
+            )
+        else:
+            details.append(repr(v))
+    raise TypeError(
+        f"'year' column from {source} has {int(bad_mask.sum())} non-numeric "
+        f"value(s) out of {len(df)} (dtype={years.dtype}); examples: "
+        f"{details}. The upstream writer stored years as BLOBs. Repair the "
+        "table by decoding blobs with int.from_bytes(b, 'little') and make "
+        "the writer coerce years to int before binding."
+    )
+
+
 def prepare_lagged_data(region="BR", target_year=None, level="state"):
     """
     Prepares a dataset with lagged features for predicting target_year metrics.
@@ -115,6 +163,10 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
     # Let's aggregate to State level first
     if df_metrics.empty:
         return pd.DataFrame()
+    
+    df_metrics = _ensure_numeric_years(
+        df_metrics, "data/episcanner_*.parquet (via DuckDB)"
+    )
     
     if level == 'state':
         # Aggregate by State and Year
@@ -148,7 +200,11 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
 
         if df_fits.empty:
             return pd.DataFrame()
-            
+
+        df_fits = _ensure_numeric_years(
+            df_fits, "powerlaw_results.db:episcanner_state_fits"
+        )
+
         df_fits_size = df_fits[df_fits['metric'] == 'total_cases'][['state', 'year', 'alpha', 'xmin']].rename(columns={'alpha': 'alpha_size', 'xmin': 'xmin_size'})
         df_fits_dur = df_fits[df_fits['metric'] == 'ep_dur'][['state', 'year', 'alpha', 'xmin']].rename(columns={'alpha': 'alpha_dur', 'xmin': 'xmin_dur'})
         
@@ -187,12 +243,16 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
                 df_fits = pd.read_sql_query("SELECT geocode, year, alpha, xmin, xmax FROM powerlaw_fits_yearly", conn)
             except:
                 df_fits = pd.DataFrame()
-                
+
         if df_fits.empty:
             # Fallback or just continue with limited features?
             # Creating dummy fit features if missing to avoid crash, or return empty?
             pass
-            
+
+        df_fits = _ensure_numeric_years(
+            df_fits, "powerlaw_results.db:powerlaw_fits_yearly"
+        )
+
         # In city data, we only have one alpha (for cases usually).
         # The 'powerlaw_fits_yearly' usually tracks the alpha for Cases distribution (Size).
         # We don't typically have city-level Duration alpha fits in that table unless specified.
@@ -261,12 +321,14 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
     
     df_lagged = df_features.copy()
     for col in feature_cols:
-        # Note: alpha_trend for Year T already uses data from Years < T.
-        # However, to keep it consistent with 'prev_' naming, 
-        # we treat it like other features and shift if needed, or use it as is.
-        # Let's shift it by 1 JUST to be safe so 'prev_alpha_trend' at Year T
-        # uses the trend calculated at Year T-1 (which used data < T-1).
-        # Actually, if we use the slope of < T, it's already a valid predictor for T.
+        # `prev_alpha_trend` is NOT a shifted copy: alpha_trend at year T is
+        # already computed exclusively from years strictly before T (see
+        # calculate_historical_slope above), so it is causal for T and is used
+        # as-is, exactly as described in Manuscript section 2.7 ("the OLS
+        # slope of alpha_S over all years strictly before t"). Shifting it
+        # again would throw away the most recent year of scaling information.
+        # Every other dynamic feature is a genuine one-year lag; static
+        # features are copied unchanged.
         if col in static_features:
             df_lagged[f'prev_{col}'] = df_lagged[col] # Static features don't need real lag if we assume they don't change
         else:
@@ -329,7 +391,11 @@ def train_predictive_models(train_df, test_year=None, model_type="random_forest"
         print(f"[Training] FAILED: Input dataframe is empty after dropping NaNs. Input size: {len(train_df)}")
         print(f"Features considered: {all_prev_cols}")
         print(f"Features with data: {feature_cols}")
-        return {}, {}, feature_cols, {}
+        # Return contract: every path returns the same 5-tuple
+        # (models, metrics, feature_cols, train_data_dict, bias_correction_dict).
+        # Absent metrics are NaN, not 0 -- a model that never ran must not be
+        # indistinguishable from one that performed terribly.
+        return {}, {}, feature_cols, {}, {}
 
     print(f"[Training] Starting for {len(train_clean)} clean rows. Test Year: {test_year}, Model: {model_type}")
     print(f"Features used: {feature_cols}")
@@ -354,9 +420,12 @@ def train_predictive_models(train_df, test_year=None, model_type="random_forest"
             y_test = y[mask_test]
 
             if X_train.empty:
-                # Cannot train
+                # Cannot train -- report missing metrics as NaN, not 0.
                 models[target] = None
-                metrics[target] = {'MAE': 0, 'RMSE': 0, 'R2': 0, 'MAPE': 0}
+                metrics[target] = {
+                    'MAE': np.nan, 'RMSE': np.nan, 'R2': np.nan,
+                    'MAPE': np.nan, 'OOB_R2': np.nan,
+                }
                 continue
         else:
             # Random Split
@@ -419,19 +488,19 @@ def train_predictive_models(train_df, test_year=None, model_type="random_forest"
                 p_y_test = np.expm1(y_test)
                 mae = mean_absolute_error(p_y_test, p_preds)
                 rmse = np.sqrt(mean_squared_error(p_y_test, p_preds))
-                r2 = r2_score(p_y_test, p_preds) if len(p_y_test) > 1 else 0
+                r2 = r2_score(p_y_test, p_preds) if len(p_y_test) > 1 else np.nan
                 try:
                     mape = mean_absolute_percentage_error(p_y_test, p_preds)
-                except:
-                    mape = 0
+                except Exception:
+                    mape = np.nan
             else:
                 mae = mean_absolute_error(y_test, preds)
                 rmse = np.sqrt(mean_squared_error(y_test, preds))
-                r2 = r2_score(y_test, preds) if len(y_test) > 1 else 0
+                r2 = r2_score(y_test, preds) if len(y_test) > 1 else np.nan
                 try:
                     mape = mean_absolute_percentage_error(y_test, preds)
-                except:
-                    mape = 0
+                except Exception:
+                    mape = np.nan
 
             # Pinball loss for quantile models
             if model_type in ("lightgbm_quantile", "hist_gradient_boosting_quantile"):
@@ -447,11 +516,12 @@ def train_predictive_models(train_df, test_year=None, model_type="random_forest"
             else:
                 pinball = None
         else:
-            mae, rmse, r2, mape = 0, 0, 0, 0
+            # No test rows in the held-out window: metrics are missing, not 0.
+            mae, rmse, r2, mape = np.nan, np.nan, np.nan, np.nan
             pinball = None
 
         # OOB R2 is only available for RandomForest
-        oob_r2 = model.oob_score_ if hasattr(model, 'oob_score_') else 0
+        oob_r2 = model.oob_score_ if hasattr(model, 'oob_score_') else np.nan
 
         is_quantile = model_type in ("lightgbm_quantile", "hist_gradient_boosting_quantile")
 
