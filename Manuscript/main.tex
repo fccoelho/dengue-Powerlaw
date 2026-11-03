@@ -466,10 +466,16 @@ fold.
 
 Two gradient-boosted classifiers are used, XGBoost \citep{chen2016xgboost} and
 LightGBM, with imbalance handled by \texttt{scale\_pos\_weight} and
-\texttt{is\_unbalance} respectively. Validation uses \texttt{TimeSeriesSplit}
-with $k=\min(5,\max(2,n_{\text{years}}-1))$ contiguous folds and no shuffling,
-which preserves temporal ordering and prevents a fold from training on the
-future of its validation block. The decision threshold applied to the predicted
+\texttt{is\_unbalance} respectively. Validation is an expanding-window split
+\emph{defined on the year index}, with
+$k=\min(5,\max(2,n_{\text{years}}-1))$ contiguous year blocks and no shuffling:
+folds are formed by calendar year, never by row position, so that a fold can
+never train on the future of its validation block. (This distinction is not
+cosmetic. An implementation that applies a contiguous-index split to rows
+sorted by unit rather than by year produces a grouped-by-municipality split
+that is honest in the ordinary sense but is not a test of temporal
+generalisation, and it will report skill that does not survive a change of
+forecast origin.) The decision threshold applied to the predicted
 probability is chosen by Youden's $J$ statistic \citep{youden1950index},
 computed on the out-of-fold predictions rather than on the training fit, and
 then held fixed for the test set. We report the area under the ROC curve, the
