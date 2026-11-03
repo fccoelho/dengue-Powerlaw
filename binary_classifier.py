@@ -13,8 +13,6 @@ import numpy as np
 import pandas as pd
 from sklearn.impute import SimpleImputer
 from sklearn.pipeline import Pipeline
-from sklearn.compose import ColumnTransformer
-from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import (
     roc_auc_score,
     average_precision_score,
@@ -186,7 +184,11 @@ def _get_feature_columns(df, expected=None):
 
 def _get_numerical_and_categorical_features(feature_cols, df):
     """
-    Separate features into numerical and categorical lists for ColumnTransformer.
+    Separate features into numerical and categorical lists.
+
+    Note: currently unused by the training pipeline (all features are
+    numerical lags and reach the classifiers raw -- see build_model_pipeline).
+    Kept for future categorical support.
     """
     # In current pipeline, all features are numerical (lags of metrics)
     # If categorical features are added later, this handles them.
@@ -224,7 +226,13 @@ def compute_optimal_threshold(fpr, tpr, thresholds):
 
 def build_model_pipeline(model_type="xgboost", scale_pos_weight=1.0, random_state=42):
     """
-    Build a scikit-learn Pipeline with ColumnTransformer + Classifier.
+    Build a scikit-learn Pipeline with a single classifier step.
+
+    No preprocessing/scaling is applied: tree ensembles are scale-invariant,
+    and the fold-level median imputation of NaNs happens explicitly in
+    train_binary_model() before this pipeline is fitted, so a
+    ColumnTransformer + StandardScaler step here would be dead weight that
+    advertises preprocessing the model never receives.
 
     Parameters
     ----------
@@ -238,15 +246,8 @@ def build_model_pipeline(model_type="xgboost", scale_pos_weight=1.0, random_stat
     Returns
     -------
     sklearn.pipeline.Pipeline
-        Fitted pipeline.
+        Unfitted pipeline with one step: ("classifier", classifier).
     """
-    preprocessor = ColumnTransformer(
-        transformers=[
-            ("num", StandardScaler(), "__numerical__"),
-        ],
-        remainder="passthrough",
-    )
-
     if model_type == "xgboost" and HAS_XGBOOST:
         classifier = xgb.XGBClassifier(
             n_estimators=300,
@@ -550,21 +551,29 @@ def train_binary_model(
     if y_test is not None and len(y_test) > 0:
         y_pred_test = (y_prob_test >= optimal_threshold).astype(int)
         test_metrics = _compute_fold_metrics(y_test, y_prob_test)
-        test_metrics["f1_at_optimal"] = f1_score(y_test, y_pred_test)
+        test_metrics["f1_at_youden"] = f1_score(
+            y_test, y_pred_test, zero_division=np.nan
+        )
         test_metrics["confusion_matrix"] = confusion_matrix(y_test, y_pred_test).tolist()
         test_metrics["n_test_samples"] = len(y_test)
         test_metrics["n_positive_test"] = int(np.sum(y_test))
         test_metrics["n_negative_test"] = int(np.sum(y_test == 0))
 
-    # CV aggregate metrics
+    # CV aggregate metrics. Fold-level AUCs can be NaN for single-class folds,
+    # so the aggregate skips NaNs and is NaN itself when nothing measurable
+    # remains -- absent evidence must not look like a score of zero.
+    def _nanmean(values):
+        arr = np.asarray(values, dtype=float)
+        return float(np.nanmean(arr)) if np.isfinite(arr).any() else np.nan
+
     if cv_results:
         cv_metrics = {
-            "cv_auc_roc": np.mean([r["auc_roc"] for r in cv_results]),
-            "cv_auc_pr": np.mean([r["auc_pr"] for r in cv_results]),
-            "cv_f1": np.mean([r["f1"] for r in cv_results]),
-            "cv_precision": np.mean([r["precision"] for r in cv_results]),
-            "cv_recall": np.mean([r["recall"] for r in cv_results]),
-            "cv_brier": np.mean([r["brier"] for r in cv_results]),
+            "cv_auc_roc": _nanmean([r["auc_roc"] for r in cv_results]),
+            "cv_auc_pr": _nanmean([r["auc_pr"] for r in cv_results]),
+            "cv_f1_at_0.5": _nanmean([r["f1_at_0.5"] for r in cv_results]),
+            "cv_precision": _nanmean([r["precision"] for r in cv_results]),
+            "cv_recall": _nanmean([r["recall"] for r in cv_results]),
+            "cv_brier": _nanmean([r["brier"] for r in cv_results]),
             "n_folds": len(cv_results),
         }
     else:
@@ -620,13 +629,21 @@ def train_binary_model(
 def _compute_fold_metrics(y_true, y_prob):
     """
     Compute metrics for a single fold or dataset.
+
+    The F1/precision/recall reported here use the fixed 0.5 probability rule;
+    the key names make that explicit (``f1_at_0.5``) so they cannot be
+    confused with metrics computed at the Youden threshold
+    (``f1_at_youden``, added by the caller for test sets). ``auc_roc`` and
+    ``auc_pr`` are threshold-free; when ``y_true`` has a single class they are
+    undefined and reported as NaN rather than as a misleading 0.
     """
     y_pred = (y_prob >= 0.5).astype(int)
 
+    single_class = len(np.unique(y_true)) < 2
     metrics = {
-        "auc_roc": roc_auc_score(y_true, y_prob) if len(np.unique(y_true)) > 1 else 0.0,
-        "auc_pr": average_precision_score(y_true, y_prob),
-        "f1": f1_score(y_true, y_pred, zero_division=0),
+        "auc_roc": np.nan if single_class else roc_auc_score(y_true, y_prob),
+        "auc_pr": np.nan if single_class else average_precision_score(y_true, y_prob),
+        "f1_at_0.5": f1_score(y_true, y_pred, zero_division=0),
         "precision": precision_score(y_true, y_pred, zero_division=0),
         "recall": recall_score(y_true, y_pred, zero_division=0),
         "brier": brier_score_loss(y_true, y_prob),

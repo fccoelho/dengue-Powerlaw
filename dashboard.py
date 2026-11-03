@@ -890,6 +890,12 @@ def create_dashboard():
 
                 is_quantile = model_type in ("lightgbm_quantile", "hist_gradient_boosting_quantile")
 
+                def _fmt_reg(val, spec=".2f"):
+                    """NaN-safe metric formatting: NaN/None means 'not measured'."""
+                    if val is None or (isinstance(val, float) and not np.isfinite(val)):
+                        return "N/A"
+                    return f"{val:{spec}}"
+
                 metrics_data = []
                 for t, m in metrics.items():
                     if is_quantile:
@@ -898,10 +904,10 @@ def create_dashboard():
                         metrics_data.append(
                             [
                                 t,
-                                f"{m['MAE']:.2f}",
-                                f"{m['RMSE']:.2f}",
-                                f"{pinball_val:.4f}" if pinball_val is not None else "N/A",
-                                f"{quantile_val:.2f}" if quantile_val is not None else "N/A",
+                                _fmt_reg(m.get('MAE')),
+                                _fmt_reg(m.get('RMSE')),
+                                _fmt_reg(pinball_val, ".4f") if pinball_val is not None else "N/A",
+                                _fmt_reg(quantile_val, ".2f") if quantile_val is not None else "N/A",
                             ]
                         )
                     else:
@@ -909,9 +915,9 @@ def create_dashboard():
                         metrics_data.append(
                             [
                                 t,
-                                f"{m['MAE']:.2f}",
-                                f"{m['RMSE']:.2f}",
-                                f"{oob:.2f}" if oob is not None else "N/A",
+                                _fmt_reg(m.get('MAE')),
+                                _fmt_reg(m.get('RMSE')),
+                                _fmt_reg(oob),
                             ]
                         )
 
@@ -1097,29 +1103,39 @@ def create_dashboard():
 
                 metrics = result["metrics"]
 
+                # NaN-safe formatting: a missing metric is reported as an
+                # em dash, never as 0 (absence must stay distinguishable from
+                # a terrible score).
+                def _fmt(key, spec=".4f", default=None):
+                    val = metrics.get(key, default)
+                    if val is None or (isinstance(val, float) and not np.isfinite(val)):
+                        return "—"
+                    return f"{val:{spec}}"
+
                 # --- Build metrics table ---
                 metrics_data = [
-                    ["AUC-ROC (CV)", f"{metrics.get('cv_auc_roc', 0):.4f}"],
-                    ["AUC-PR (CV)", f"{metrics.get('cv_auc_pr', 0):.4f}"],
-                    ["F1-Score (CV)", f"{metrics.get('cv_f1', 0):.4f}"],
-                    ["Precision (CV)", f"{metrics.get('cv_precision', 0):.4f}"],
-                    ["Recall (CV)", f"{metrics.get('cv_recall', 0):.4f}"],
-                    ["Brier Score (CV)", f"{metrics.get('cv_brier', 0):.4f}"],
+                    ["AUC-ROC (CV)", _fmt("cv_auc_roc")],
+                    ["AUC-PR (CV)", _fmt("cv_auc_pr")],
+                    ["F1-Score (CV, 0.5 rule)", _fmt("cv_f1_at_0.5")],
+                    ["Precision (CV)", _fmt("cv_precision")],
+                    ["Recall (CV)", _fmt("cv_recall")],
+                    ["Brier Score (CV)", _fmt("cv_brier")],
                     ["Num Folds", f"{metrics.get('n_folds', 0)}"],
-                    ["Threshold (cases)", f"{metrics.get('threshold_case_count', 0):.0f}"],
-                    ["Optimal threshold (prob)", f"{metrics.get('optimal_prob_threshold', 0):.4f}"],
+                    ["Threshold (cases)", _fmt("threshold_case_count", ".0f", 0)],
+                    ["Optimal threshold (prob)", _fmt("optimal_prob_threshold")],
                     ["Training samples", f"{metrics.get('n_train', 0)}"],
                     ["Positive training", f"{metrics.get('n_positive_train', 0)}"],
                     ["Negative training", f"{metrics.get('n_negative_train', 0)}"],
-                    ["scale_pos_weight", f"{metrics.get('scale_pos_weight', 0):.2f}"],
+                    ["scale_pos_weight", _fmt("scale_pos_weight", ".2f")],
                 ]
 
-                if "f1_at_optimal" in metrics:
-                    metrics_data.append(["F1 (test, optimal threshold)", f"{metrics['f1_at_optimal']:.4f}"])
-                if "auc_roc" in metrics and metrics["auc_roc"] > 0:
-                    metrics_data.append(["AUC-ROC (test)", f"{metrics['auc_roc']:.4f}"])
-                if "auc_pr" in metrics and metrics["auc_pr"] > 0:
-                    metrics_data.append(["AUC-PR (test)", f"{metrics['auc_pr']:.4f}"])
+                if "f1_at_youden" in metrics:
+                    metrics_data.append(["F1 (test, Youden threshold)", _fmt("f1_at_youden")])
+                    metrics_data.append(["F1 (test, 0.5 rule)", _fmt("f1_at_0.5")])
+                if "auc_roc" in metrics and pd.notna(metrics["auc_roc"]):
+                    metrics_data.append(["AUC-ROC (test)", _fmt("auc_roc")])
+                if "auc_pr" in metrics and pd.notna(metrics["auc_pr"]):
+                    metrics_data.append(["AUC-PR (test)", _fmt("auc_pr")])
                 if "n_test_samples" in metrics:
                     metrics_data.append(["Test samples", f"{metrics['n_test_samples']}"])
 
@@ -1144,7 +1160,7 @@ def create_dashboard():
                     cv_df = pd.DataFrame(cv_results)
                     cv_display_cols = [
         "fold", "val_year", "auc_roc", "auc_pr",
-        "f1", "precision", "recall", "brier",
+        "f1_at_0.5", "precision", "recall", "brier",
     ]
                     cv_display_cols = [c for c in cv_display_cols if c in cv_df.columns]
                     cv_display = cv_df[cv_display_cols].copy()

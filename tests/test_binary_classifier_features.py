@@ -133,6 +133,45 @@ def test_predict_future_binary_inference_matches_training_order():
     np.testing.assert_allclose(with_list["y_prob"], inferred["y_prob"])
 
 
+def test_no_unqualified_f1_keys():
+    """B4: F1 must always carry its decision rule in the key name."""
+    pytest.importorskip("xgboost")
+    df = _lagged_frame()
+    probs = 1 / (1 + np.exp(-df["prev_R0"].to_numpy(float)))  # valid probabilities
+    metrics = bc._compute_fold_metrics(
+        (df["total_cases"] > df["total_cases"].median()).to_numpy(int),
+        probs,
+    )
+    assert "f1" not in metrics
+    assert "f1_at_0.5" in metrics
+
+    result = bc.train_binary_model(df, test_year=2019, percentile=0.75)
+    all_keys = set(result["metrics"].keys())
+    assert "cv_f1" not in all_keys
+    assert "f1" not in all_keys
+    assert "f1_at_optimal" not in all_keys
+    assert "cv_f1_at_0.5" in all_keys
+    # test set exists for this frame, so the Youden F1 must be present too
+    assert "f1_at_youden" in all_keys
+
+
+def test_single_class_fold_reports_nan_auc_not_zero():
+    """B5: an undefined metric must be NaN, never a misleading 0."""
+    y_single_class = np.zeros(20, dtype=int)
+    metrics = bc._compute_fold_metrics(y_single_class, np.linspace(0, 1, 20))
+    assert np.isnan(metrics["auc_roc"])
+    assert np.isnan(metrics["auc_pr"])
+    # threshold metrics with zero_division=0 remain defined conventions
+    assert metrics["f1_at_0.5"] == 0.0
+
+
+def test_build_model_pipeline_has_no_dead_preprocessing():
+    """B3: the pipeline must not advertise a ColumnTransformer it never runs."""
+    pytest.importorskip("xgboost")
+    pipeline = bc.build_model_pipeline(model_type="xgboost")
+    assert list(pipeline.named_steps.keys()) == ["classifier"]
+
+
 if __name__ == "__main__":
     import sys
 

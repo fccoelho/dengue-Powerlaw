@@ -56,12 +56,24 @@ def run_exhaustive_evaluation():
                 if df_state.empty or len(df_state) < 10:
                     continue
 
-                # 2. Train and evaluate
-                models, metrics, feature_cols = train_predictive_models(df_state, test_year=year)
-                
+                # 2. Train and evaluate (return contract: 5-tuple)
+                (models, metrics, feature_cols, _train_data, _bias_corr) = train_predictive_models(
+                    df_state, test_year=year
+                )
+
                 # State summary
                 state_pop = df_state.groupby('geocode')['population'].first().sum()
-                mean_oob_r2 = np.mean([m['OOB_R2'] for m in metrics.values()])
+                oob_vals = [
+                    np.nan if m.get('OOB_R2') is None else m['OOB_R2']
+                    for m in metrics.values()
+                ]
+                # NaN-safe mean: models that never trained contribute absence,
+                # not a zero score.
+                mean_oob_r2 = (
+                    float(np.nanmean(oob_vals))
+                    if np.isfinite(np.asarray(oob_vals, dtype=float)).any()
+                    else np.nan
+                )
                 
                 state_level_data.append({
                     'Year': year,
