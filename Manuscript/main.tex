@@ -810,7 +810,13 @@ season.
 An earlier run of the complete pipeline at state level, with all predictor
 blocks present, reached a mean out-of-bag $R^2$ for epidemic size of 0.345
 (2022), 0.348 (2023) and 0.374 (2024), against 0.165 for duration and 0.068 for
-peak week. Size is therefore the target that the available covariates actually
+peak week. These figures must be read with care: the out-of-bag score is
+computed on the log scale on which size is fitted, whereas the $R^2$ reported
+alongside the test metrics is computed after the back-transformation to cases,
+and the two are not interchangeable. A log-scale $R^2$ of 0.35 corresponds to a
+rather worse fit in case space, because the log compresses exactly the large
+outbreaks that matter. All losses in this paper are therefore reported on the
+case scale. Size is therefore the target that the available covariates actually
 describe; duration and peak timing are substantially harder, which is
 consistent with the descriptive finding that duration is the variable whose
 distribution carries no scale information to exploit.
