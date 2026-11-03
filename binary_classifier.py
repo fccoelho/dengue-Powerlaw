@@ -106,23 +106,75 @@ def prepare_binary_dataset(region="BR", level="city", min_pop=0):
     return df
 
 
-def _get_feature_columns(df):
+# ---------------------------------------------------------------------------
+# Feature selection
+# ---------------------------------------------------------------------------
+# predictive_model.get_quarterly_climate() emits avg_temp_Q1..Q4 and
+# avg_umid_Q1..Q4 for the *target* year, which prepare_lagged_data() then
+# shifts into prev_avg_* columns. Only the shifted columns are knowable when
+# the prediction is made; the unshifted ones are contemporaneous with the
+# outcome and must never enter the feature matrix.
+_CONTEMPORANEOUS_CLIMATE_PREFIXES = ("avg_temp", "avg_umid")
+
+# Non-lagged columns that are safe to use: static, or derived from years < T.
+_STATIC_FEATURES = ("log_pop",)
+
+
+def _is_contemporaneous_climate(col):
+    """True for target-year climate aggregates such as 'avg_temp_Q3'."""
+    return col.startswith(_CONTEMPORANEOUS_CLIMATE_PREFIXES)
+
+
+def _get_feature_columns(df, expected=None):
     """
-    Identify feature columns from the lagged dataset.
-    Returns list of column names to use as features.
+    Identify the feature columns of the lagged dataset, in a stable order.
+
+    Only lagged (``prev_*``) and static (``log_pop``) columns are eligible.
+    The unshifted climate aggregates describe the target year and would leak
+    the outcome, so they are excluded; duplicates are dropped preserving
+    order. This is the single source of truth for the feature matrix — both
+    training and scoring go through it, so the column order cannot drift.
+
+    Parameters
+    ----------
+    df : pd.DataFrame
+        Lagged dataset from prepare_lagged_data().
+    expected : sequence of str, optional
+        Authoritative feature list, e.g. the one stored in the training
+        result. When supplied it is returned verbatim after checking that
+        every column is available, which guarantees scoring uses the same
+        columns *in the same order* as training.
+
+    Returns
+    -------
+    list of str
+
+    Raises
+    ------
+    KeyError
+        If ``expected`` is given and some of its columns are missing from df.
     """
-    all_prev_cols = [c for c in df.columns if c.startswith("prev_")]
-    # Also include static and climate features
-    static_features = ["log_pop"] if "log_pop" in df.columns else []
-    climate_features = [
-        c for c in df.columns if "avg_temp" in c or "avg_umid" in c
-    ]
-    feature_cols = all_prev_cols + static_features + climate_features
-    # Only keep columns that exist and have at least some non-null values
-    feature_cols = [
-        c for c in feature_cols
-        if c in df.columns and not df[c].isnull().all()
-    ]
+    if expected is not None:
+        missing = [c for c in expected if c not in df.columns]
+        if missing:
+            raise KeyError(
+                f"Cannot build the feature matrix: {len(missing)} training "
+                f"feature(s) absent from the frame: {missing}"
+            )
+        return list(expected)
+
+    candidates = [c for c in df.columns if c.startswith("prev_")]
+    candidates += [c for c in _STATIC_FEATURES if c in df.columns]
+
+    feature_cols = []
+    seen = set()
+    for col in candidates:
+        if col in seen or _is_contemporaneous_climate(col):
+            continue
+        if df[col].isnull().all():
+            continue
+        seen.add(col)
+        feature_cols.append(col)
     return feature_cols
 
 
@@ -618,9 +670,12 @@ def get_shap_values(result_dict, max_samples=1000):
         return None
 
 
-def predict_future_binary(model, df_future, imputer=None):
+def predict_future_binary(model, df_future, imputer=None, feature_cols=None):
     """
     Predict binary outcome for future data.
+
+    The feature matrix is built by _get_feature_columns(), the same function
+    used for training, so the column set and its order always match the model.
 
     Parameters
     ----------
@@ -630,18 +685,21 @@ def predict_future_binary(model, df_future, imputer=None):
         DataFrame with feature columns for prediction.
     imputer : SimpleImputer, optional
         Fitted imputer from training.
+    feature_cols : sequence of str, optional
+        Feature list the model was trained on, typically
+        ``result["feature_cols"]`` from train_binary_model(). Passing it is
+        strongly recommended: it also guarantees that target-year climate
+        columns cannot be reintroduced. When omitted the columns are inferred
+        from df_future.
 
     Returns
     -------
     dict with keys:
         - y_prob: predicted probabilities
         - y_pred_default: predictions at default 0.5 threshold
-        - y_pred_optimal: predictions at optimal threshold (if provided)
+        - feature_cols: the columns actually used, in model order
     """
-    feature_cols = [c for c in df_future.columns if c.startswith("prev_")]
-    feature_cols += [c for c in ["log_pop"] if c in df_future.columns]
-    feature_cols += [c for c in df_future.columns if "avg_temp" in c or "avg_umid" in c]
-    feature_cols = [c for c in feature_cols if c in df_future.columns]
+    feature_cols = _get_feature_columns(df_future, expected=feature_cols)
 
     X = df_future[feature_cols].values
 
