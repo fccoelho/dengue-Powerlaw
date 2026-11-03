@@ -31,3 +31,6 @@ data/
 
 # Test droppings from tests/test_fitpl.py (created in cwd, not cleaned up)
 test_powerlaw*.db
+
+# figure-generation panel cache
+Manuscript/figures/_panel_*.parquet
