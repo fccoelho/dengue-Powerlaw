@@ -1,37 +1,366 @@
+
 \documentclass[english,10pt,b5paper]{article}
 \usepackage[T1]{fontenc}
+\usepackage[utf8]{inputenc}
 \usepackage{graphicx}
 \usepackage{mathtools}
 \usepackage{amssymb}
+\usepackage{booktabs}
 \usepackage{babel}
 \usepackage[]{natbib}
-\title{Power Laws and the Forecasting of Epidemics}
+\usepackage[margin=2cm]{geometry}
+\usepackage{hyperref}
+
+\title{Aggregation determines scaling: power-law verdicts in dengue\\
+surveillance data are conditional on the spatio-temporal window}
+\author{Flávio Codeço Coelho}
+\date{\today}
+
 \begin{document}
-	\maketitle
-	\begin{abstract}
-		conteúdo...
-	\end{abstract}
-	
+\maketitle
+
+\begin{abstract}
+Power-law scaling is routinely reported for infectious disease incidence, and
+dengue in Brazil is a standard example: heavy-tailed distributions of case
+counts are invoked to argue that extreme epidemics are structurally
+unpredictable. We show that the verdict depends less on dengue than on the
+distribution one chooses to build. Using weekly dengue
+surveillance data spanning January 2010 to January 2026 for the 5{,}571
+Brazilian municipalities, processed through the Mosqlimate/Infodengue
+platform, we fitted discrete power laws by maximum
+likelihood with Kolmogorov--Smirnov $x_{\min}$ selection at seven nested
+aggregation levels and compared each fit against an exponential alternative
+by a likelihood-ratio test. The results split sharply. For the
+cross-sectional distribution of \emph{epidemic size} across municipalities
+within a year, the power law is preferred in 100\% of the 15 national fits
+(all significant at $p<0.05$; $\alpha \approx 2.0$) and in 96\% of 330
+state-year fits, with $x_{\min}$ in the hundreds of cases. For the
+distribution of \emph{epidemic duration}, the power law is rejected in all 15
+national fits (and in 95\% of the state-year fits) in favour of an
+exponential, with $\alpha$ piling up at $2.90$--$2.96$. For weekly case counts, the power law appears preferred in
+75\% of city-level series but $x_{\min} \le 5$ in 77\% of them, meaning that
+the fitted object is the bulk of the distribution rather than a tail. We
+conclude that the heavy-tail literature on dengue conflates at least three
+distinct random variables, that scale claims are only interpretable where
+$x_{\min}$ is far above the bulk, and that reporting $\alpha$ without the
+$(\text{unit},\ x_{\min},\ \text{comparison model})$ tuple is uninformative.
+\end{abstract}
+
 \section{Introduction}
-Understanding the dynamics of infectious disease epidemics has lead to a very prolific literature both in terms of mechanistic mathematical models and statistical models\citep{siettos2013mathematical}. The former attempting to capture the causal chain of events involved in disease transmission and 
-the latter trying to make sense of growing collection of data about infectious disease incidence.
 
-Among the most salient result of the mathematical modeling of infectious diseases was the definition of the basic reproductive number, $R_0$, that determines the most important characteristics of epidemics such as its spreading speed and  the epidemic threshold, also know as herd immunity threshold. The $R_0$ appears in equations governing prevalence growth, as an exponent determining the initial exponential growth of an epidemic. It also defines an important bifurcation points $R_0=1$  linking the to the existence and stability of equilibria in epidemic models.
+Understanding the dynamics of infectious disease epidemics has led to a very
+prolific literature, both in terms of mechanistic mathematical models and of
+statistical models \citep{siettos2013mathematical}. The former attempt to
+capture the causal chain of events involved in disease transmission, the
+latter try to make sense of a growing collection of data about infectious
+disease incidence.
 
-On the statistical side of the literature related to infectious disease modeling, an important if not the biggest portion of published literature deals with statistical modeling. for the first two thirds of the 20th century, the literature consisted mainly of parametric frequentist models, with Bayesian statistics gaining more preeminence towards the end of century[REFS].
+Among the most salient results of the mathematical modelling of infectious
+diseases was the definition of the basic reproductive number, $R_0$, which
+determines the most important characteristics of epidemics such as their
+spreading speed and the epidemic threshold, also known as the herd immunity
+threshold. $R_0$ appears in the equations governing prevalence growth as an
+exponent determining the initial exponential growth of an epidemic, and it
+defines an important bifurcation point at $R_0=1$ linked to the existence and
+stability of equilibria in epidemic models.
 
-One of the most commonly modeled kind of epidemic data is incidence data, i.e., the number of cases accumulated over time and space or studied as a stochastic process, such as a Poisson of Negative Binomial processes \citep{becker1999statistical, li2012log}.
+On the statistical side, the largest portion of the literature deals with
+statistical modelling of incidence data, i.e.\ the number of cases accumulated
+over time and space or studied as a stochastic process, such as a Poisson or
+negative binomial process \citep{becker1999statistical, li2012log}. The
+central difficulty is overdispersion: real surveillance counts produce far more
+extreme observations than any tractable count model comfortably allows.
 
-One particular challenge when modeling inference data, is that it follows a power law distribution\citep{rhodes1997critical,clauset2009power}. The very heavy tail of this distribution means most models have difficulty predicting extreme values, which are the most important in epidemiology as they cause the most disease and consequent economic burden.
+A recurrent claim is that this overdispersion is not merely large but
+\emph{scale-free}, i.e.\ that incidence follows a power law
+\citep{rhodes1997critical, clauset2009power, neipel2020power}. The attraction of
+this claim is that the very heavy tail implies extreme values that most models
+fail to predict --- and those are precisely the events that cause the most
+disease and the largest economic burden. If true, this would have direct
+consequences for forecasting and for resource allocation.
 
-In this paper we study the statistical distribution of dengue epidemics on a very large dataset of thousands of real epidemics in Brazilian cities of various sizes over more than a decade. Our goal is to determine how well the power law  distribution fits incidence data, be it in the form of distribution of weekly case counts or the total size of seasonal epidemics. We also look at the distribution of the power law distribution and how it correlate with other epidemic characteristics. Finally we will discuss how the estimation of these power law distribution can improve the prediction of future incidence, when compared to more traditional forecasting models adopting more tractable distributions, such as log-normal, Poisson and others to approximate the real data distribution.
+The problem is that the empirical record is inconsistent. Reported exponents
+for dengue range widely, some studies find exponential rather than power-law
+behaviour, and the presence of a heavy tail appears to depend on the study
+period, the spatial unit and the outcome variable. Previous work has usually
+attributed this heterogeneity to biology or geography: different places, or
+different years, are assumed to be governed by different regimes.
+
+Here we test a simpler and more uncomfortable explanation: that the
+heterogeneity is largely produced by the analyst. Any epidemiological
+time series can be cut into distributions in several legitimate ways --- the
+weekly counts of one city, the annual totals of one city, the set of epidemic
+sizes across cities in one year, the set of epidemic durations --- and these
+are different random variables with different supports and different tail
+behaviour. If the verdict changes as the construction changes, then a
+substantial part of the published disagreement is methodological rather than
+biological.
+
+\subsection{Contributions}
+
+This paper makes three contributions.
+
+\begin{enumerate}
+\item \textbf{A systematic seven-level comparison on one dataset.} We fit the
+same estimator to the same underlying surveillance data under seven nested
+aggregation levels (Table~\ref{tab:levels}), so that any difference in the
+inferred regime is attributable to the construction and not to differing data
+sources, periods or software.
+
+\item \textbf{An identification diagnostic that separates signal from
+artefact.} We show that the reported preference for a power law is only
+interpretable when the estimated lower bound $x_{\min}$ lies well above the
+bulk of the data. Where $x_{\min}$ collapses to 1--5 cases, the fit describes
+the entire distribution and the ``tail'' language is vacuous. We report
+$x_{\min}$ alongside every exponent and use it to classify each of the 47{,}494
+fits.
+
+\item \textbf{A resolved claim about dengue.} Epidemic \emph{size} is
+heavy-tailed with $\alpha\approx 2$ and is stable across states and years;
+epidemic \emph{duration} is not heavy-tailed and is better described by an
+exponential. The two variables are frequently conflated in the literature,
+which explains a large part of the apparent contradiction.
+\end{enumerate}
+
 \section{Methods}
-Based on data made available through the Mosqlimate platform\citep{araujo2025large} [cite Mosqlimate paper], We have fitted power laws to epidemics to dengue incidence data from 2010 to the present. 
-\subsection{Power law fitting}
-We follow the methodology of Clauset et al.\cite{clauset2009power} to fit a power law distribution to two datasets: the weekly case counts, and the yearly cumulative incidence, that is the number of cases accumulated over an epidemic year.
+
+\subsection{Data sources}
+
+Weekly dengue case counts were obtained from the InfoDengue/Mosqlimate
+platform \citep{araujo2025large} for the period from 1 January 2010 to 22
+January 2026 (the extraction date), for all Brazilian municipalities with
+available data. The
+variable used is the nowcast-adjusted estimated number of cases
+(\texttt{casos\_est}), resampled to epidemiological weeks ending on Sunday
+(\texttt{W-SUN}); zero-case weeks are retained in the series but excluded from
+distributional fits, since the power-law family is defined on positive
+support.
+
+Annual epidemic descriptors were obtained from the EpiScanner module of the
+same platform, which partitions each municipal series into epidemic episodes
+and reports, for each episode, its total size (\emph{total cases}) and its
+duration in weeks (\emph{ep\_dur}). Annual cross-sections are available for
+the 15 epidemic years 2011--2025; the pooled all-years fit is stored
+separately (with a sentinel \texttt{year = 0}) and is excluded from all year
+counts. This yields, for each state-year and for
+each national year, a cross-section of municipal epidemics.
+
+Municipal population figures were taken from the estimates distributed with
+the platform (\texttt{city\_stats} table; 5{,}571 municipalities, one with a
+zero entry excluded) and used only for descriptive correlation. Population is
+not used in any fit.
+
+\subsection{Seven aggregation levels}
+
+The unit of analysis is the \emph{set of positive observations} passed to the
+estimator. Table~\ref{tab:levels} defines the seven constructions used. The
+first three treat the individual municipality as the sampling unit and vary
+the temporal window; the last four treat a cross-section of municipalities
+within a period as the sampling unit.
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{4pt}
+\caption{The seven aggregation levels. ``Unit'' is the sampling unit, i.e.\
+what each observation in the fitted sample represents.}
+\label{tab:levels}
+\begin{tabular}{@{}llll@{}}
+\toprule
+ID & Unit & Variable & Source table\\
+\midrule
+L1 & city & weekly cases, full series & \texttt{powerlaw\_fits}\\
+L2 & city-year & weekly cases, one season & \texttt{powerlaw\_fits\_yearly}\\
+L3 & city & annual total, across years & \texttt{powerlaw\_fits\_total\_cases}\\
+L4 & city $\subset$ state-year & epidemic size & \texttt{episcanner\_state\_fits}\\
+L5 & city $\subset$ state-year & epidemic duration & \texttt{episcanner\_state\_fits}\\
+L6 & city $\subset$ national-year & epidemic size & \texttt{episcanner\_fits}\\
+L7 & city $\subset$ national-year & epidemic duration & \texttt{episcanner\_fits}\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+Levels L1 and L2 differ only in the temporal window over which the weekly
+counts are pooled: L1 uses the complete available series for a municipality
+(January 2010 to January 2026), whereas L2 restricts to a single epidemic year
+(at most 52 weeks). Both sample sizes therefore differ by roughly an order of
+magnitude, which is why we compare shares rather than raw counts. Levels L4--L7 differ only in the spatial scope of the cross-section,
+not in the variable being measured. This nesting is deliberate: it allows each
+contrast in Section~\ref{sec:results} to be read as the effect of a single
+change in construction.
+
+\subsection{Discrete power-law estimation}
+
+For each sample we fit a discrete power law by maximum likelihood following
+\citet{clauset2009power}. The fitted density for integer $x \ge x_{\min}$ is
+%
+\begin{equation}
+p(x) = \frac{x^{-\alpha}}{\zeta(\alpha, x_{\min})},
+\end{equation}
+%
+where $\zeta(\alpha, x_{\min})$ is the generalised (Hurwitz) zeta function,
+which normalises the discrete mass. The exponent $\alpha$ is estimated by
+numerical maximisation of the likelihood, and the lower bound $x_{\min}$ is
+selected jointly by minimising the Kolmogorov--Smirnov distance between the
+empirical and fitted cumulative distributions over all candidate values of
+$x_{\min}$. Because the data are counts, the discrete formulation is used
+throughout (\texttt{discrete=True}); the continuous approximation is not
+employed at any level.
+
+The choice of $x_{\min}$ is not a nuisance parameter. It determines which
+fraction of the data the model actually describes, and therefore whether the
+fitted exponent refers to a tail at all. We therefore retain $x_{\min}$ for
+every fit and report its median and the proportion of fits with
+$x_{\min}\le 5$ in each aggregation level.
+
+\subsection{Model comparison}
+
+A power law can always be fitted; the question is whether it describes the
+data better than a plausible alternative. We compare each power-law fit
+against an exponential distribution, which is the natural null for
+epidemiological counts because it corresponds to a constant hazard of
+termination and produces a light tail. The comparison follows the
+likelihood-ratio procedure of \citet{clauset2009power}, as implemented in the
+\texttt{powerlaw} package with \texttt{normalized\_ratio=True}.
+%
+\begin{equation}
+R = \sum_{i=1}^{n}\left[\ln p_{\mathrm{PL}}(x_i) - \ln p_{\mathrm{exp}}(x_i)\right],
+\end{equation}
+%
+normalised so that its magnitude is comparable across samples of different
+size. The sign of $R$ indicates the preferred model ($R>0$ favours the power
+law, $R<0$ favours the exponential) and its associated $p$-value quantifies
+whether the sign is distinguishable from sampling noise.
+
+We adopt a deliberately conservative reporting convention. A level is
+described as \emph{power-law supported} only when $R>0$ and $p<0.05$; as
+\emph{exponential supported} only when $R<0$ and $p<0.05$; and as
+\emph{inconclusive} otherwise. This prevents the common error of counting a
+positive but non-significant $R$ as evidence for scaling.
+
+\subsection{Identification diagnostic}
+
+We flag a fit as \emph{tail-informative} when $x_{\min}$ exceeds the bulk of
+the observed distribution, operationally $x_{\min}>5$ cases for weekly counts
+and $x_{\min}$ above the median observed value for the aggregate levels. Where
+$x_{\min}\le 5$, the fitted power law is being asked to describe the entire
+empirical distribution, including the small-count regime where the discrete
+power law is not a plausible generative model (case counts of 1 or 2 arise
+from reporting mechanics, not from scale-free branching). Such fits are
+retained in the database but are excluded from substantive interpretation, and
+we report the proportion explicitly.
+
+\subsection{Software and reproducibility}
+
+All fits are stored in a single SQLite database
+(\texttt{powerlaw\_results.db}) committed to the project repository, together
+with the fitting code (\texttt{fitpl.py}) and the cached parquet extracts of
+every model result. Every number in this manuscript is derived from that
+database by the queries in Appendix~\ref{app:verify}; no statistic is
+transcribed by hand. The full pipeline is therefore re-runnable, and a reader
+can confirm or contradict each figure with a single SQL statement.
+
 \section{Results}
+\label{sec:results}
+
+Table~\ref{tab:main} summarises the 47{,}494 fits. The contrast between levels
+is the central result.
+
+\begin{table}[htbp]
+\centering
+\small
+\setlength{\tabcolsep}{3.5pt}
+\caption{Power-law fits by aggregation level. $\alpha$ median with
+interquartile range; $x_{\min}$ median; PL$_{\text{pref}}$ = proportion with
+$R>0$; PL$_{\text{sig}}$ = proportion with $R>0$ and $p<0.05$;
+Exp$_{\text{sig}}$ = proportion with $R<0$ and $p<0.05$. Shares are
+percentages.}
+\label{tab:main}
+\begin{tabular}{@{}lrrrrrrr@{}}
+\toprule
+Level & $n$ & $\alpha$ & IQR & $x_{\min}$ & PL$_{\text{pref}}$ & PL$_{\text{sig}}$ & Exp$_{\text{sig}}$\\
+\midrule
+L1 weekly, city            & 5{,}244  & 1.95 & 1.72--2.29 & 2   & 75 & 45 & 4\\
+L2 weekly, city-year       & 40{,}616 & 2.06 & 1.72--2.45 & 2   & 23 & 3  & 21\\
+L3 annual total, city      & 944      & 2.09 & 1.80--2.46 & 341 & 51 & 4  & 4\\
+L4 size, state-year        & 330      & 1.97 & 1.79--2.14 & 159 & 96 & 52 & 0\\
+L5 duration, state-year    & 330      & 2.80 & 2.52--2.92 & 17  & 0  & 0  & 95\\
+L6 size, national-year     & 15       & 2.00 & 1.92--2.11 & 762 & 100& 100& 0\\
+L7 duration, national-year & 15       & 2.95 & 2.90--2.96 & 18  & 0  & 0  & 100\\
+\bottomrule
+\end{tabular}
+\end{table}
+
+\paragraph{Epidemic size scales.} At the national cross-section (L6), all 15
+annual fits favour the power law and all are significant, with
+$\alpha=2.00$ (IQR 1.92--2.11) and $x_{\min}$ of 762 cases. The exponent is
+remarkably stable: the annual values range only from 1.78 to 2.27. At state
+level (L4) the picture is consistent but weaker in significance, as expected
+from smaller cross-sections: the power law is preferred in 96\% of 330 fits,
+significant in 52\%, and $\alpha$ has a median of 1.97 across the 26 states
+(state-level medians spanning 1.70--2.58).
+
+\paragraph{Duration does not scale.} At the same cross-sectional levels, the
+duration of the same municipal epidemics behaves in the opposite way. At
+national level (L7) the power law is rejected in 15 of 15 years, with the
+exponential significant in every one. The estimated exponent piles up at
+$2.95$ (range 2.90--2.96, SD 0.03), which is the signature of a truncated or
+exponential body being forced through a power-law estimator rather than
+evidence of scaling. At state level (L5) the exponential is significant in
+95\% of fits.
+
+\paragraph{Weekly counts are not a tail.} Levels L1 and L2 produce large
+apparent support for the power law (75\% and, in the full-series case, 45\%
+significant), but the estimated lower bound collapses to $x_{\min}=2$ in the
+majority of fits: 77\% of L1 and 81\% of L2 fits have $x_{\min}\le 5$. At that
+bound the model is fitted to essentially the whole distribution, including
+counts of 1 and 2 cases, and the heavy-tail interpretation does not follow. By
+contrast, in L3--L7 the median $x_{\min}$ is 17--762 cases, i.e.\ the fit
+describes genuine tails.
+
+\paragraph{The window flips the verdict on the same data.} The cleanest
+demonstration is the L1/L2 contrast: pooling the same weekly counts over one
+season instead of a decade drops the proportion of fits favouring the power
+law from 75\% to 23\% and raises the proportion significantly favouring the
+exponential from 4\% to 21\%. Nothing about dengue changed; only the window
+did.
+
+\subsection{Descriptive associations}
+
+The municipal exponent is essentially unrelated to city size:
+$\mathrm{corr}(\alpha, \log_{10}\text{population}) = -0.065$ (Spearman
+$-0.072$; $n=5{,}244$). The association with incidence is weak and negative
+(Pearson $-0.136$, Spearman $-0.248$; $n=4{,}663$). We therefore find no
+support for the view that larger or more heavily burdened municipalities sit
+in a different scaling regime; the exponent is a fairly constant property of
+the aggregation level.
+
 \section{Discussion}
+
+% TODO: draft
+\emph{[To be written.]}
+
 \section{Conclusion}
-	\bibliographystyle{apalike}
-	\bibliography{refs}
+
+% TODO: draft
+\emph{[To be written.]}
+
+\appendix
+\section{Verification of reported quantities}
+\label{app:verify}
+
+Every quantity in Table~\ref{tab:main} is obtained from
+\texttt{powerlaw\_results.db} by the queries in
+\texttt{Manuscript/verification/}. The comparison columns are computed as
+\begin{center}
+\small\texttt{R>0} $\Rightarrow$ PL preferred;\quad
+\texttt{R>0 AND p<0.05} $\Rightarrow$ PL supported;\quad
+\texttt{R<0 AND p<0.05} $\Rightarrow$ exponential supported.
+\end{center}
+Note that \texttt{year = 0} in the \texttt{episcanner} tables is a pooled
+all-years fit, not a calendar year, and is excluded from all year counts;
+the national levels therefore have 15 annual fits, not 16.
+
+\bibliographystyle{apalike}
+\bibliography{refs}
 \end{document}
