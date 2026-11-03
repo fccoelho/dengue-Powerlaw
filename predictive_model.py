@@ -22,12 +22,25 @@ try:
 except ImportError:
     NAME_BY_GEOCODE = {}
 
-def get_quarterly_climate(region, level="state"):
+def get_quarterly_climate(region, level="state", strict=False,
+                          data_path="data/[0-9]*.parquet"):
     """
     Fetches and aggregates tempmin and umidmin by quarter from Infodengue parquet files.
+
+    Returns one row per (unit, year) with ``avg_temp_Q1..Q4`` and
+    ``avg_umid_Q1..Q4``.
+
+    Parameters
+    ----------
+    strict : bool
+        Raise instead of returning an empty frame. The empty frame is why the
+        M2 rung of the ablation ladder could collapse into M1 without anyone
+        noticing: ``prepare_lagged_data`` merges climate only
+        ``if not df_climate.empty``, so a failure here removes eight
+        predictors and leaves no trace in the panel. Callers that actually
+        need the columns should pass ``strict=True``.
     """
     con = duckdb.connect()
-    data_path = "data/[0-9]*.parquet"
     
     # Filter by region if not BR
     where_clause = ""
@@ -59,6 +72,13 @@ def get_quarterly_climate(region, level="state"):
         df_q = con.execute(query).df()
         
         if df_q.empty:
+            if strict:
+                raise RuntimeError(
+                    "get_quarterly_climate: the query over "
+                    f"{data_path!r} returned no rows. The Infodengue extracts are "
+                    "empty, or lack tempmin/umidmin, or the region filter "
+                    f"({region!r}) matched nothing."
+                )
             return pd.DataFrame()
             
         # Pivot to have Year, Geocode as rows and (Metric, Quarter) as columns
@@ -86,6 +106,8 @@ def get_quarterly_climate(region, level="state"):
             return df_pivot
             
     except Exception as e:
+        if strict:
+            raise
         print(f"Error fetching climate data: {e}")
         return pd.DataFrame()
 
@@ -281,7 +303,20 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
             
     # Add Climate Data
     df_climate = get_quarterly_climate(region, level=level)
-    if not df_climate.empty:
+    if df_climate.empty:
+        # This used to pass in silence, and the consequence was invisible: the
+        # panel simply had no avg_temp_Q*/avg_umid_Q*, hence no prev_avg_*
+        # either, and the M2 rung of the ablation ladder silently became M1.
+        print(
+            "[WARNING] no climate in the panel: get_quarterly_climate() returned "
+            "nothing, so avg_temp_Q*/avg_umid_Q* and their prev_* lags are "
+            "absent.\n"
+            "          The reason is printed above (or data/[0-9]*.parquet is "
+            "missing).\n"
+            "          The M2 rung of run_ablation.py cannot be built without "
+            "these columns."
+        )
+    else:
         df_features = df_features.merge(df_climate, on=[group_col, 'year'], how='left')
     
     def calculate_historical_slope(group):

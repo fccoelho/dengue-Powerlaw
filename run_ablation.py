@@ -16,6 +16,9 @@ Four nested rungs built on the lagged panel returned by
                            the classifier
     M1  lagged metrics     M0 predictors + P_{t-1}, R0_{t-1}, log10(pop)
     M2  + climate          M1 + quarterly mean T and H of year t-1
+                           (eight ``prev_avg_{temp,umid}_Q1..Q4`` columns, listed
+                           in ``CLIMATE_BLOCK`` rather than discovered; the run
+                           aborts if the panel supplies none of them)
     M3  + scaling          M2 + alpha_{t-1}, x_min,t-1, alpha-dot_{t-1}
 
 An optional fifth rung ``M3dur`` (off by default, ``--include-dur-scaling``)
@@ -134,6 +137,18 @@ DEMO = ["prev_log_pop"]
 SCALING_SIZE = ["prev_alpha_size", "prev_xmin_size", "prev_alpha_trend"]
 SCALING_DUR = ["prev_alpha_dur", "prev_xmin_dur"]
 
+#: The climate block that *defines* M2, named instead of discovered.
+#:
+#: Discovering it by scanning the panel for ``prev_avg_*`` made the rung
+#: silently identical to M1 whenever the panel carried no climate at all, and
+#: a rung that adds nothing yields a contrast of exactly 0.0 with a [0, 0]
+#: interval -- the table then says "climate adds nothing" when the truth is
+#: "climate was never entered". Listing the block makes that failure mode
+#: impossible: what is missing is reported, and a rung that adds no column is
+#: refused rather than scored.
+CLIMATE_BLOCK = [
+    f"prev_avg_{var}_Q{q}" for var in ("temp", "umid") for q in (1, 2, 3, 4)
+]
 CLIMATE_RE = re.compile(r"^prev_avg_(?:temp|umid)_Q[1-4]$")
 
 #: Loss reported as primary for each task (Section 2.10).
@@ -245,15 +260,166 @@ def validate_panel(df, level, verbose=True):
 # --------------------------------------------------------------------------
 # The ladder
 # --------------------------------------------------------------------------
-def build_ladder(df, include_dur_scaling=False):
-    """Return ``{rung: feature list}`` for the rungs that the panel supports.
+def attach_climate(df, level, region, parquet=None, block=None, verbose=True):
+    """Merge the quarterly climate block onto ``df`` as year-1 predictors.
+
+    This is what ``prepare_lagged_data`` does, minus the silent skip: when
+    ``get_quarterly_climate`` fails it returns an empty frame, the merge is
+    never attempted, and the panel simply has no climate columns. Rebuilding
+    the block here makes the failure visible instead of turning it into an
+    ablation rung that is quietly empty.
+
+    The merge is on ``(unit, year + 1)``: the climate of season t-1 becomes a
+    predictor of season t, which is exactly what the ``prev_avg_*`` name
+    asserts and what the one-year ``shift`` in ``prepare_lagged_data`` does.
+    """
+    unit_col = "state" if level == "state" else "geocode"
+    block = list(CLIMATE_BLOCK if block is None else block)
+    raw_cols = [c[len("prev_"):] if c.startswith("prev_") else c for c in block]
+
+    available, missing = climate_availability(df, block)
+    if not missing:
+        if verbose:
+            print(f"[climate] panel already carries all {len(block)} climate columns")
+        return df, []
+
+    if parquet:
+        clim = pd.read_parquet(parquet)
+        source = f"parquet:{parquet}"
+    else:
+        try:
+            import predictive_model
+        except ImportError as exc:
+            raise SystemExit(f"cannot import predictive_model ({exc})") from None
+        try:
+            clim = predictive_model.get_quarterly_climate(region, level=level, strict=True)
+        except SystemExit:
+            raise
+        except Exception as exc:  # noqa: BLE001
+            raise SystemExit(
+                f"cannot build the climate block: {type(exc).__name__}: {exc}\n"
+                "get_quarterly_climate() reads data/[0-9]*.parquet (Infodengue). "
+                "Fetch those extracts (data_utils.ensure_episcanner_files / "
+                "update_data.py) or pass --climate-parquet with a pre-aggregated "
+                "file."
+            ) from None
+        source = "get_quarterly_climate(strict=True)"
+
+    if unit_col not in clim.columns:
+        raise SystemExit(
+            f"climate source {source} has no {unit_col!r} column "
+            f"(it has {list(clim.columns)})"
+        )
+    absent = [c for c in raw_cols if c not in clim.columns]
+    if absent:
+        raise SystemExit(
+            f"climate source {source} is missing {absent}; expected the quarterly "
+            f"aggregates {raw_cols} plus {unit_col!r} and 'year'"
+        )
+
+    clim = clim[[unit_col, "year"] + raw_cols].copy()
+    clim["year"] = pd.to_numeric(clim["year"], errors="coerce")
+    clim = clim.dropna(subset=["year"])
+    clim["year"] = clim["year"].astype(int) + 1  # lag: climate of t-1 predicts t
+    clim = clim.rename(columns={c: f"prev_{c}" for c in raw_cols})
+
+    before = set(df.columns)
+    df = df.merge(clim, on=[unit_col, "year"], how="left")
+    added = [c for c in block if c in df.columns and c not in before]
+
+    notes = []
+    if not added:
+        raise SystemExit(
+            f"merging climate from {source} added no column; the panel keys "
+            f"({unit_col!r}, 'year') did not match the climate frame"
+        )
+    coverage = float(df[added].notna().any(axis=1).mean())
+    notes.append(
+        f"climate block attached from {source}: {len(added)}/{len(block)} columns, "
+        f"non-null on {coverage:.1%} of panel rows"
+    )
+    if verbose:
+        print(f"[climate] {source}: +{len(added)} columns, coverage {coverage:.1%}")
+        if missing:
+            print(f"[climate] still unavailable: {missing}")
+    if coverage < 0.5:
+        notes.append(
+            f"climate coverage is only {coverage:.1%}; the M2 rung will be fitted "
+            "on mostly-missing climate and its contrast is hard to interpret"
+        )
+    return df, notes
+
+
+def climate_availability(df, block=None):
+    """Return ``(available, missing)`` for the declared climate block.
+
+    ``available`` keeps the declared order and requires the column to hold at
+    least one observation: a column that is present but entirely null is not a
+    predictor and must not be counted as one.
+    """
+    block = list(CLIMATE_BLOCK if block is None else block)
+    available, missing = [], []
+    for col in block:
+        ok = col in df.columns and not df[col].isnull().all()
+        (available if ok else missing).append(col)
+    return available, missing
+
+
+def _diagnose_missing_climate(df, missing):
+    """Actionable message for a panel that cannot supply the climate block."""
+    climate_like = sorted(
+        c for c in df.columns
+        if "avg_" in c or "temp" in c.lower() or "umid" in c.lower()
+    )
+    lines = [
+        f"The M2 rung cannot be built: the panel supplies none of the "
+        f"{len(missing)} climate columns that define it.",
+        "",
+        f"  expected : {missing}",
+        ("  present  : " + str(climate_like)) if climate_like
+        else "  present  : none -- the panel has no climate-like column at all",
+        "",
+        "prepare_lagged_data() drops climate silently: it merges only",
+        "``if not df_climate.empty``, so when get_quarterly_climate() fails it",
+        "returns an empty frame, the merge is skipped, and avg_temp_Q* /",
+        "avg_umid_Q* never reach the panel. Their prev_* lags then do not",
+        "exist either, and nothing downstream notices.",
+        "",
+        "Options, in order of preference:",
+        "  1. python run_ablation.py --attach-climate",
+        "     rebuild the block from data/[0-9]*.parquet (Infodengue) here and",
+        "     lag it to year-1",
+        "  2. python run_ablation.py --climate-parquet CLIMATE.parquet",
+        "     a pre-aggregated file with columns <unit>, year, avg_temp_Q1..Q4,",
+        "     avg_umid_Q1..Q4",
+        "  3. rebuild the panel with the Infodengue extracts in place and rerun",
+        "     with --panel",
+        "",
+        "Refusing to run: M2 identical to M1 writes M2-M1 = 0.0 with a [0, 0]",
+        "interval, which reads as 'climate adds nothing' when the truth is",
+        "'climate was never entered'.",
+    ]
+    return "\n".join(lines)
+
+
+def build_ladder(df, include_dur_scaling=False, climate_block=None,
+                 require_climate=True):
+    """Return ``(ladder, dropped, climate_info)``.
 
     A column is dropped from a rung when it is absent from the panel or is
     entirely null, because a predictor with no observations is not a
-    predictor. Every drop is reported so the table can be read knowing which
-    predictors were actually available.
+    predictor. Every drop is reported -- including the climate columns that
+    were *expected* and did not arrive -- so the table can be read knowing
+    which predictors were actually available.
+
+    ``require_climate`` aborts when the panel supplies none of the declared
+    climate block. That is not defensiveness: an M2 with no climate column is
+    M1, and the M2-M1 contrast it produces is a zero by construction rather
+    than a finding.
     """
-    climate_cols = [c for c in df.columns if CLIMATE_RE.match(c)]
+    climate_cols, climate_missing = climate_availability(df, climate_block)
+    if require_climate and not climate_cols:
+        raise SystemExit(_diagnose_missing_climate(df, climate_missing))
 
     m1 = LAGGED_SIZE + LAGGED_DUR + LAGGED_PEAK + EPI + DEMO
     ladder = {
@@ -264,8 +430,7 @@ def build_ladder(df, include_dur_scaling=False):
     if include_dur_scaling:
         ladder["M3dur"] = m1 + climate_cols + SCALING_SIZE + SCALING_DUR
 
-    available = {}
-    dropped = {}
+    available, dropped = {}, {}
     for rung, cols in ladder.items():
         keep, gone = [], []
         for c in cols:
@@ -276,16 +441,47 @@ def build_ladder(df, include_dur_scaling=False):
         available[rung] = keep
         if gone:
             dropped[rung] = gone
-    return available, dropped
+
+    if climate_missing:
+        # Expected for M2, absent from the panel -- and therefore absent from
+        # ladder["M2"], which only holds what survived. Without this line they
+        # disappear from the metadata too, which is exactly how the original
+        # run came to report "unavailable_columns: {}" while M2 was empty.
+        dropped.setdefault("M2", []).extend(climate_missing)
+
+    # A block that vanishes leaves two consecutive rungs with the very same
+    # features, and their contrast would be a fabricated 0.0. Catch it here,
+    # where the message can still say which column went missing.
+    order = [r for r in ("M1", "M2", "M3", "M3dur") if r in available]
+    for prev, nxt in zip(order, order[1:]):
+        if set(available[nxt]) == set(available[prev]):
+            raise SystemExit(
+                f"rung {nxt} ended up with exactly the same features as {prev} "
+                f"({sorted(set(available[nxt]))}), so the {nxt}-{prev} contrast "
+                "would be identically zero. Columns listed for "
+                f"{nxt} but absent from the panel: {dropped.get(nxt, [])}"
+            )
+
+    climate_info = {
+        "block": list(CLIMATE_BLOCK if climate_block is None else climate_block),
+        "available": climate_cols,
+        "missing": climate_missing,
+    }
+    return available, dropped, climate_info
 
 
-def assert_ladder_is_nested(ladder):
+def assert_ladder_is_nested(ladder, climate_block=None):
     """Structural guarantee that consecutive rungs differ only in their block.
 
     This is what licenses the sentence "a contrast between consecutive rungs
     is attributable to the block that was added". If a future edit adds a
     column to the wrong rung, the run dies here rather than producing a table
     that quietly supports the wrong claim.
+
+    Nesting alone is not enough: M2 must be a *strict* superset of M1, or the
+    M2-M1 contrast is zero by construction. The emptiness check is here as
+    well as in ``build_ladder`` so that a hand-built ladder handed to this
+    function cannot slip through either.
     """
     for rung in ("M1", "M2", "M3", "M3dur"):
         cols = ladder.get(rung, [])
@@ -296,6 +492,9 @@ def assert_ladder_is_nested(ladder):
                 "to exactly one rung"
             )
 
+    expected_climate = set(
+        CLIMATE_BLOCK if climate_block is None else climate_block
+    )
     order = [r for r in ("M1", "M2", "M3", "M3dur") if r in ladder]
     for prev, nxt in zip(order, order[1:]):
         added = set(ladder[nxt]) - set(ladder[prev])
@@ -305,11 +504,17 @@ def assert_ladder_is_nested(ladder):
                 f"rung {nxt} drops columns relative to {prev}: {sorted(removed)}. "
                 "Rungs must be nested."
             )
+        if not added:
+            raise AssertionError(
+                f"rung {nxt} adds no column to {prev}: the {nxt}-{prev} contrast "
+                "is identically zero and is not a result"
+            )
         if nxt == "M2":
-            bad = [c for c in added if not CLIMATE_RE.match(c)]
+            bad = sorted(added - expected_climate)
             if bad:
                 raise AssertionError(
-                    f"M2 must add only previous-season climate columns; it also added {sorted(bad)}"
+                    f"M2 must add only the declared climate block; it also added "
+                    f"{bad}"
                 )
         if nxt in ("M3", "M3dur") and prev == "M2":
             bad = [c for c in added if c not in SCALING_SIZE + SCALING_DUR]
@@ -731,6 +936,28 @@ def run_regression_ablation(df, ladder, unit_col, origins, tau_grid, model, seed
                 for rung, reference in ADJACENT:
                     if rung not in L.columns or reference not in L.columns:
                         continue
+                    if set(ladder.get(rung, [])) == set(ladder.get(reference, [])):
+                        # Unreachable while build_ladder refuses such a ladder.
+                        # Kept as a second line of defence: this is the exact
+                        # shape of the bug that wrote 95 zeros, and a missing
+                        # number must never be rendered as "no difference".
+                        rows.append({
+                            "record_type": "contrast", "level": level, "task": task,
+                            "target": target, "origin": int(origin), "rung": rung,
+                            "contrast": f"{rung}-{reference}", "model": "",
+                            "loss": "pinball", "tau": float(tau), "value": np.nan,
+                            "n_train": int(len(train)),
+                            "n_val": int(len(L[[reference, rung]].dropna())),
+                            "n_units": int(val[unit_col].nunique()),
+                            "ci_low": np.nan, "ci_high": np.nan, "se": np.nan,
+                            "p_value": np.nan, "ci_excludes_zero": False,
+                            "improves": False, "features": "",
+                            "note": (f"undefined: {rung} and {reference} carry the "
+                                     "same feature set, so the differential is "
+                                     "identically zero by construction and is not "
+                                     "a result"),
+                        })
+                        continue
                     pair = L[[reference, rung]].dropna()
                     if len(pair) < 3:
                         continue
@@ -1050,6 +1277,17 @@ def parse_args(argv=None):
     ap.add_argument("--include-dur-scaling", action="store_true",
                     help="add the diagnostic rung M3dur (duration scaling descriptors)")
     ap.add_argument("--panel", default=None, help="reuse a cached panel parquet")
+    ap.add_argument("--attach-climate", action="store_true",
+                    help="build the climate block from data/[0-9]*.parquet when the "
+                         "panel has none, and lag it to year-1. Without this the run "
+                         "refuses to proceed when M2 would equal M1")
+    ap.add_argument("--climate-parquet", default=None,
+                    help="pre-aggregated climate file (<unit>, year, "
+                         "avg_temp_Q1..Q4, avg_umid_Q1..Q4) merged as year-1 "
+                         "predictors")
+    ap.add_argument("--climate-block", default=None,
+                    help="override the eight column names that define M2 "
+                         "(comma-separated); default is the declared CLIMATE_BLOCK")
     ap.add_argument("--save-panel", default=None, help="write the panel here for reuse")
     ap.add_argument("--output", default="ablation_results.csv")
     ap.add_argument("--bootstrap", type=int, default=2000)
@@ -1130,8 +1368,26 @@ def main(argv=None):
         )
 
     # -- ladder ----------------------------------------------------------
-    ladder, dropped = build_ladder(df, include_dur_scaling=args.include_dur_scaling)
-    assert_ladder_is_nested(ladder)
+    climate_block = None
+    if args.climate_block:
+        climate_block = [c.strip() for c in args.climate_block.split(",") if c.strip()]
+
+    if args.attach_climate or args.climate_parquet:
+        df, climate_notes = attach_climate(
+            df, args.level, args.region, parquet=args.climate_parquet,
+            block=climate_block, verbose=verbose,
+        )
+        panel_notes = panel_notes + climate_notes
+        if args.save_panel:
+            df.to_parquet(args.save_panel, index=False)
+            if verbose:
+                print(f"[panel] re-cached with climate to {args.save_panel}")
+
+    ladder, dropped, climate_info = build_ladder(
+        df, include_dur_scaling=args.include_dur_scaling,
+        climate_block=climate_block,
+    )
+    assert_ladder_is_nested(ladder, climate_block=climate_block)
     assert_no_contemporaneous_leak(ladder, df)
 
     if verbose:
@@ -1140,6 +1396,10 @@ def main(argv=None):
             print(f"  {rung:6s} {len(ladder[rung]):2d} features  {ladder[rung]}")
         for rung, gone in dropped.items():
             print(f"  {rung:6s} unavailable in this panel: {gone}")
+        if climate_info["missing"]:
+            print(f"[climate] {len(climate_info['available'])}/"
+                  f"{len(climate_info['block'])} block columns available; missing "
+                  f"{climate_info['missing']}")
 
     # -- runs ------------------------------------------------------------
     tau_grid = parse_tau_grid(args.tau_grid)
@@ -1227,6 +1487,10 @@ def main(argv=None):
                           f"{args.min_origins}/{len(ready)} origins"),
         "ladder": {k: v for k, v in ladder.items()},
         "unavailable_columns": dropped,
+        "climate": climate_info,
+        "climate_columns_in_panel": sorted(
+            c for c in df.columns if CLIMATE_RE.match(c)
+        ),
         "panel_notes": panel_notes,
         "classifier_threshold_scope": args.threshold_scope,
         "classifier_percentile": args.percentile,

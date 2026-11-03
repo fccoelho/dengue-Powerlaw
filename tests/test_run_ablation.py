@@ -50,8 +50,14 @@ def _panel(n_units=8, y0=2012, y1=2020, seed=0):
 # ---------------------------------------------------------------------------
 def test_m2_adds_only_climate_and_m3_adds_only_scaling():
     df = _panel()
-    ladder, dropped = ra.build_ladder(df)
-    assert dropped == {}
+    ladder, dropped, climate = ra.build_ladder(df)
+
+    # The synthetic panel carries Q1 only. The other six are *expected* and
+    # absent, so they must be reported rather than silently omitted: that is
+    # exactly what made M2 collapse into M1 when the real panel had no climate.
+    assert set(climate["available"]) == {"prev_avg_temp_Q1", "prev_avg_umid_Q1"}
+    assert set(climate["missing"]) == set(ra.CLIMATE_BLOCK) - set(climate["available"])
+    assert set(dropped["M2"]) == set(climate["missing"])
 
     added_m2 = set(ladder["M2"]) - set(ladder["M1"])
     assert added_m2 == {"prev_avg_temp_Q1", "prev_avg_umid_Q1"}
@@ -68,7 +74,7 @@ def test_m2_adds_only_climate_and_m3_adds_only_scaling():
 
 def test_assert_ladder_is_nested_rejects_a_foreign_column_in_m3():
     df = _panel()
-    ladder, _ = ra.build_ladder(df)
+    ladder, _, _ = ra.build_ladder(df)
     ra.assert_ladder_is_nested(ladder)
 
     broken = {k: list(v) for k, v in ladder.items()}
@@ -79,7 +85,7 @@ def test_assert_ladder_is_nested_rejects_a_foreign_column_in_m3():
 
 def test_assert_ladder_is_nested_rejects_a_shifted_rung():
     df = _panel()
-    ladder, _ = ra.build_ladder(df)
+    ladder, _, _ = ra.build_ladder(df)
     broken = {k: list(v) for k, v in ladder.items()}
     broken["M2"] = broken["M2"] + ["prev_alpha_size"]  # scaling inside M2
     with pytest.raises(AssertionError, match="climate"):
@@ -88,7 +94,7 @@ def test_assert_ladder_is_nested_rejects_a_shifted_rung():
 
 def test_contemporaneous_climate_is_rejected_by_the_leak_guard():
     df = _panel()
-    ladder, _ = ra.build_ladder(df)
+    ladder, _, _ = ra.build_ladder(df)
     ra.assert_no_contemporaneous_leak(ladder, df)
 
     broken = {k: list(v) for k, v in ladder.items()}
@@ -100,7 +106,7 @@ def test_contemporaneous_climate_is_rejected_by_the_leak_guard():
 def test_all_null_column_is_dropped_and_reported():
     df = _panel()
     df["prev_R0"] = np.nan
-    ladder, dropped = ra.build_ladder(df)
+    ladder, dropped, _ = ra.build_ladder(df)
     assert "prev_R0" not in ladder["M1"]
     assert "prev_R0" in dropped["M1"]
 
@@ -108,7 +114,7 @@ def test_all_null_column_is_dropped_and_reported():
 def test_duration_rung_is_optional_and_adds_only_duration_scaling():
     df = _panel()
     assert "M3dur" not in ra.build_ladder(df)[0]
-    ladder, _ = ra.build_ladder(df, include_dur_scaling=True)
+    ladder, _, _ = ra.build_ladder(df, include_dur_scaling=True)
     added = set(ladder["M3dur"]) - set(ladder["M3"])
     assert added == set(ra.SCALING_DUR)
 
@@ -210,7 +216,7 @@ def test_run_regression_ablation_emits_one_loss_row_per_rung_and_origin(monkeypa
                         lambda Xtr, ytr, tau, model=None, seed=42, max_iter=300:
                         _Constant().fit(Xtr, ytr))
     df = _panel(n_units=6, y0=2015, y1=2019)
-    ladder, _ = ra.build_ladder(df)
+    ladder, _, _ = ra.build_ladder(df)
 
     rows, origin_diffs = ra.run_regression_ablation(
         df, ladder, "state", [2019], [0.5], "hist_gradient_boosting",
