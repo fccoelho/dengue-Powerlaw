@@ -1029,14 +1029,23 @@ Table~\ref{tab:ablation_results} is the pinball loss rather than the RMSE.}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig11_ablation_skill}
-\caption{The ablation ladder. (a) Skill score relative to the persistence
-benchmark (M0) for epidemic size, duration and peak week, as predictor blocks
-are added from M1 to M3; the M2$\to$M3 step isolates the contribution of the
-scaling descriptors $(\alpha_{t-1},x_{\min,t-1},\dot\alpha_{t-1})$. (b) Pinball
-loss as a function of the quantile level $\tau$ for M2 and M3: a gain confined
-to high $\tau$ would mean the scaling information concerns extreme seasons
-specifically, which is what a heavy-tail description should deliver. Bars are
-95\% bootstrap intervals from resampling units.}
+\caption{The ablation ladder, drawn directly from \texttt{ablation\_results.csv}
+rather than recomputed. (a) Skill score relative to the calibrated persistence
+benchmark (M0) for epidemic size, duration and peak week at the primary loss
+(pinball, $\tau=0.5$); bar height is the median over the five forecast origins
+and each dot is a single origin. The M2$\to$M3 step isolates the contribution of
+the scaling descriptors $(\alpha_{t-1},x_{\min,t-1},\dot\alpha_{t-1})$.
+(b) The quantity the decision rule turns on, $100\,(L_{M2}-L_{M3})/L_{M2}$,
+against $\tau$: a gain confined to high $\tau$ would mean the scaling
+information concerns extreme seasons specifically, which is what a heavy-tail
+description should deliver, so negative values here are the opposite of the
+intended effect. Lines are medians over origins and the band is the range across
+origins for epidemic size. The block degrades the extreme quantile of the size
+forecast, with a median loss of $18.3\%$ at $\tau=0.95$ and a negative
+differential in all five origins, and no $\tau$ on any target reaches the 3/5
+criterion of Section~\ref{sec:ablation}. Skill scores carry no interval of their
+own: the unit-bootstrap interval in this analysis belongs to the paired
+differential, which is what Table~\ref{tab:ablation_results} reports.}
 \label{fig:ablation}
 \end{figure}
 
@@ -1051,7 +1060,9 @@ with the range over origins in brackets; the primary loss is the pinball loss at
 $\tau=0.5$ for all three targets. The last column is the M3$-$M2 differential at
 that loss: median relative change, negative meaning that the scaling block
 worsens the forecast, and in parentheses the number of origins in which M3
-improves on M2. The decision rule of Section~\ref{sec:ablation} grants the rung
+improves on M2 by sign alone; in at most one of those origins does the
+bootstrap interval exclude zero, so the count in parentheses is not the one
+the decision rule scores. The decision rule of Section~\ref{sec:ablation} grants the rung
 no credit unless the improvement holds in the same direction with a 95\%
 unit-bootstrap interval excluding zero in at least 3 of the 5 origins; no
 contrast involving the scaling block reaches that threshold, and no rung at all
@@ -1062,8 +1073,8 @@ tabulated: it was not part of this run (Section~\ref{sec:predtest}).}
 \toprule
 Target & M1 & M2 & M3 & M3$-$M2 \\
 \midrule
-Size $S_t$      & $0.10$ [$-$0.59, $0.71$] & $-0.02$ [$-$0.75, $0.71$] & $-0.14$ [$-$0.56, $0.71$] & $-1.5\%$ (2/5)\\
-Duration $D_t$  & $0.27$ [$-$0.02, $0.43$] & $0.29$ [$0.06$, $0.52$]  & $0.27$ [$-$0.06, $0.48$] & $-3.9\%$ (1/5)\\
+Size $S_t$      & $0.10$ [$-$0.59, $0.71$] & $-0.01$ [$-$0.75, $0.71$] & $-0.14$ [$-$0.56, $0.71$] & $-1.5\%$ (2/5)\\
+Duration $D_t$  & $0.27$ [$-$0.01, $0.43$] & $0.29$ [$0.06$, $0.52$]  & $0.26$ [$-$0.06, $0.48$] & $-3.9\%$ (1/5)\\
 Peak week $P_t$ & $0.08$ [$-$0.16, $0.26$] & $-0.03$ [$-$0.69, $0.26$] & $0.06$ [$-$0.55, $0.26$] & $+1.4\%$ (3/5)\\
 \bottomrule
 \end{tabular}
