@@ -21,10 +21,10 @@ large dengue epidemics in Brazil}
 \begin{abstract}
 Power-law tails are reported for dengue incidence and read as a verdict on
 forecastability: if the exponent is near two, extreme seasons cannot be
-anticipated. We argue that the same fit supports a more useful conclusion ---
-that the tail prices the risk --- and test it out of sample. Using weekly
-surveillance for the 5{,}571 Brazilian municipalities from 2010 to 2026, we
-fitted discrete power laws by maximum likelihood with Kolmogorov--Smirnov
+anticipated. We argue the same fit supports a more useful conclusion --- the tail prices
+the risk --- and test it out of sample. Using weekly
+surveillance for the 5{,}571 Brazilian municipalities (2010--2026), we fitted
+discrete power laws by maximum likelihood with Kolmogorov--Smirnov
 $x_{\min}$ selection at seven nested aggregation levels (47{,}494 fits), tested
 each against an exponential by likelihood ratio, and evaluated the fitted pair
 $(\alpha,x_{\min})$ on a rolling-origin design.
@@ -39,17 +39,21 @@ $x_{\min}$ two to three orders of magnitude above the bulk.
 Because $\alpha\approx2$ fixes the whole exceedance curve, the pair is a
 two-parameter risk statement, and it is well calibrated: it reproduces the
 observed exceedance frequency over two decades, implying that 5.4--16.5\% of
-municipalities exceed ten times $x_{\min}$ in a year and 0.3--2.7\% exceed a
-hundred times it. The exponent is also a readout of seasonal magnitude ---
+municipalities exceed ten times $x_{\min}$ in a year and 0.3--2.7\% a hundred
+times it. The exponent is also a readout of seasonal magnitude ---
 rank-correlated with $x_{\min}$ at $0.87$ nationally and $0.65$ within states, a
 coupling absent under simulation.
 
-Predictively, the question worth asking is the exceedance one: lagged
-descriptors, with duration and peak timing as ordinary covariates, improve the
-Brier score over calibrated persistence in 3 of 5 origins, by up to $0.18$. The
-scaling block adds nothing to the size forecast (0 of 5) and degrades its 95th
-percentile by a median $18\%$, because it re-encodes the lagged count. The tail
-is worth reporting --- as a risk curve, not as a predictor.
+Predictively, the exceedance question is the tractable one. At state level,
+lagged descriptors --- with duration and peak timing as ordinary covariates ---
+beat calibrated persistence on the Brier score in 3 of 5 origins, by up to
+$0.18$. At municipal level, with the label referred to each municipality's own
+history, AUC rises from $0.50$ to $0.64$, but no rung clears the pre-registered
+incremental test, and the scaling block contributes at most $+0.002$ Brier (4 of
+5 origins, no interval excluding zero). That block adds nothing to the size
+forecast and degrades its 95th percentile by a median $18\%$, because it
+re-encodes the lagged count. The tail is worth reporting --- as a risk curve, not
+as a predictor.
 \end{abstract}
 
 \section{Introduction}
@@ -498,7 +502,11 @@ area under the precision--recall curve (the more informative summary under
 class imbalance), the Brier score \citep{gneiting2007strictly}, the $F_1$ score
 at the Youden threshold and a calibration curve, and we test differences in AUC
 between nested feature sets by the method of \citet{delong1988comparing}.
-Feature attributions are obtained from SHAP values \citep{lundberg2017unified}.
+Feature attribution is measured by held-out permutation importance on the
+Brier score, reported both per predictor and for the scaling block shuffled
+as a unit \citep{breiman2001random}: under the collinearity that
+Section~\ref{sec:coupling} documents, a per-column ranking alone
+understates a block whose members can stand in for one another.
 
 \subsection{Evaluation protocol and ablation ladder}
 \label{sec:ablation}
@@ -904,73 +912,112 @@ quartile of the unit's own history. This is the risk statement itself, and it is
 the natural place to look for value in the scaling descriptors, since a tail
 exponent is by construction a statement about upper-tail probabilities.
 
-It is also the one place where the answer is positive. Table~\ref{tab:exceed}
-reports the paired Brier-score differentials across the five forecast origins.
-Lagged epidemic descriptors --- which include the previous season's duration and
-peak timing as ordinary covariates, alongside size, $R_0$ and population ---
-improve on calibrated persistence with a 95\% bootstrap interval excluding zero
-in 3 of the 5 origins, by up to $0.175$ in absolute Brier score. Climate adds
-nothing (0 of 5), and the scaling block adds nothing (0 of 5), with point
-estimates close to zero.
+We posed it at the two levels where it is asked operationally. At state level
+(Table~\ref{tab:exceed}), lagged epidemic descriptors --- which include the
+previous season's duration and peak timing as ordinary covariates, alongside
+size, $R_0$ and population --- improve on calibrated persistence with a 95\%
+bootstrap interval excluding zero in 3 of the 5 origins, by up to $0.175$ in
+absolute Brier score. Climate adds nothing (0 of 5) and the scaling block adds
+nothing (0 of 5), with point estimates close to zero. Per origin, the M1$-$M0
+differentials are $-0.047$, $+0.074$, $+0.134$, $+0.175$ and $+0.159$ for 2021
+to 2025 --- negative in the first origin and increasingly positive thereafter,
+which is what one expects from a model that needs history to be trained on.
+
+At municipal level the same ladder runs over 3{,}976 municipalities with enough
+history for a within-unit threshold (at least five seasons), with between 579
+and 1{,}483 units evaluated per origin. Two things change, and only one of them
+is about the scaling descriptors. The first is a correction. With the threshold
+taken from each municipality's own seasons rather than pooled across the country,
+the population-only reference falls to a median AUC of $0.47$ (range
+$0.456$--$0.516$), against $0.94$ when the threshold is pooled: the pooled label
+was measuring municipality size, and the within-unit label is not. The second is
+that discrimination is real but modest. Median AUC rises from $0.50$ for the
+no-skill reference to $0.59$, $0.63$ and $0.64$ for M1, M2 and M3; M3 is the best
+of the three in 4 of 5 origins and gains a median $+0.008$ over M2. Against a
+rule that demands a bootstrap interval excluding zero in 3 of 5 origins, however,
+no rung passes at this level. The scaling block improves the Brier score in 4 of
+5 origins, by a median of $+0.002$, and in none of them does the interval
+exclude zero.
+
+The gap between the two levels is mostly an arithmetic one. Absolute Brier
+differentials are two orders of magnitude smaller at municipal level ($0.002$
+against $0.13$) because the loss is an average over hundreds of small units
+rather than over twenty-six large ones, so the same relative signal is a much
+smaller number. What does not change is the ranking: the scaling block clears
+the bar at neither level, and where it moves at all it moves in the right
+direction. Whether a municipality will have an exceptional season is partly
+predictable from how large the last one was; the exponent does not add to that.
+
+One origin deserves a flag. In 2024, 69.5\% of the evaluated municipalities
+exceeded their own upper quartile, against a training base rate of 26.4\%, and
+every rung scores a Brier score of about $0.40$. That season was a national
+record, and no model trained on earlier seasons anticipated its level. This is
+the honest boundary of the exercise: the classifier ranks units within a season
+of familiar magnitude; it does not foresee a regime break.
+
+Figures~\ref{fig:roc} and~\ref{fig:importance} report discrimination, calibration
+and attribution for the municipal classifier. The calibration panel is the one to
+read: a classifier that is useful for planning must track the diagonal in the
+upper deciles, not merely rank well on average.
 
 \begin{table}[htbp]
 \centering
 \small
 \setlength{\tabcolsep}{5pt}
-\caption{The large-season classifier, state level, five forecast origins
-2021--2025. The target is whether a unit exceeds the 75th percentile of its own
-history; the loss is the Brier score. Positive values mean the later rung has the
-lower Brier score. The decision rule of Section~\ref{sec:ablation} requires a
-same-direction improvement with a 95\% unit-bootstrap interval excluding zero in
-at least 3 of 5 origins.}
+\caption{The large-season classifier at both aggregation levels, five forecast
+origins 2021--2025. The target is whether a unit exceeds the 75th percentile of
+its own history; the loss is the Brier score. Positive values mean the later rung
+has the lower Brier score, and ``median'' is over the five origins. The decision
+rule of Section~\ref{sec:ablation} requires a same-direction improvement with a
+95\% unit-bootstrap interval excluding zero in at least 3 of 5 origins. The
+municipal rows use a within-unit threshold, without which the label is a
+population indicator; there the population-only reference reaches a median AUC of
+$0.47$ against $0.62$--$0.65$ for the fitted rungs.}
 \label{tab:exceed}
-\begin{tabular}{@{}lrrrr@{}}
+\begin{tabular}{@{}llrrrr@{}}
 \toprule
-Contrast & $\Delta$Brier, median & Origins $\Delta>0$ & Origins CI excl.\ 0 & Verdict\\
+Level & Contrast & $\Delta$Brier, median & Origins $\Delta>0$ & Origins CI excl.\ 0 & Verdict\\
 \midrule
-M1$-$M0 (lagged metrics) & $+0.134$ & 4/5 & \textbf{3/5} & \textbf{supported}\\
-M2$-$M1 (climate)        & $-0.001$ & 2/5 & 0/5 & not supported\\
-M3$-$M2 (scaling)        & $+0.008$ & 3/5 & 0/5 & not supported\\
+State (26 units) & M1$-$M0 (lagged metrics) & $+0.134$ & 4/5 & \textbf{3/5} & \textbf{supported}\\
+                 & M2$-$M1 (climate)        & $-0.001$ & 2/5 & 0/5 & not supported\\
+                 & M3$-$M2 (scaling)        & $+0.008$ & 3/5 & 0/5 & not supported\\
+\addlinespace
+Municipal (3{,}976 units) & M1$-$M0 (lagged metrics) & $+0.003$ & 3/5 & 2/5 & not supported\\
+                 & M2$-$M1 (climate)        & $+0.001$ & 3/5 & 1/5 & not supported\\
+                 & M3$-$M2 (scaling)        & $+0.002$ & 4/5 & 0/5 & not supported\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Per origin, the M1$-$M0 differentials are $-0.047$, $+0.074$, $+0.134$, $+0.175$
-and $+0.159$ for 2021 to 2025 --- negative in the first origin and increasingly
-positive thereafter, which is what one expects from a model that needs history to
-be trained on. The scaling block's differentials are $-0.009$, $-0.001$,
-$+0.008$, $+0.036$ and $+0.010$: three of five have the right sign and none has
-an interval excluding zero. Whatever the exponent contributes to the probability
-of a large season, it is not detectable against a model that already knows how
-large the previous season was.
-
-Figures~\ref{fig:roc} and~\ref{fig:shap} report discrimination, calibration and
-attribution for the classifier. The calibration panel is the one to read: a
-classifier that is useful for planning must track the diagonal in the upper
-deciles, not merely rank well on average.
-
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig12_roc_pr_calibration}
-\caption{Classification of large epidemics. (a) ROC curves; (b)
-precision--recall curves, the more informative summary when the positive class
-is the minority; (c) calibration of the predicted probability of exceeding the
-75th percentile; (d) $F_1$ as a function of the decision threshold, with the
-Youden point marked. All curves are drawn from out-of-fold predictions so that
-they are honest. Solid lines denote M2 (without scaling descriptors) and dashed
-lines M3 (with them).}
+\caption{Classification of large epidemics at municipal level. (a) ROC curves;
+(b) precision--recall curves, the more informative summary when the positive
+class is the minority; (c) calibration of the predicted probability of exceeding
+the 75th percentile; (d) $F_1$ as a function of the decision threshold, with the
+Youden point marked. All curves are computed out of fold and averaged over the
+five forecast origins rather than pooled across them: pooling is not neutral here,
+because the base rate ranges from $0.21$ to $0.70$ between origins and a
+prediction that knows only the calendar year reaches a pooled AUC of $0.60$ while
+having no within-origin discrimination at all. Solid lines denote M2 (without
+scaling descriptors), dashed lines M3 (with them), the dash-dot curve the
+no-skill M0 reference and the dotted grey curve the population-only reference.}
 \label{fig:roc}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{figures/fig13_shap}
-\caption{Where the scaling descriptors rank. Mean absolute SHAP values for the
-large-season classifier, pooled over forecast origins, with the power-law block
-highlighted. The left panel ranks all features; the right panel isolates
-$\alpha_{t-1}$, $x_{\min,t-1}$ and $\dot\alpha_{t-1}$ and shows the direction of
-their effect on the predicted probability.}
-\label{fig:shap}
+\includegraphics[width=\textwidth]{figures/fig13_importance}
+\caption{What the classifier is actually using. Held-out permutation importance,
+measured as the increase in Brier score when a predictor is shuffled, so a
+negative value means the predictor hurts. Panel (a) ranks the individual
+predictors, with the power-law block in red; panel (b) tracks the three scaling
+descriptors across forecast origins. The joint bar is the scaling block shuffled
+as a single unit: permuting one column while its correlated partners remain in
+place understates a collinear block, and $\alpha_{t-1}$ and $x_{\min,t-1}$ are
+rank-correlated at $0.65$ within units.}
+\label{fig:importance}
 \end{figure}
 
 \subsection{Predicting epidemic size}
@@ -1161,10 +1208,13 @@ reserve, that is closer to the decision than a point forecast is.
 
 The predictive evaluation confirms the division of labour. Where the question is
 posed as a probability --- will this municipality exceed its own upper quartile?
---- the answer is yes, and detectably so: lagged epidemic descriptors improve the
-Brier score over calibrated persistence in 3 of 5 origins, by up to $0.18$
-(Table~\ref{tab:exceed}). Where the question is posed as a magnitude, the answer
-is no, and the failure is orderly rather than mysterious.
+--- the answer is yes at state level, and detectably so: lagged epidemic descriptors
+improve the Brier score over calibrated persistence in 3 of 5 origins, by up to
+$0.18$ (Table~\ref{tab:exceed}). At municipal level the same design lifts
+discrimination from $0.50$ to $0.64$ AUC, though the Brier differentials fall to
+$0.002$ and no rung clears the pre-registered bar --- a ranking device rather than
+a level forecast. Where the question is posed as a magnitude, the answer is no,
+and the failure is orderly rather than mysterious.
 
 \subsection{Why the coupling explains both results}
 
@@ -1278,6 +1328,16 @@ in Section~\ref{sec:coupling}. A rung containing the scaling descriptors
 interesting question --- whether three power-law parameters can substitute for the
 full covariate stack --- and is not reported here.
 
+\emph{The municipal classifier is a ranking device, not a level forecast.} With the
+exceedance label referred to each municipality's own history, the population-only
+reference falls to a median AUC of $0.47$, so the task no longer measures unit
+size; but discrimination reaches only $0.64$, no rung clears the pre-registered
+incremental test at that level, and the 2024 origin --- in which 69.5\% of units
+exceeded their own upper quartile against a training base rate of 26.4\% ---
+defeats every rung. The classifier orders municipalities within a season of
+familiar magnitude. It does not anticipate a regime change, and in a record year
+its probabilities should not be read as levels.
+
 \emph{Epidemic duration and peak timing are not scaling objects.} Both are
 bounded above by the length of a season, so a scale-free law cannot apply to them
 a priori, and the fits confirm it: the power law is rejected in 15 of 15 national
@@ -1377,7 +1437,8 @@ two-parameter risk specification, and it is well calibrated against the empirica
 frequency of large seasons over two decades of epidemic size. Posed as a
 probability --- will this municipality exceed its own upper quartile? --- the
 problem is tractable: lagged epidemic descriptors improve the Brier score over
-calibrated persistence in 3 of 5 forecast origins. Posed as a magnitude, it is
+calibrated persistence in 3 of 5 state-level origins, and lift municipal
+discrimination from $0.50$ to $0.64$ AUC. Posed as a magnitude, it is
 not: no rung achieves skill for size, and the scaling block specifically adds
 nothing (0 of 5) while degrading the upper quantile by a median $18\%$.
 

@@ -20,8 +20,8 @@ All environments use `\includegraphics` **without an extension**, so either
 | `fig09_exceedance` | Results 3.3 | Implied $\Pr(S\ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ vs empirical exceedance frequency, per national year. |
 | `fig10_pred_vs_obs` | Results 3.4 | Predicted vs observed annual cases, log--log, one point per unit-origin; identity line; 10:1 and 1:10 bands. Two panels: RF and quantile ensemble median. |
 | `fig11_ablation_skill` | Results 3.4 | (a) Skill score vs M0 per target, M1/M2/M3; (b) pinball loss vs $\tau$ for M2 vs M3, with bootstrap bands. |
-| `fig12_roc_pr_calibration` | Results 3.5 | 2x2: ROC, PR, calibration, F1 vs threshold; out-of-fold predictions; M2 solid, M3 dashed; Youden point marked. |
-| `fig13_shap` | Results 3.5 | Mean absolute SHAP ranking with the power-law block highlighted, plus direction plot for the three scaling features. |
+| `fig12_roc_pr_calibration` | Results 3.5 | 2x2: ROC, PR, calibration, F1 vs threshold; out-of-fold predictions averaged over the five origins (not pooled); M0 dotted-dash reference, M2 solid, M3 dashed, population-only dotted. |
+| `fig13_importance` | Results 3.5 | Held-out permutation importance ($\Delta$ Brier), power-law block highlighted; joint block row plus per-origin stability of the three scaling features. |
 | `fig14_error_vs_pop` | Results 3.6 | (a) absolute percentage error vs population; (b) standardised residuals by target vs N(0,1). |
 | `fig15_pred_map` | Results 3.6 | Choropleth of predicted probability of exceeding the 75th percentile, one forecast origin, quintile classes, using `muni_br.gpkg`. |
 

@@ -889,11 +889,17 @@ def _binary_oof(df, feature_cols, percentile=0.75, test_year=2024, n_splits=5):
 def fig12(art):
     """ROC / PR / calibration / F1 of the rarity classifier, read from the artefact.
 
-    The population-only curve is drawn on purpose. If it tracks the full model,
-    the task is separating large municipalities from small ones and no amount
-    of AUC rescues it.
+    Curves are averaged over forecast origins rather than pooled across them.
+    Pooling is not neutral here: the positive rate ranges from 0.21 to 0.70
+    between origins, so a pooled curve ranks a 2021 observation against a 2024
+    one and a predictor that knows only the calendar year scores a pooled AUC of
+    0.60 while having no within-origin discrimination at all (0.50 by
+    construction). The M0 curve is drawn for exactly that reason.
+
+    The population-only curve is drawn for the other reason: if it tracks the
+    full model, the task is separating large municipalities from small ones.
     """
-    from sklearn.metrics import roc_curve, precision_recall_curve, auc, roc_auc_score
+    from sklearn.metrics import roc_curve, precision_recall_curve, roc_auc_score
 
     oof, meta = art["oof"], art["meta"]
     scope = meta.get("threshold_scope", "?")
@@ -901,68 +907,100 @@ def fig12(art):
     q = int(round(float(meta.get("percentile", 0.75)) * 100))
 
     style = {
+        "M0": dict(color="#444444", ls="-.", label="M0 (no skill)"),
         "M2": dict(color="#1f77b4", ls="-", label="M2 (no scaling)"),
         "M3": dict(color="#d62728", ls="--", label="M3 (with scaling)"),
         "POP": dict(color="#7f7f7f", ls=":", label="population only"),
     }
     present = set(oof["rung"])
-    order = [r for r in ("M2", "M3", "POP") if r in present]
+    order = [r for r in ("M0", "M2", "M3", "POP") if r in present]
 
-    fig, axes = plt.subplots(1, 4, figsize=(12.4, 3.1))
+    fpr_grid = np.linspace(0, 1, 201)
+    rec_grid = np.linspace(0, 1, 201)
+    thr_grid = np.linspace(0.01, 0.99, 99)
+
+    def _macro(rung):
+        """Per-origin curves, interpolated onto a common grid and averaged."""
+        roc, pr, cal, f1 = [], [], [], []
+        aucs = []
+        sub = oof[oof["rung"] == rung]
+        for _, d in sub.groupby("origin"):
+            y = d["y_true"].to_numpy()
+            p = d["y_prob"].to_numpy()
+            if len(np.unique(y)) < 2:
+                continue
+            aucs.append(roc_auc_score(y, p))
+
+            f, t, _ = roc_curve(y, p)
+            roc.append(np.interp(fpr_grid, f, t))
+
+            prec, rec, _ = precision_recall_curve(y, p)
+            o = np.argsort(rec)
+            pr.append(np.interp(rec_grid, rec[o], prec[o]))
+
+            qs = np.quantile(p, np.linspace(0, 1, 11))
+            bins = np.clip(np.digitize(p, qs[1:-1]), 0, 9)
+            exp, obs = [], []
+            for k in range(10):
+                m = bins == k
+                if m.any():
+                    exp.append(p[m].mean())
+                    obs.append(y[m].mean())
+            cal.append((np.array(exp), np.array(obs)))
+
+            f1s = []
+            for t0 in thr_grid:
+                pred = p >= t0
+                tp = float(np.sum(pred & (y == 1)))
+                den = float(np.sum(pred) + np.sum(y == 1))
+                f1s.append(2 * tp / den if den else np.nan)
+            f1.append(f1s)
+        return roc, pr, cal, f1, float(np.mean(aucs))
+
+    fig, axes = plt.subplots(1, 4, figsize=(12.4, 3.2))
     for rung in order:
         st = style[rung]
-        sub = oof[oof["rung"] == rung]
-        y = sub["y_true"].to_numpy()
-        p = sub["y_prob"].to_numpy()
+        roc, pr, cal, f1, auc_v = _macro(rung)
 
-        fpr, tpr, th = roc_curve(y, p)
-        auc_v = roc_auc_score(y, p) if len(np.unique(y)) > 1 else np.nan
-        axes[0].plot(fpr, tpr, ls=st["ls"], color=st["color"],
-                     label=f"{st['label']} (AUC {auc_v:.3f})")
-
-        prec, rec, _ = precision_recall_curve(y, p)
-        axes[1].plot(rec, prec, ls=st["ls"], color=st["color"],
-                     label=f"{st['label']} (AP {auc(rec, prec):.3f})")
-
-        qs = np.quantile(p, np.linspace(0, 1, 11))
-        bins = np.clip(np.digitize(p, qs[1:-1]), 0, 9)
-        obs = [y[bins == b].mean() if (bins == b).any() else np.nan for b in range(10)]
-        exp = [p[bins == b].mean() if (bins == b).any() else np.nan for b in range(10)]
-        axes[2].plot(exp, obs, "o", ls=st["ls"], color=st["color"],
-                     label=st["label"], ms=4)
-
-        grid = np.linspace(0.01, 0.99, 99)
-        f1s = []
-        for t in grid:
-            pred = p >= t
-            tp = float(np.sum(pred & (y == 1)))
-            denom = float(np.sum(pred) + np.sum(y == 1))
-            f1s.append(2 * tp / denom if denom else np.nan)
-        axes[3].plot(grid, f1s, ls=st["ls"], color=st["color"], label=st["label"])
-        if len(np.unique(y)) > 1:
-            j = int(np.argmax(tpr - fpr))
-            axes[3].axvline(th[j], color=st["color"], ls=":", lw=1)
+        if roc:
+            axes[0].plot(fpr_grid, np.nanmean(roc, axis=0), ls=st["ls"],
+                         color=st["color"],
+                         label=f"{st['label']} (AUC {auc_v:.3f})")
+            axes[0].fill_between(fpr_grid, np.nanmin(roc, axis=0),
+                                 np.nanmax(roc, axis=0), color=st["color"],
+                                 alpha=0.12, lw=0)
+        if pr:
+            axes[1].plot(rec_grid, np.nanmean(pr, axis=0), ls=st["ls"],
+                         color=st["color"], label=st["label"])
+        if cal:
+            xs = np.array([c[0].mean() for c in cal])
+            ys = np.array([c[1].mean() for c in cal])
+            axes[2].plot(xs, ys, "o", ls=st["ls"], color=st["color"],
+                         label=st["label"], ms=5)
+        if f1:
+            axes[3].plot(thr_grid, np.nanmean(f1, axis=0), ls=st["ls"],
+                         color=st["color"], label=st["label"])
 
     axes[0].plot([0, 1], [0, 1], "k:", lw=0.8)
     axes[0].set_xlabel("false positive rate")
     axes[0].set_ylabel("true positive rate")
-    axes[0].set_title("(a) ROC (out-of-fold)", fontsize=9)
+    axes[0].set_title("(a) ROC, averaged over origins", fontsize=9)
     axes[1].set_xlabel("recall")
     axes[1].set_ylabel("precision")
     axes[1].set_title("(b) precision-recall", fontsize=9)
     axes[2].plot([0, 1], [0, 1], "k:", lw=0.8)
     axes[2].set_xlabel("mean predicted probability")
     axes[2].set_ylabel("observed frequency")
-    axes[2].set_title("(c) calibration (deciles)", fontsize=9)
+    axes[2].set_title("(c) calibration (deciles within origin)", fontsize=9)
     axes[3].set_xlabel("decision threshold")
     axes[3].set_ylabel(r"$F_1$")
-    axes[3].set_title("(d) $F_1$ vs threshold (dotted: Youden)", fontsize=9)
+    axes[3].set_title(r"(d) $F_1$ vs threshold", fontsize=9)
     for ax in axes:
         ax.legend(fontsize=7)
     fig.suptitle(
-        f"$Q_{{{q}}}$ rarity, {scope} threshold, {n_orig} forecast origins pooled, "
-        f"{meta.get('panel_units', oof['unit'].nunique())} units",
-        fontsize=9, y=1.05)
+        f"$Q_{{{q}}}$ rarity, {scope} threshold, {n_orig} origins averaged, "
+        f"{meta.get('panel_units', oof['unit'].nunique())} units strictly "
+        f"out-of-fold", fontsize=9, y=1.06)
     fig.tight_layout()
     fig.savefig(OUT / "fig12_roc_pr_calibration.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig12_roc_pr_calibration.png", bbox_inches="tight")
@@ -970,16 +1008,19 @@ def fig12(art):
 
 
 # ---------------------------------------------------------------------------
-# Fig 13 -- SHAP ranking with the scaling block highlighted
+# Figure 13: what the classifier uses
 # ---------------------------------------------------------------------------
-def fig13(art):
-    """Held-out permutation importance of the scaling block, from the artefact.
 
-    Permutation importance replaces SHAP here because it is measured on the
-    held-out fold: shuffling a column of the validation set answers "how much
-    worse does the Brier score get when this predictor is destroyed", which is
-    the question the figure claims to answer. A negative value means the
-    predictor actively hurts, which is a legitimate and reportable outcome.
+
+def fig13(art):
+    """Held-out permutation importance, with the scaling block scored jointly.
+
+    Permuting one column of a collinear group while its partners stay in place
+    lets the model read the information off the partners, so per-column
+    importance collapses towards zero even when the group carries signal. The
+    scaling descriptors are rank-correlated at about 0.65 within units, so the
+    block is also scored as a unit -- that joint row is what the ablation's
+    M3-M2 contrast measures, and the two must agree.
     """
     imp = art["importance"]
     if imp is None or len(imp) == 0:
@@ -990,40 +1031,53 @@ def fig13(art):
         )
 
     scaling = ["prev_alpha_size", "prev_xmin_size", "prev_alpha_trend"]
-    agg = (imp.groupby(["feature", "is_scaling"])["importance"]
+    joint = imp[imp["feature"] == "SCALING_BLOCK"]
+    per_feat = imp[imp["feature"] != "SCALING_BLOCK"]
+
+    agg = (per_feat.groupby(["feature", "is_scaling"])["importance"]
            .agg(["mean", "std"]).reset_index().sort_values("mean"))
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.4, 4.4),
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.6, 4.4),
                                    gridspec_kw={"width_ratios": [2, 1.2]})
     labels = [str(f).replace("prev_", "").replace("_", " ") for f in agg["feature"]]
     colors = ["#d62728" if bool(s) else "#7f7f7f" for s in agg["is_scaling"]]
-    ax1.barh(range(len(agg)), agg["mean"], xerr=agg["std"], color=colors,
+    ax1.barh(np.arange(len(agg)), agg["mean"], xerr=agg["std"], color=colors,
              error_kw={"lw": 0.8, "capsize": 2})
-    ax1.set_yticks(range(len(agg)), labels, fontsize=7)
+    ax1.set_yticks(np.arange(len(agg)), labels, fontsize=7)
+    if len(joint):
+        jm = float(joint["importance"].mean())
+        jd = float(joint["importance"].std())
+        ax1.errorbar(jm, len(agg) + 0.4, xerr=jd, fmt="D", color="#d62728",
+                     ms=6, capsize=2)
+        ax1.set_yticks(np.append(np.arange(len(agg)), len(agg) + 0.4),
+                       labels + ["scaling block (joint)"], fontsize=7)
     ax1.axvline(0, color="k", lw=0.8)
     ax1.set_xlabel(r"permutation importance ($\Delta$ Brier, held-out)")
     ax1.set_title("(a) all features (red = scaling block)", fontsize=9)
 
+    plotted = 0
     for i, feat in enumerate(scaling):
         d = imp[imp["feature"] == feat].sort_values("origin")
         if d.empty:
             continue
-        ax2.plot(d["origin"], d["importance"], "o-", color=COLORS[i], ms=4,
-                 label=feat.replace("prev_", "").replace("_", " "))
+        ax2.plot(d["origin"], d["importance"], "o-", color=COLORS[plotted % len(COLORS)],
+                 ms=4, label=feat.replace("prev_", "").replace("_", " "))
+        plotted += 1
+    if len(joint):
+        d = joint.sort_values("origin")
+        ax2.plot(d["origin"], d["importance"], "D-", color="#d62728", ms=6,
+                 lw=2, label="block (joint)", zorder=5)
     ax2.axhline(0, color="k", lw=0.8)
     ax2.set_xlabel("forecast origin")
     ax2.set_ylabel(r"$\Delta$ Brier when shuffled")
     ax2.set_title("(b) scaling descriptors: stability", fontsize=9)
     ax2.legend(fontsize=7)
     fig.tight_layout()
-    fig.savefig(OUT / "fig13_shap.pdf", bbox_inches="tight")
-    fig.savefig(OUT / "fig13_shap.png", bbox_inches="tight")
+    fig.savefig(OUT / "fig13_importance.pdf", bbox_inches="tight")
+    fig.savefig(OUT / "fig13_importance.png", bbox_inches="tight")
     plt.close(fig)
 
 
-# ---------------------------------------------------------------------------
-# Fig 14 -- error structure
-# ---------------------------------------------------------------------------
 def fig14(oof):
     from scipy.stats import norm
 

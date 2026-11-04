@@ -20,7 +20,9 @@ What it writes
                              origin x rung, so the figure can be checked
                              against a table.
 ``<out>_importance.csv``     permutation importance on the held-out fold, per
-                             origin x feature. What Figure 13 plots.
+                             origin x feature, plus a joint row
+                             (``SCALING_BLOCK``) for the block shuffled as a
+                             unit. What Figure 13 plots.
 ``<out>.meta.json``          panel, ladder, threshold scope, seeds, versions.
 
 Guarantees
@@ -141,6 +143,50 @@ def _permutation_importance(model, X, y, feature_names, n_repeats, seed,
     }).sort_values("importance", ascending=False), ""
 
 
+#: The power-law block. Kept as an explicit list rather than discovered by a
+#: name pattern: a block that silently matches nothing turns "the scaling
+#: descriptors did not help" into a statement about an empty feature set.
+SCALING_BLOCK = ("prev_alpha_size", "prev_xmin_size", "prev_alpha_trend")
+
+
+def _permutation_importance_joint(model, X, y, cols, n_repeats, seed,
+                                  max_rows=None):
+    """Brier degradation when ``cols`` are shuffled together, as one block.
+
+    Permuting one column of a collinear group while its partners stay in place
+    lets the model read the information off the partners, so per-column
+    importance collapses towards zero even when the group carries signal. The
+    scaling descriptors are rank-correlated at about 0.65 within units, which is
+    exactly this case, so the group is also scored jointly.
+    """
+    from sklearn.metrics import brier_score_loss
+
+    cols = [c for c in cols if c in X.columns]
+    if not cols:
+        return None, "no block columns present"
+    if len(np.unique(y)) < 2:
+        return None, "only one class in the held-out fold"
+
+    X = X.copy()
+    y = np.asarray(y)
+    if max_rows is not None and len(X) > max_rows:
+        rng = np.random.default_rng(seed)
+        keep = rng.choice(len(X), size=max_rows, replace=False)
+        X, y = X.iloc[keep], y[keep]
+
+    base = brier_score_loss(y, model.predict_proba(X)[:, 1])
+    rng = np.random.default_rng(seed + 1)
+    deltas = np.empty(n_repeats)
+    block = X[cols].to_numpy()
+    for i in range(n_repeats):
+        Xp = X.copy()
+        Xp[cols] = block[rng.permutation(len(X))]
+        deltas[i] = brier_score_loss(y, model.predict_proba(Xp)[:, 1]) - base
+    return pd.DataFrame({"feature": ["SCALING_BLOCK"],
+                         "importance": [float(deltas.mean())],
+                         "sd": [float(deltas.std(ddof=0))]}), ""
+
+
 def main(argv=None):
     args = parse_args(argv)
     verbose = not args.quiet
@@ -244,6 +290,18 @@ def main(argv=None):
             imp.insert(1, "rung", rung)
             imp_rows.append(imp)
 
+            blk, bwhy = _permutation_importance_joint(
+                model, val_ok[feats], y_val,
+                [c for c in feats if c in SCALING_BLOCK],
+                args.n_repeats, args.seed, max_rows=args.importance_max_rows)
+            if blk is None:
+                if verbose:
+                    print(f"[importance {origin}/{rung}] block skipped: {bwhy}")
+            else:
+                blk.insert(0, "origin", int(origin))
+                blk.insert(1, "rung", rung)
+                imp_rows.append(blk)
+
     if not oof_rows:
         raise SystemExit(
             "No fold could be evaluated, so nothing was written. Check the "
@@ -261,8 +319,7 @@ def main(argv=None):
     if imp_rows:
         importance = pd.concat(imp_rows, ignore_index=True)
         importance["is_scaling"] = importance["feature"].isin(
-            {"prev_alpha_size", "prev_xmin_size", "prev_alpha_trend"}
-        )
+            set(SCALING_BLOCK) | {"SCALING_BLOCK"})
         importance.to_csv(Path(f"{out}_importance.csv"), index=False)
 
     # A population-only reference that matches the full model is the signature
