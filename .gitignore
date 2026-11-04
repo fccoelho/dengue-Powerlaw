@@ -40,3 +40,14 @@ Manuscript/figures/_panel_*.parquet
 # snapshot_manifest.json hashes them, so a regeneration must show up in
 # `git status` instead of being hidden by an ignore rule.
 _ablation_panel*.parquet
+
+# Vendored JS deps and slide build output (restored by `npm ci` / `node compile.js`)
+node_modules/
+slides/output/
+
+# LaTeX structural aux (the PDFs stay tracked on purpose)
+*.fdb_latexmk
+*.fls
+*.nav
+*.snm
+*.vrb
