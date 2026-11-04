@@ -12,13 +12,23 @@ drawn. Predictive figures (10-15) retrain the models described in the Methods;
 their numbers therefore move when the database is refreshed, and the figures
 should be regenerated after every data update.
 
-One exception, deliberately: Figure 11 (the ablation ladder) is *read* from
-``ablation_results.csv`` / ``ablation_results.meta.json`` written by
-``run_ablation.py``, not recomputed here. Recomputing it was the defect: the
-previous version ran its own ladder at city level with a random forest, a raw
-persistence baseline and a substring-discovered climate block, so it could
-disagree with Table 4 -- and did, once the climate block silently came up
-empty. A figure that is a view of the same artefact cannot disagree with it.
+Three exceptions, deliberately. Figures 11, 12 and 13 are *read* from
+artefacts, not recomputed here:
+
+* Figure 11 reads ``ablation_results.csv`` / ``.meta.json`` from
+  ``run_ablation.py``. Recomputing it was the defect: the previous version ran
+  its own ladder at city level with a random forest, a raw persistence
+  baseline and a substring-discovered climate block, so it could disagree with
+  Table 4 -- and did, once the climate block silently came up empty.
+* Figures 12 and 13 read ``classifier_results*`` from ``run_classifier.py``.
+  The previous version fitted its own classifier with a single split and, at
+  municipality level, a Q_75 pooled across every municipality in the country.
+  That label is answerable from population size alone -- the population-only
+  reference reaches AUC 0.94 against 0.96 for the full model -- so the ROC
+  panel was reporting the ability to tell a large municipality from a small
+  one. ``_load_classifier`` refuses such an artefact instead of drawing it.
+
+A figure that is a view of the same artefact cannot disagree with it.
 """
 import json
 import sqlite3
@@ -56,6 +66,12 @@ PANEL_CACHE = HERE / "_panel_city_BR.parquet"
 ABLATION_CSV = Path(os.environ.get("EPIDEMIC_ABLATION_CSV",
                                    ROOT / "ablation_results.csv"))
 ABLATION_META = ABLATION_CSV.with_suffix("").with_suffix(".meta.json")
+
+#: The rarity-classifier artefacts written by ``run_classifier.py``. Figures 12
+#: and 13 are *views* of these files, never a recomputation: a figure that fits
+#: its own classifier can disagree with the table it is meant to illustrate.
+CLASSIFIER_PREFIX = Path(os.environ.get("EPIDEMIC_CLASSIFIER_PREFIX",
+                                        ROOT / "classifier_results"))
 
 mpl.rcParams.update({
     "figure.dpi": 150,
@@ -219,6 +235,69 @@ def _ablation_relative(abl):
 # ---------------------------------------------------------------------------
 # Fig 01 -- schematic of the seven aggregation levels
 # ---------------------------------------------------------------------------
+def _load_classifier():
+    """Read and validate the rarity-classifier artefacts. Never recompute them.
+
+    The checks are the point. A municipality-level artefact built with a pooled
+    threshold carries a label that a population count answers on its own -- the
+    population-only reference reaches AUC ~0.94 against ~0.96 for the full
+    model -- so the ROC panel would look excellent while measuring nothing but
+    municipality size. Such an artefact is refused here instead of drawn.
+    """
+    oof_path = CLASSIFIER_PREFIX.with_suffix(".parquet")
+    meta_path = CLASSIFIER_PREFIX.with_suffix(".meta.json")
+    metrics_path = CLASSIFIER_PREFIX.parent / f"{CLASSIFIER_PREFIX.name}_metrics.csv"
+    imp_path = CLASSIFIER_PREFIX.parent / f"{CLASSIFIER_PREFIX.name}_importance.csv"
+
+    if not oof_path.exists() or not meta_path.exists():
+        raise RuntimeError(
+            f"classifier artefact not found at {oof_path} / {meta_path}. "
+            "Build it first:\n"
+            "    python run_classifier.py --level city --origins "
+            "2021,2022,2023,2024,2025\n"
+            "Figures 12 and 13 do not fit their own classifier: a figure that "
+            "recomputes the experiment can disagree with the table it is "
+            "supposed to illustrate."
+        )
+
+    meta = json.loads(meta_path.read_text())
+    oof = pd.read_parquet(oof_path)
+    metrics = pd.read_csv(metrics_path) if metrics_path.exists() else pd.DataFrame()
+    importance = pd.read_csv(imp_path) if imp_path.exists() else pd.DataFrame()
+
+    missing = {"M2", "M3"} - set(oof["rung"].unique())
+    if missing:
+        raise RuntimeError(
+            f"the OOF artefact has no {sorted(missing)} predictions; it cannot "
+            "support a scaling-vs-climate comparison"
+        )
+    if meta.get("level") == "city" and meta.get("threshold_scope") == "pooled":
+        raise RuntimeError(
+            "refusing a municipality-level artefact built with "
+            "--threshold-scope pooled: a single Q_p across thousands of "
+            "municipalities of very different size labels a small municipality "
+            "0 in every year it exists, so the label is a population indicator. "
+            "Rebuild with --threshold-scope per_unit (the default at --level city)."
+        )
+    if oof["y_true"].nunique() < 2:
+        raise RuntimeError("the OOF artefact carries a single class; nothing to plot")
+    if oof["origin"].nunique() < 2:
+        raise RuntimeError(
+            f"the OOF artefact covers {oof['origin'].nunique()} forecast origin; "
+            "an out-of-fold curve needs at least two"
+        )
+
+    if not metrics.empty and {"POP", "M3"} <= set(metrics["rung"]):
+        gap = float((metrics[metrics.rung == "M3"]["auc"].mean()
+                     - metrics[metrics.rung == "POP"]["auc"].mean()))
+        if gap < 0.05:
+            print(f"  [classifier] note: M3 beats the population-only reference "
+                  f"by only {gap:+.3f} AUC", flush=True)
+
+    return {"oof": oof, "meta": meta, "metrics": metrics,
+            "importance": importance, "path": oof_path}
+
+
 def fig01():
     fig, ax = plt.subplots(figsize=(8.4, 3.4))
     ax.axis("off")
@@ -807,50 +886,70 @@ def _binary_oof(df, feature_cols, percentile=0.75, test_year=2024, n_splits=5):
     return np.concatenate(y_true_all), np.concatenate(y_prob_all)
 
 
-def fig12():
-    from sklearn.metrics import roc_curve, precision_recall_curve, auc
+def fig12(art):
+    """ROC / PR / calibration / F1 of the rarity classifier, read from the artefact.
 
-    df = _city_panel()
-    scaling = ["prev_alpha_size", "prev_xmin_size", "prev_alpha_trend"]
-    m3 = [c for c in df.columns if c.startswith("prev_")
-          and not df[c].isnull().all()] + ["log_pop"]
-    m3 = [c for c in m3 if not c.startswith(("prev_alpha_dur", "prev_xmin_dur"))]
-    m2 = [c for c in m3 if c not in scaling]
-    variants = {"M2 (no scaling)": m2, "M3 (with scaling)": m3}
+    The population-only curve is drawn on purpose. If it tracks the full model,
+    the task is separating large municipalities from small ones and no amount
+    of AUC rescues it.
+    """
+    from sklearn.metrics import roc_curve, precision_recall_curve, auc, roc_auc_score
+
+    oof, meta = art["oof"], art["meta"]
+    scope = meta.get("threshold_scope", "?")
+    n_orig = int(oof["origin"].nunique())
+    q = int(round(float(meta.get("percentile", 0.75)) * 100))
+
+    style = {
+        "M2": dict(color="#1f77b4", ls="-", label="M2 (no scaling)"),
+        "M3": dict(color="#d62728", ls="--", label="M3 (with scaling)"),
+        "POP": dict(color="#7f7f7f", ls=":", label="population only"),
+    }
+    present = set(oof["rung"])
+    order = [r for r in ("M2", "M3", "POP") if r in present]
+
     fig, axes = plt.subplots(1, 4, figsize=(12.4, 3.1))
-    for name, feats in variants.items():
-        y, p = _binary_oof(df, feats)
-        color = "#1f77b4" if "M2" in name else "#d62728"
-        ls = "-" if "M2" in name else "--"
+    for rung in order:
+        st = style[rung]
+        sub = oof[oof["rung"] == rung]
+        y = sub["y_true"].to_numpy()
+        p = sub["y_prob"].to_numpy()
+
         fpr, tpr, th = roc_curve(y, p)
-        axes[0].plot(fpr, tpr, ls=ls, color=color,
-                     label=f"{name} (AUC {auc(fpr, tpr):.3f})")
+        auc_v = roc_auc_score(y, p) if len(np.unique(y)) > 1 else np.nan
+        axes[0].plot(fpr, tpr, ls=st["ls"], color=st["color"],
+                     label=f"{st['label']} (AUC {auc_v:.3f})")
+
         prec, rec, _ = precision_recall_curve(y, p)
-        axes[1].plot(rec, prec, ls=ls, color=color,
-                     label=f"{name} (AP {auc(rec, prec):.3f})")
-        # calibration in deciles
+        axes[1].plot(rec, prec, ls=st["ls"], color=st["color"],
+                     label=f"{st['label']} (AP {auc(rec, prec):.3f})")
+
         qs = np.quantile(p, np.linspace(0, 1, 11))
         bins = np.clip(np.digitize(p, qs[1:-1]), 0, 9)
-        obs = [y[bins == b].mean() for b in range(10)]
-        exp = [p[bins == b].mean() for b in range(10)]
-        axes[2].plot(exp, obs, "o-", ls=ls, color=color, label=name, ms=4)
-        # F1 vs threshold
+        obs = [y[bins == b].mean() if (bins == b).any() else np.nan for b in range(10)]
+        exp = [p[bins == b].mean() if (bins == b).any() else np.nan for b in range(10)]
+        axes[2].plot(exp, obs, "o", ls=st["ls"], color=st["color"],
+                     label=st["label"], ms=4)
+
         grid = np.linspace(0.01, 0.99, 99)
         f1s = []
         for t in grid:
             pred = p >= t
-            tp = np.sum(pred & (y == 1))
-            f1s.append(2 * tp / (np.sum(pred) + np.sum(y == 1)))
-        axes[3].plot(grid, f1s, ls=ls, color=color, label=name)
-        j = np.argmax(tpr - fpr)
-        axes[3].axvline(th[j], color=color, ls=":", lw=1)
+            tp = float(np.sum(pred & (y == 1)))
+            denom = float(np.sum(pred) + np.sum(y == 1))
+            f1s.append(2 * tp / denom if denom else np.nan)
+        axes[3].plot(grid, f1s, ls=st["ls"], color=st["color"], label=st["label"])
+        if len(np.unique(y)) > 1:
+            j = int(np.argmax(tpr - fpr))
+            axes[3].axvline(th[j], color=st["color"], ls=":", lw=1)
+
     axes[0].plot([0, 1], [0, 1], "k:", lw=0.8)
     axes[0].set_xlabel("false positive rate")
     axes[0].set_ylabel("true positive rate")
     axes[0].set_title("(a) ROC (out-of-fold)", fontsize=9)
     axes[1].set_xlabel("recall")
     axes[1].set_ylabel("precision")
-    axes[1].set_title("(b) precision–recall", fontsize=9)
+    axes[1].set_title("(b) precision-recall", fontsize=9)
     axes[2].plot([0, 1], [0, 1], "k:", lw=0.8)
     axes[2].set_xlabel("mean predicted probability")
     axes[2].set_ylabel("observed frequency")
@@ -860,6 +959,10 @@ def fig12():
     axes[3].set_title("(d) $F_1$ vs threshold (dotted: Youden)", fontsize=9)
     for ax in axes:
         ax.legend(fontsize=7)
+    fig.suptitle(
+        f"$Q_{{{q}}}$ rarity, {scope} threshold, {n_orig} forecast origins pooled, "
+        f"{meta.get('panel_units', oof['unit'].nunique())} units",
+        fontsize=9, y=1.05)
     fig.tight_layout()
     fig.savefig(OUT / "fig12_roc_pr_calibration.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig12_roc_pr_calibration.png", bbox_inches="tight")
@@ -869,58 +972,48 @@ def fig12():
 # ---------------------------------------------------------------------------
 # Fig 13 -- SHAP ranking with the scaling block highlighted
 # ---------------------------------------------------------------------------
-def fig13():
-    import shap
-    import xgboost as xgb
-    from sklearn.impute import SimpleImputer
+def fig13(art):
+    """Held-out permutation importance of the scaling block, from the artefact.
 
-    df = _city_panel()
-    m3 = [c for c in df.columns if c.startswith("prev_")
-          and not df[c].isnull().all()] + ["log_pop"]
-    m3 = [c for c in m3 if not c.startswith(("prev_alpha_dur", "prev_xmin_dur"))]
+    Permutation importance replaces SHAP here because it is measured on the
+    held-out fold: shuffling a column of the validation set answers "how much
+    worse does the Brier score get when this predictor is destroyed", which is
+    the question the figure claims to answer. A negative value means the
+    predictor actively hurts, which is a legitimate and reportable outcome.
+    """
+    imp = art["importance"]
+    if imp is None or len(imp) == 0:
+        raise RuntimeError(
+            f"no importance table for {CLASSIFIER_PREFIX}. Rebuild the artefact "
+            "with run_classifier.py (it writes <out>_importance.csv for the "
+            "rungs named in --importance-rungs, M3 by default)."
+        )
+
     scaling = ["prev_alpha_size", "prev_xmin_size", "prev_alpha_trend"]
-    dfc = df.dropna(subset=m3 + ["total_cases"])
-    df_train = dfc[dfc["year"] < 2024]
-    y = (df_train["total_cases"] > df_train["total_cases"].quantile(0.75)).astype(int)
-    X = SimpleImputer(strategy="median").fit_transform(df_train[m3])
-    pos_w = float(np.sum(y == 0) / max(np.sum(y == 1), 1))
-    clf = xgb.XGBClassifier(
-        n_estimators=300, max_depth=5, learning_rate=0.05,
-        scale_pos_weight=pos_w, eval_metric="logloss",
-        random_state=42, tree_method="hist", n_jobs=-1)
-    clf.fit(X, y)
-    explainer = shap.TreeExplainer(clf)
-    sv = explainer.shap_values(X)
-    if isinstance(sv, list):
-        sv = sv[1]
-    mean_abs = np.abs(sv).mean(axis=0)
-    order = np.argsort(mean_abs)
-    _label_map = {"log_pop": "log pop (static)"}
-    labels = [
-        _label_map.get(c, c.replace("prev_", "").replace("_", " "))
-        for c in np.array(m3)[order]
-    ]
+    agg = (imp.groupby(["feature", "is_scaling"])["importance"]
+           .agg(["mean", "std"]).reset_index().sort_values("mean"))
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.0, 4.4),
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(10.4, 4.4),
                                    gridspec_kw={"width_ratios": [2, 1.2]})
-    colors = ["#d62728" if m3[i] in scaling else "#7f7f7f" for i in order]
-    ax1.barh(range(len(order)), mean_abs[order], color=colors)
-    ax1.set_yticks(range(len(order)), labels, fontsize=7)
-    ax1.set_xlabel("mean |SHAP value|")
+    labels = [str(f).replace("prev_", "").replace("_", " ") for f in agg["feature"]]
+    colors = ["#d62728" if bool(s) else "#7f7f7f" for s in agg["is_scaling"]]
+    ax1.barh(range(len(agg)), agg["mean"], xerr=agg["std"], color=colors,
+             error_kw={"lw": 0.8, "capsize": 2})
+    ax1.set_yticks(range(len(agg)), labels, fontsize=7)
+    ax1.axvline(0, color="k", lw=0.8)
+    ax1.set_xlabel(r"permutation importance ($\Delta$ Brier, held-out)")
     ax1.set_title("(a) all features (red = scaling block)", fontsize=9)
 
-    # (b) direction of the scaling block: SHAP value vs feature value
     for i, feat in enumerate(scaling):
-        col = m3.index(feat)
-        sub = np.random.RandomState(0).choice(len(X), min(3000, len(X)),
-                                              replace=False)
-        ax2.scatter(X[sub, col], sv[sub, col], s=4, alpha=0.3,
-                    color=COLORS[i],
-                    label=feat.replace("prev_", "").replace("_", " "))
+        d = imp[imp["feature"] == feat].sort_values("origin")
+        if d.empty:
+            continue
+        ax2.plot(d["origin"], d["importance"], "o-", color=COLORS[i], ms=4,
+                 label=feat.replace("prev_", "").replace("_", " "))
     ax2.axhline(0, color="k", lw=0.8)
-    ax2.set_xlabel("feature value (median-imputed)")
-    ax2.set_ylabel("SHAP value")
-    ax2.set_title("(b) scaling descriptors: direction", fontsize=9)
+    ax2.set_xlabel("forecast origin")
+    ax2.set_ylabel(r"$\Delta$ Brier when shuffled")
+    ax2.set_title("(b) scaling descriptors: stability", fontsize=9)
     ax2.legend(fontsize=7)
     fig.tight_layout()
     fig.savefig(OUT / "fig13_shap.pdf", bbox_inches="tight")
@@ -1058,6 +1151,16 @@ def main(which=None):
         print(f"[fig11] reading {abl['path'].name} "
               f"({len(abl['raw'])} rows); not recomputing the ladder.", flush=True)
 
+    # figs 12 and 13 read the classifier artefacts written by run_classifier.py.
+    clf = None
+    if {"fig12", "fig13"} & set(todo):
+        clf = _load_classifier()
+        print(f"[fig12/13] reading {clf['path'].name} "
+              f"({len(clf['oof'])} OOF rows, "
+              f"{clf['oof']['rung'].nunique()} rungs, "
+              f"{clf['oof']['origin'].nunique()} origins); not refitting.",
+              flush=True)
+
     for name in todo:
         t0 = time.time()
         print(f"[{name}] generating...", flush=True)
@@ -1065,6 +1168,8 @@ def main(which=None):
             everything[name](oof)
         elif name == "fig11":
             everything[name](abl)
+        elif name in ("fig12", "fig13"):
+            everything[name](clf)
         elif name == "fig14":
             everything[name](oof)
         else:

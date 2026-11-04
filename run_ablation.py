@@ -25,6 +25,31 @@ An optional fifth rung ``M3dur`` (off by default, ``--include-dur-scaling``)
 adds the *duration* scaling descriptors. It is a diagnostic, never the
 quantity the manuscript's decision rule refers to.
 
+The classifier rung (``--tasks exceedance``)
+-------------------------------------------
+The rarity task is ``Y = 1[S_t > Q_p]`` with ``Q_p`` estimated inside each
+fold from training years only. The scope of that estimate is not cosmetic:
+
+``pooled``    one Q_p across every unit. Correct with 27 states, where each
+              unit is large enough for a single bar to be meaningful.
+``per_unit``  Q_p from each unit's own history. Required at municipality
+              level: a pooled Q_p sits above the annual case count of a small
+              municipality, so such a unit is labelled 0 in every year it
+              exists and the classifier degenerates into a population-size
+              detector. On a panel with log-normal municipality sizes a
+              population-only model reaches AUC 0.94 under a pooled threshold
+              and 0.50 under a per-unit one.
+
+``--threshold-scope`` therefore defaults by ``--level`` (per_unit for city,
+pooled for state), and a city-level run with an explicit ``pooled`` prints a
+warning. A unit needs ``--min-unit-years`` seasons to receive a per-unit
+threshold; below that it is excluded from the fold and counted in the note,
+never handed the pooled value.
+
+Every classifier run also emits one ``diagnostic`` row per origin with the
+population-only floor, so a reader can see whether the label is really about
+epidemic rarity or just about unit size.
+
 The only contrast the paper needs is M2 -> M3. Everything else is context
 for reading it. The script therefore (a) asserts that M2 and M3 differ
 *only* in scaling columns, and (b) applies the decision rule stated in
@@ -77,18 +102,32 @@ A tidy long table, one row per
   ``contrast``  the paired differential against the previous rung, with a
                 bootstrap interval; positive means the later rung is better
   ``decision``  the pre-registered verdict, one row per contrast and task
+  ``diagnostic``  the population-only floor of the classifier task
 
 A rung that cannot be evaluated is written with an empty ``value`` and the
 reason in ``note``, never as a zero.
+
+Two extra columns exist for reading, not for deciding. ``rel_improvement`` is
+the paired differential as a fraction of the reference rung's loss, and
+``verdict_effect_aware`` is the same pre-registered rule with a
+``--min-effect-rel`` floor imposed. ``verdict`` is never altered by the floor:
+at municipality level the bootstrap resamples tens of thousands of rows, so
+its interval excludes zero for differences far below any operational
+consequence, and rewriting the rule after seeing that would not be a
+pre-registered rule. The floors default to 2 percent at ``--level city`` and 0
+at ``--level state``.
 
 Runtime
 -------
 At state level the panel is a few hundred rows, so a full run (5 origins,
 19 tau, 3 targets, 3 rungs) is 855 model fits and typically a few minutes.
 At ``--level city`` the panel is tens of thousands of rows and the same run
-takes hours; use ``--dry-run`` first, ``--tau-grid none`` to get the
-decision quickly, and ``--max-iter`` only for a pilot (the manuscript
-specifies 300, and the value actually used is recorded in the metadata).
+takes hours. Use ``--dry-run`` first, and ``--tasks exceedance`` to run only
+the classifier -- it fits ``origins x rungs`` models instead of
+``origins x tau x targets x rungs``, which is the difference between minutes
+and most of a day. ``--tau-grid none`` gives the regression decision quickly,
+and ``--max-iter`` is for pilots only (the manuscript specifies 300, and the
+value actually used is recorded in the metadata).
 
 Usage
 -----
@@ -796,6 +835,14 @@ COLUMNS = [
     "record_type", "level", "task", "target", "origin", "rung", "contrast",
     "model", "loss", "tau", "value", "n_train", "n_val", "n_units",
     "ci_low", "ci_high", "se", "p_value", "ci_excludes_zero", "improves",
+    # ``rel_improvement`` is the paired differential as a fraction of the
+    # reference rung's loss. It exists because at municipality level n is
+    # large enough that a bootstrap interval excludes zero for differences
+    # that are operationally meaningless; the relative size is what separates
+    # "better" from "better by 0.3%". ``auc`` carries the discrimination of
+    # each classifier rung, and ``verdict_effect_aware`` is the same
+    # pre-registered rule with that floor imposed on top.
+    "rel_improvement", "auc", "verdict_effect_aware",
     "verdict", "dm_stat", "dm_pvalue", "dm_n", "features", "note",
 ]
 
@@ -811,8 +858,15 @@ def _row_key(frame, unit_col):
 
 
 def run_regression_ablation(df, ladder, unit_col, origins, tau_grid, model, seed,
-                            n_boot, level, verbose=True, max_iter=300):
-    """Evaluate M0..M3 on size, duration and peak week over the origins."""
+                            n_boot, level, verbose=True, max_iter=300, tasks=None):
+    """Evaluate M0..M3 on size, duration and peak week over the origins.
+
+    ``tasks`` restricts the loop to a subset of ``TARGETS``. It exists so that
+    the classifier can be run on its own: at municipality level the panel is
+    tens of thousands of rows, and the three quantile regressions on the full
+    tau grid cost hours that a classifier-only run does not need.
+    """
+    selected = [t for t in (tasks if tasks else list(TARGETS)) if t in TARGETS]
     rows = []
     rung_order = [r for r in ("M0", "M1", "M2", "M3", "M3dur") if r in ladder or r == "M0"]
     #: per-origin mean differentials, for the Diebold-Mariano summary
@@ -830,7 +884,8 @@ def run_regression_ablation(df, ladder, unit_col, origins, tau_grid, model, seed
             print(f"[origin {origin}] n_train={len(train)} n_val={len(val)} "
                   f"units={val[unit_col].nunique()}")
 
-        for task, target in TARGETS.items():
+        for task in selected:
+            target = TARGETS[task]
             kind = task
             y_train_all = train[target].to_numpy(dtype=float)
             if np.isfinite(y_train_all).sum() < 10:
@@ -985,6 +1040,7 @@ def run_regression_ablation(df, ladder, unit_col, origins, tau_grid, model, seed
                     excludes = (np.isfinite(st["ci_low"]) and np.isfinite(st["ci_high"])
                                 and (st["ci_low"] > 0 or st["ci_high"] < 0))
                     improves = bool(excludes and st["mean"] > 0)
+                    ref_mean = float(pair[reference].mean())
                     rows.append({
                         "record_type": "contrast", "level": level, "task": task,
                         "target": target, "origin": int(origin), "rung": rung,
@@ -995,6 +1051,8 @@ def run_regression_ablation(df, ladder, unit_col, origins, tau_grid, model, seed
                         "ci_low": st["ci_low"], "ci_high": st["ci_high"],
                         "se": st["se"], "p_value": st["p_value"],
                         "ci_excludes_zero": bool(excludes), "improves": improves,
+                        "rel_improvement": (float(st["mean"] / ref_mean)
+                                            if ref_mean > 0 else np.nan),
                         "features": "|".join(sorted(set(ladder.get(rung, [])) - set(ladder.get(reference, []))))
                                     if rung != "M0" else "",
                         "note": "positive value = the later rung has the lower loss; "
@@ -1046,7 +1104,8 @@ def run_regression_ablation(df, ladder, unit_col, origins, tau_grid, model, seed
     return rows, origin_diffs
 
 
-def decision_rows(rows, origin_diffs, origins, level, min_origins=3):
+def decision_rows(rows, origin_diffs, origins, level, min_origins=3,
+                  min_effect_rel=0.0):
     """Apply the pre-registered rule to each adjacent contrast, per task.
 
     Section 2.10: the rung is credited only if it improves the *primary* loss
@@ -1056,6 +1115,15 @@ def decision_rows(rows, origin_diffs, origins, level, min_origins=3):
     would multiply the decision without adding evidence, and the primary loss
     is pinball at tau=0.5 for the regressions and the Brier score for the
     classifier.
+
+    ``min_effect_rel`` adds a floor on the relative improvement and is
+    reported in a *separate* column, ``verdict_effect_aware``. The original
+    ``verdict`` is never altered by it. The reason is sampling: at
+    municipality level the paired bootstrap resamples tens of thousands of
+    rows, so its interval excludes zero for differences far smaller than any
+    operational consequence. Reporting both columns lets a reader see whether
+    a "supported" verdict survives a floor, instead of the floor silently
+    rewriting a rule that was fixed before the numbers existed.
 
     Diebold-Mariano is attached to the same row as a descriptive complement.
     """
@@ -1076,15 +1144,34 @@ def decision_rows(rows, origin_diffs, origins, level, min_origins=3):
         improving = [y for y, m in per_origin.items()
                      if np.isfinite(m) and m > 0
                      and _ci_excluded(rows, level, task, contrast, tau_key, y)]
+        improving_eff = [y for y, m in per_origin.items()
+                         if np.isfinite(m) and m > 0
+                         and _ci_excluded(rows, level, task, contrast, tau_key, y)
+                         and _effect_excluded(rows, level, task, contrast,
+                                              tau_key, y, min_effect_rel)]
         n_eval = len(per_origin)
-        if n_eval < min_origins:
-            verdict = "underpowered"
-        elif len(improving) >= min_origins:
-            verdict = "supported"
-        else:
-            verdict = "not_supported"
+
+        def _verdict(count):
+            if n_eval < min_origins:
+                return "underpowered"
+            return "supported" if count >= min_origins else "not_supported"
+
+        verdict = _verdict(len(improving))
+        verdict_eff = _verdict(len(improving_eff))
 
         dm = diebold_mariano(series)
+        note = (f"{len(improving)}/{n_eval} origins show a same-direction "
+                f"improvement on the primary loss with a 95% bootstrap "
+                f"interval excluding zero; the rule requires "
+                f"{min_origins}/{len(origins)}.")
+        if min_effect_rel > 0:
+            note += (f" With a relative-improvement floor of "
+                     f"{min_effect_rel:.0%}, {len(improving_eff)}/{n_eval} "
+                     f"origins qualify (verdict_effect_aware).")
+        note += (f" Diebold-Mariano over the {dm['dm_n']} per-origin means "
+                 f"(NW lag {dm['dm_lag']}) is reported as description only: "
+                 "with so few origins it is low-powered by construction.")
+
         out.append({
             "record_type": "decision", "level": level, "task": task,
             "target": TARGETS.get(task, "total_cases"), "origin": -1,
@@ -1092,22 +1179,15 @@ def decision_rows(rows, origin_diffs, origins, level, min_origins=3):
             "loss": ("brier" if task == "exceedance" else "pinball"),
             "tau": (np.nan if tau_key is None else float(tau_key)),
             "value": int(len(improving)), "n_val": int(n_eval),
-            "verdict": verdict,
+            "verdict": verdict, "verdict_effect_aware": verdict_eff,
             "dm_stat": dm["dm_stat"], "dm_pvalue": dm["dm_pvalue"],
-            "dm_n": dm["dm_n"],
-            "note": (f"{len(improving)}/{n_eval} origins show a same-direction "
-                     f"improvement on the primary loss with a 95% bootstrap "
-                     f"interval excluding zero; the rule requires "
-                     f"{min_origins}/{len(origins)}. Diebold-Mariano over the "
-                     f"{dm['dm_n']} per-origin means (NW lag {dm['dm_lag']}) is "
-                     "reported as description only: with so few origins it is "
-                     "low-powered by construction."),
+            "dm_n": dm["dm_n"], "note": note,
         })
     return out
 
 
-def _ci_excluded(rows, level, task, contrast, tau, origin):
-    """True if the contrast row for this origin had a CI excluding zero."""
+def _contrast_row(rows, level, task, contrast, tau, origin):
+    """The contrast row for one origin, or None when there is none."""
     for r in rows:
         if (r["record_type"] == "contrast" and r["level"] == level
                 and r["task"] == task and r["contrast"] == contrast
@@ -1120,8 +1200,25 @@ def _ci_excluded(rows, level, task, contrast, tau, origin):
                 if not (r_tau is not None and np.isfinite(float(r_tau))
                         and abs(float(r_tau) - float(tau)) < 1e-9):
                     continue
-            return bool(r.get("improves"))
-    return False
+            return r
+    return None
+
+
+def _ci_excluded(rows, level, task, contrast, tau, origin):
+    """True if the contrast row for this origin had a CI excluding zero."""
+    r = _contrast_row(rows, level, task, contrast, tau, origin)
+    return bool(r.get("improves")) if r else False
+
+
+def _effect_excluded(rows, level, task, contrast, tau, origin, min_effect_rel):
+    """True when the relative improvement also clears ``min_effect_rel``."""
+    if min_effect_rel <= 0:
+        return True
+    r = _contrast_row(rows, level, task, contrast, tau, origin)
+    if r is None:
+        return False
+    rel = r.get("rel_improvement")
+    return bool(rel is not None and np.isfinite(rel) and rel >= min_effect_rel)
 
 
 # --------------------------------------------------------------------------
@@ -1133,103 +1230,235 @@ def _threshold(train_cases, percentile, unit=None, scope="pooled", per_unit=None
     return float(np.percentile(np.asarray(train_cases, dtype=float), percentile * 100.0))
 
 
-def run_classifier_ablation(df, ladder, unit_col, origins, level, seed, n_boot,
-                            percentile=0.75, threshold_scope="pooled", verbose=True):
-    """Brier-score ablation for Y = 1[S_t > Q_p], Q_p computed inside each fold.
+def _per_unit_thresholds(train, unit_col, percentile, min_unit_years):
+    """Q_p estimated from each unit's own training seasons.
 
-    The threshold is estimated from the training years only (Section 2.11,
-    leakage channel 2). M0 is the training base rate, which is exactly the
-    benchmark Table 4 specifies for the classifier.
+    A unit with fewer than ``min_unit_years`` usable seasons gets no threshold
+    and is excluded from the fold. It is *not* handed the pooled value. At
+    municipality level the pooled Q_p sits far above the annual case count of
+    a small municipality, so every one of its seasons is labelled 0 however
+    large its own outbreak was: on a panel with log-normal municipality sizes
+    a pooled threshold puts population size alone at an AUC of about 0.94, and
+    half the municipalities can never exceed it. Against a per-unit threshold
+    the same population-only classifier sits at 0.50, which is the point.
+
+    Returns ``(thresholds, n_units_too_short)``.
+    """
+    thresholds, short = {}, 0
+    for unit, grp in train.groupby(unit_col, sort=False):
+        cases = grp["total_cases"].to_numpy(dtype=float)
+        cases = cases[np.isfinite(cases)]
+        if cases.size >= min_unit_years:
+            thresholds[unit] = float(np.percentile(cases, percentile * 100.0))
+        else:
+            short += 1
+    return thresholds, short
+
+
+def classifier_fold(df, ladder, unit_col, origin, *, percentile=0.75,
+                    threshold_scope="per_unit", min_unit_years=5,
+                    seed=SEED, max_iter=300, verbose=True,
+                    pop_rung="prev_log_pop"):
+    """Fit the classifier ladder for one forecast origin.
+
+    The rarity label is ``Y = 1[S_t > Q_p]``, with ``Q_p`` estimated *inside*
+    the fold from training years only. ``threshold_scope="per_unit"`` takes
+    Q_p from each unit's own history, so the question is "will this unit have
+    an unusually large season for itself". ``"pooled"`` takes a single Q_p
+    across all units, which at municipality level is answerable from
+    population size alone -- see ``_per_unit_thresholds``.
+
+    Returns ``None`` when the fold cannot be evaluated, otherwise a dict with
+    the labels, the per-rung probabilities, a population-only model, and the
+    bookkeeping the ablation and the out-of-fold exporter both need.
     """
     from sklearn.ensemble import HistGradientBoostingClassifier
 
+    train = df[df["year"] < origin]
+    val = df[df["year"] == origin]
+    if train.empty or val.empty:
+        return None
+    train = train[np.isfinite(train["total_cases"].to_numpy(dtype=float))]
+    val = val[np.isfinite(val["total_cases"].to_numpy(dtype=float))]
+    if train.empty or val.empty:
+        return None
+
+    n_short = 0
+    n_unlabelled_val = 0
+    if threshold_scope == "per_unit":
+        per_unit, n_short = _per_unit_thresholds(
+            train, unit_col, percentile, min_unit_years)
+        if not per_unit:
+            if verbose:
+                print(f"[classifier {origin}] skipped: no unit reaches "
+                      f"{min_unit_years} training seasons, so no threshold "
+                      "can be estimated without falling back to the pooled one")
+            return None
+
+        tr_map = train[unit_col].map(per_unit)
+        keep_tr = tr_map.notna().to_numpy()
+        train_ok = train[keep_tr]
+        y_train = (train_ok["total_cases"].to_numpy(dtype=float)
+                   > tr_map[keep_tr].to_numpy(dtype=float)).astype(int)
+
+        va_map = val[unit_col].map(per_unit)
+        keep_va = va_map.notna().to_numpy()
+        n_unlabelled_val = int((~keep_va).sum())
+        val_ok = val[keep_va]
+        if val_ok.empty:
+            if verbose:
+                print(f"[classifier {origin}] skipped: no validation row has "
+                      f"a per-unit threshold ({n_unlabelled_val} excluded)")
+            return None
+        y_val = (val_ok["total_cases"].to_numpy(dtype=float)
+                 > va_map[keep_va].to_numpy(dtype=float)).astype(int)
+        thr_desc = (f"Q{int(percentile * 100)} from each unit's own training "
+                    f"seasons (>= {min_unit_years})")
+    else:
+        thr = float(np.percentile(train["total_cases"].to_numpy(dtype=float),
+                                  percentile * 100.0))
+        train_ok, val_ok = train, val
+        y_train = (train_ok["total_cases"].to_numpy(dtype=float) > thr).astype(int)
+        y_val = (val_ok["total_cases"].to_numpy(dtype=float) > thr).astype(int)
+        thr_desc = f"Q{int(percentile * 100)} pooled over all units"
+
+    n_pos = int(y_train.sum())
+    if n_pos < 5 or (len(y_train) - n_pos) < 5:
+        if verbose:
+            print(f"[classifier {origin}] skipped: degenerate training labels "
+                  f"({n_pos} positives of {len(y_train)})")
+        return None
+
+    units_val = _row_key(val_ok, unit_col).to_numpy()
+
+    def _fit(feats):
+        clf = HistGradientBoostingClassifier(
+            max_iter=max_iter, learning_rate=0.05, max_depth=5, random_state=seed)
+        clf.fit(train_ok[feats], y_train)
+        return clf, clf.predict_proba(val_ok[feats])[:, 1]
+
+    rungs, models = {}, {}
+    for rung in ("M1", "M2", "M3", "M3dur"):
+        feats = ladder.get(rung) or []
+        if not feats:
+            continue
+        try:
+            clf, prob = _fit(feats)
+        except Exception as exc:  # noqa: BLE001
+            if verbose:
+                print(f"[classifier {origin}] {rung} failed: {type(exc).__name__}: {exc}")
+            continue
+        rungs[rung] = prob
+        models[rung] = clf
+
+    # Population-only floor. Not a ladder rung: it answers a diagnostic
+    # question ("is the label just telling units apart by size?") rather than
+    # competing with M1..M3.
+    pop_prob = None
+    if pop_rung and pop_rung in train_ok.columns and not train_ok[pop_rung].isnull().all():
+        try:
+            _, pop_prob = _fit([pop_rung])
+        except Exception:  # noqa: BLE001
+            pop_prob = None
+
+    return {
+        "origin": int(origin), "train_ok": train_ok, "val_ok": val_ok,
+        "y_train": y_train, "y_val": y_val, "units_val": units_val,
+        "rungs": rungs, "models": models, "pop_prob": pop_prob,
+        "thr_desc": thr_desc, "n_short_units": n_short,
+        "n_unlabelled_val": n_unlabelled_val,
+        "threshold_scope": threshold_scope,
+    }
+
+
+def _auc(y_true, prob):
+    """ROC AUC, or NaN when only one class is present."""
+    try:
+        from sklearn.metrics import roc_auc_score
+
+        if len(np.unique(y_true)) < 2:
+            return np.nan
+        return float(roc_auc_score(y_true, prob))
+    except Exception:  # noqa: BLE001
+        return np.nan
+
+
+def run_classifier_ablation(df, ladder, unit_col, origins, level, seed, n_boot,
+                            percentile=0.75, threshold_scope="pooled",
+                            min_unit_years=5, verbose=True, max_iter=300):
+    """Brier-score ablation for the rarity task, over the forecast origins.
+
+    M0 is the training base rate, which is exactly the benchmark Table 4
+    specifies for the classifier. Alongside each loss row this emits the AUC
+    of the same predictions, and one ``diagnostic`` row per origin carrying
+    the population-only floor.
+    """
     rows = []
     origin_diffs = {}
-    rung_order = [r for r in ("M0", "M1", "M2", "M3", "M3dur") if r in ladder or r == "M0"]
+    rung_order = [r for r in ("M0", "M1", "M2", "M3", "M3dur")
+                  if r in ladder or r == "M0"]
 
     for origin in origins:
-        train = df[df["year"] < origin]
-        val = df[df["year"] == origin]
-        if train.empty or val.empty:
-            continue
-
-        per_unit = None
-        if threshold_scope == "per_unit":
-            per_unit = {}
-            for unit, grp in train.groupby(unit_col):
-                cases = grp["total_cases"].to_numpy(dtype=float)
-                cases = cases[np.isfinite(cases)]
-                if cases.size >= 3:
-                    per_unit[unit] = float(np.percentile(cases, percentile * 100.0))
-        thr_pooled = _threshold(train["total_cases"].dropna(), percentile)
-        thr = _threshold(train["total_cases"].dropna(), percentile,
-                         scope=threshold_scope, per_unit=per_unit)
-
-        if threshold_scope == "per_unit" and per_unit:
-            thr_val = val[unit_col].map(per_unit).fillna(thr_pooled).to_numpy(dtype=float)
-        else:
-            thr_val = np.full(len(val), thr_pooled)
-
-        y_tr = (train["total_cases"].to_numpy(dtype=float) > thr).astype(int)
-        y_val = (val["total_cases"].to_numpy(dtype=float) > thr_val).astype(int)
-        keep_tr = np.isfinite(train["total_cases"].to_numpy(dtype=float))
-        y_tr, train_ok = y_tr[keep_tr], train[keep_tr]
-        keep_val = np.isfinite(val["total_cases"].to_numpy(dtype=float))
-        y_val, val_ok = y_val[keep_val], val[keep_val]
-
-        if y_tr.sum() < 5 or (len(y_tr) - y_tr.sum()) < 5:
-            if verbose:
-                print(f"[classifier {origin}] skipped: degenerate training labels "
-                      f"({int(y_tr.sum())} positives of {len(y_tr)})")
-            continue
-
-        units_val = _row_key(val_ok, unit_col)
-        losses = {}
-
-        # M0: training base rate
-        base = float(y_tr.mean())
-        losses["M0"] = pd.Series(
-            (np.clip(np.full(len(y_val), base), 0, 1) - y_val) ** 2,
-            index=units_val.values,
+        fold = classifier_fold(
+            df, ladder, unit_col, origin, percentile=percentile,
+            threshold_scope=threshold_scope, min_unit_years=min_unit_years,
+            seed=seed, max_iter=max_iter, verbose=verbose,
         )
+        if fold is None:
+            continue
 
-        for rung in rung_order:
-            if rung == "M0" or rung not in ladder:
-                continue
-            feats = ladder[rung]
-            if not feats:
-                continue
-            X_tr = train_ok[feats]
-            X_val = val_ok[feats]
-            if X_tr.dropna(how="all").empty:
-                continue
-            try:
-                clf = HistGradientBoostingClassifier(
-                    max_iter=300, learning_rate=0.05, max_depth=5, random_state=seed
-                )
-                clf.fit(X_tr, y_tr)
-                p = clf.predict_proba(X_val)[:, 1]
-            except Exception as exc:  # noqa: BLE001
-                if verbose:
-                    print(f"[classifier {origin}] {rung} failed: {exc}")
-                continue
-            losses[rung] = pd.Series((p - y_val) ** 2, index=units_val.values)
+        y_val, units = fold["y_val"], fold["units_val"]
+        base = float(fold["y_train"].mean())
 
+        losses = {
+            "M0": pd.Series(
+                (np.clip(np.full(len(y_val), base), 0, 1) - y_val) ** 2, index=units
+            )
+        }
+        for rung, prob in fold["rungs"].items():
+            losses[rung] = pd.Series((prob - y_val) ** 2, index=units)
         L = pd.DataFrame(losses)
         L = L.reindex(columns=[r for r in rung_order if r in L.columns])
+
+        common = {
+            "level": level, "task": "exceedance", "target": "total_cases",
+            "origin": int(origin), "loss": "brier", "tau": np.nan,
+            "n_train": int(len(fold["train_ok"])), "n_val": int(len(y_val)),
+            "n_units": int(fold["val_ok"][unit_col].nunique()),
+        }
+        scope_note = (f"{fold['thr_desc']}; positives in validation: "
+                      f"{int(y_val.sum())}/{len(y_val)}")
+        if fold["n_unlabelled_val"]:
+            scope_note += (f"; {fold['n_unlabelled_val']} validation row(s) "
+                           "excluded for too short a history")
+        if fold["n_short_units"]:
+            scope_note += f"; {fold['n_short_units']} unit(s) below the history floor"
+
         for rung in L.columns:
             n_val = int(L[rung].notna().sum())
+            prob = (np.full(len(y_val), base) if rung == "M0"
+                    else fold["rungs"][rung])
             rows.append({
-                "record_type": "loss", "level": level, "task": "exceedance",
-                "target": "total_cases", "origin": int(origin), "rung": rung,
-                "contrast": "", "model": ("base_rate" if rung == "M0" else "hist_gradient_boosting"),
-                "loss": "brier", "tau": np.nan,
+                **common, "record_type": "loss", "rung": rung, "contrast": "",
+                "model": "base_rate" if rung == "M0" else "hist_gradient_boosting",
                 "value": float(L[rung].mean()) if n_val else np.nan,
-                "n_train": int(len(train_ok)), "n_val": n_val,
-                "n_units": int(val_ok[unit_col].nunique()),
+                "auc": _auc(y_val, prob),
                 "features": "|".join(ladder.get(rung, [])) if rung != "M0" else "",
-                "note": f"threshold Q{int(percentile*100)} from training years only "
-                        f"({threshold_scope}); positives in validation: {int(y_val.sum())}/{len(y_val)}",
+                "note": scope_note,
+            })
+
+        if fold["pop_prob"] is not None:
+            rows.append({
+                **common, "record_type": "diagnostic", "rung": "POP",
+                "contrast": "", "model": "hist_gradient_boosting",
+                "value": float(np.mean((fold["pop_prob"] - y_val) ** 2)),
+                "auc": _auc(y_val, fold["pop_prob"]),
+                "features": "prev_log_pop",
+                "note": ("population-only floor: the rarity label predicted from "
+                         "log population alone. If this AUC approaches the full "
+                         "model's, the task is measuring unit size rather than "
+                         "epidemic rarity, and the threshold scope is wrong for "
+                         "this aggregation level."),
             })
 
         for rung, reference in ADJACENT:
@@ -1242,26 +1471,66 @@ def run_classifier_ablation(df, ladder, unit_col, origins, level, seed, n_boot,
             st = paired_bootstrap(diff, pair.index.to_numpy(), n_boot=n_boot, seed=seed)
             excludes = (np.isfinite(st["ci_low"]) and np.isfinite(st["ci_high"])
                         and (st["ci_low"] > 0 or st["ci_high"] < 0))
+            ref_mean = float(pair[reference].mean())
             rows.append({
-                "record_type": "contrast", "level": level, "task": "exceedance",
-                "target": "total_cases", "origin": int(origin), "rung": rung,
-                "contrast": f"{rung}-{reference}", "model": "", "loss": "brier",
-                "tau": np.nan, "value": st["mean"], "n_train": int(len(train_ok)),
-                "n_val": st["n"], "n_units": st.get("n_units", np.nan),
-                "ci_low": st["ci_low"], "ci_high": st["ci_high"], "se": st["se"],
-                "p_value": st["p_value"], "ci_excludes_zero": bool(excludes),
+                **common, "record_type": "contrast", "rung": rung,
+                "contrast": f"{rung}-{reference}", "model": "",
+                "value": st["mean"], "n_val": st["n"],
+                "n_units": st.get("n_units", np.nan),
+                "ci_low": st["ci_low"], "ci_high": st["ci_high"],
+                "se": st["se"], "p_value": st["p_value"],
+                "ci_excludes_zero": bool(excludes),
                 "improves": bool(excludes and st["mean"] > 0),
+                "rel_improvement": (float(st["mean"] / ref_mean)
+                                    if ref_mean > 0 else np.nan),
+                "features": "|".join(sorted(set(ladder.get(rung, []))
+                                            - set(ladder.get(reference, [])))),
                 "note": "positive value = the later rung has the lower Brier score",
             })
             origin_diffs.setdefault(
                 ("exceedance", f"{rung}-{reference}", None), {}
             )[int(origin)] = st["mean"]
+
     return rows, origin_diffs
 
 
 # --------------------------------------------------------------------------
 # CLI
 # --------------------------------------------------------------------------
+def resolve_tasks(args):
+    """The list of tasks to evaluate, from --tasks and --include-classifier."""
+    allowed = ["size", "duration", "peak_week", "exceedance"]
+    tasks = [t.strip() for t in (args.tasks or "").split(",") if t.strip()]
+    if args.include_classifier and "exceedance" not in tasks:
+        tasks.append("exceedance")
+    unknown = [t for t in tasks if t not in allowed]
+    if unknown:
+        raise SystemExit(f"--tasks: unknown {unknown}; choose from {allowed}")
+    if not tasks:
+        raise SystemExit("--tasks is empty, so nothing would be evaluated")
+    return tasks
+
+
+def resolve_threshold_scope(args):
+    """Threshold scope, defaulting by aggregation level.
+
+    Pooled is the right default with 27 states, where every unit is large
+    enough that a single Q_75 is a meaningful bar. It is the wrong default
+    with 5,000 municipalities, where the same Q_75 puts half of them below the
+    bar in every single year and the label becomes a population indicator.
+    """
+    if args.threshold_scope:
+        return args.threshold_scope
+    return "per_unit" if args.level == "city" else "pooled"
+
+
+def resolve_min_effect_rel(args):
+    """Relative-improvement floor, defaulting by aggregation level."""
+    if args.min_effect_rel is not None:
+        return float(args.min_effect_rel)
+    return 0.02 if args.level == "city" else 0.0
+
+
 def default_tau_grid():
     """The grid of Section 2.8: tau in {0.05, 0.10, ..., 0.95}."""
     return [round(0.05 * i, 2) for i in range(1, 20)]
@@ -1285,13 +1554,28 @@ def parse_args(argv=None):
     ap.add_argument("--percentile", type=float, default=0.75,
                     help="rarity threshold for the classifier task")
     ap.add_argument("--threshold-scope", choices=["pooled", "per_unit"],
-                    default="pooled",
+                    default=None,
                     help="how Q_p is estimated inside each fold. 'pooled' "
                          "matches binary_classifier.compute_percentile_threshold; "
                          "'per_unit' matches the wording of the Limitations "
-                         "section ('75th percentile of a unit's own history')")
+                         "section ('75th percentile of a unit's own history'). "
+                         "Default: per_unit at --level city, pooled at --level "
+                         "state, because a pooled Q_p at municipality level is "
+                         "answerable from population size alone")
+    ap.add_argument("--min-unit-years", type=int, default=5,
+                    help="seasons of a unit's own history required to estimate "
+                         "its per-unit Q_p; units below it are excluded from the "
+                         "classifier fold instead of being handed the pooled value")
+    ap.add_argument("--min-effect-rel", type=float, default=None,
+                    help="floor on the relative improvement of the primary loss "
+                         "for verdict_effect_aware. Default: 0.02 at --level city, "
+                         "0.0 at --level state. Never alters `verdict`")
+    ap.add_argument("--tasks", default="size,duration,peak_week",
+                    help="comma-separated tasks to evaluate: any of "
+                         "size,duration,peak_week,exceedance. Use "
+                         "'--tasks exceedance' to run only the classifier")
     ap.add_argument("--include-classifier", action="store_true",
-                    help="add the exceedance (Brier) task")
+                    help="shorthand for adding the exceedance (Brier) task")
     ap.add_argument("--include-dur-scaling", action="store_true",
                     help="add the diagnostic rung M3dur (duration scaling descriptors)")
     ap.add_argument("--panel", default=None, help="reuse a cached panel parquet")
@@ -1419,32 +1703,60 @@ def main(argv=None):
                   f"{len(climate_info['block'])} block columns available; missing "
                   f"{climate_info['missing']}")
 
-    # -- runs ------------------------------------------------------------
+    # -- what to evaluate ------------------------------------------------
+    tasks = resolve_tasks(args)
+    regression_tasks = [t for t in tasks if t in TARGETS]
+    run_classifier = "exceedance" in tasks
+    threshold_scope = resolve_threshold_scope(args)
+    min_effect_rel = resolve_min_effect_rel(args)
+
+    if run_classifier and args.level == "city" and threshold_scope == "pooled":
+        print(
+            "[warning] --level city with --threshold-scope pooled: a single "
+            "Q_p across thousands of municipalities of very different size "
+            "labels a small municipality 0 in every year it exists, so the "
+            "classifier reduces to a population-size detector. The POP "
+            "diagnostic row measures exactly that; compare its AUC with the "
+            "rung AUCs before reading any verdict from this run."
+        )
+
     tau_grid = parse_tau_grid(args.tau_grid)
     if verbose:
-        print(f"\n[run] {len(ready)} origin(s) x {len(tau_grid)} tau x "
-              f"{len(TARGETS)} target(s); model={args.model}")
+        print(f"\n[run] tasks={tasks}")
+        if regression_tasks:
+            print(f"[run] {len(ready)} origin(s) x {len(tau_grid)} tau x "
+                  f"{len(regression_tasks)} target(s); model={args.model}")
+        if run_classifier:
+            print(f"[run] classifier: Q{int(args.percentile * 100)}, "
+                  f"scope={threshold_scope}, min_unit_years={args.min_unit_years}, "
+                  f"effect floor={min_effect_rel:.0%}")
 
     # --dry-run: show the plan, fit nothing -------------------------------
     if args.dry_run:
-        n_fits = len(ready) * len(tau_grid) * len(TARGETS) * len(ladder)
-        if args.include_classifier:
+        n_fits = len(ready) * len(tau_grid) * len(regression_tasks) * len(ladder)
+        if run_classifier:
             n_fits += len(ready) * len(ladder)
         print(f"\n[dry-run] would fit {n_fits} model(s) "
-              f"({len(ready)} origin(s) x {len(tau_grid)} tau x {len(TARGETS)} target(s) "
-              f"x {len(ladder)} rung(s)"
-              + (" + classifier" if args.include_classifier else "") + ")")
+              f"({len(ready)} origin(s) x {len(tau_grid)} tau x "
+              f"{len(regression_tasks)} regression target(s) x {len(ladder)} rung(s)"
+              + (f" + {len(ready)} x {len(ladder)} classifier fits"
+                 if run_classifier else "") + ")")
         print(f"[dry-run] origins: {ready}; panel {len(df)} rows, "
               f"{df[unit_col].nunique()} units")
+        if run_classifier:
+            print(f"[dry-run] classifier threshold scope: {threshold_scope}")
         print("[dry-run] nothing was fitted and nothing was written")
         return 0
 
-    rows, origin_diffs = run_regression_ablation(
-        df, ladder, unit_col, ready, tau_grid, args.model, args.seed,
-        args.bootstrap, args.level, verbose=verbose, max_iter=args.max_iter,
-    )
+    rows, origin_diffs = [], {}
+    if regression_tasks:
+        rows, origin_diffs = run_regression_ablation(
+            df, ladder, unit_col, ready, tau_grid, args.model, args.seed,
+            args.bootstrap, args.level, verbose=verbose, max_iter=args.max_iter,
+            tasks=regression_tasks,
+        )
 
-    if args.include_classifier:
+    if run_classifier:
         if verbose:
             if args.level == "state":
                 print(f"\n[warning] the classifier is evaluated on a "
@@ -1454,14 +1766,16 @@ def main(argv=None):
             print("\n[run] classifier task (Brier)")
         clf_rows, clf_diffs = run_classifier_ablation(
             df, ladder, unit_col, ready, args.level, args.seed, args.bootstrap,
-            percentile=args.percentile, threshold_scope=args.threshold_scope,
-            verbose=verbose,
+            percentile=args.percentile, threshold_scope=threshold_scope,
+            min_unit_years=args.min_unit_years, verbose=verbose,
+            max_iter=args.max_iter,
         )
         rows += clf_rows
         origin_diffs.update(clf_diffs)
 
     rows += decision_rows(rows, origin_diffs, ready, args.level,
-                          min_origins=args.min_origins)
+                          min_origins=args.min_origins,
+                          min_effect_rel=min_effect_rel)
 
     if not rows:
         raise SystemExit(
@@ -1510,8 +1824,13 @@ def main(argv=None):
             c for c in df.columns if CLIMATE_RE.match(c)
         ),
         "panel_notes": panel_notes,
-        "classifier_threshold_scope": args.threshold_scope,
+        "tasks": tasks,
+        "classifier_threshold_scope": threshold_scope,
+        "classifier_threshold_scope_requested": args.threshold_scope,
         "classifier_percentile": args.percentile,
+        "classifier_min_unit_years": args.min_unit_years,
+        "min_effect_rel": min_effect_rel,
+        "min_effect_rel_requested": args.min_effect_rel,
         "versions": {
             "python": sys.version.split()[0],
             "pandas": pd.__version__,
@@ -1541,8 +1860,12 @@ def _print_summary(out, level):
         print("DECISION RULE -- pre-registered, Section 2.10")
         print("-" * 78)
         for _, r in dec.iterrows():
-            print(f"  {r['task']:10s} {r['contrast']:9s} tau={r['tau']:<5} "
-                  f"{r['value']}/{r['n_val']} origins -> {r['verdict']}")
+            tau = "" if pd.isna(r["tau"]) else f"tau={float(r['tau']):<5}"
+            eff = r.get("verdict_effect_aware", "")
+            tail = (f"  [effect-aware: {eff}]"
+                    if isinstance(eff, str) and eff and eff != r["verdict"] else "")
+            print(f"  {r['task']:10s} {r['contrast']:9s} {tau:<9s} "
+                  f"{int(r['value'])}/{int(r['n_val'])} origins -> {r['verdict']}{tail}")
 
     prim = out[(out["record_type"] == "contrast") & (out["loss"] == "pinball")
                & (np.isclose(out["tau"].astype(float), 0.5))]
