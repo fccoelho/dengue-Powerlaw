@@ -1,13 +1,8 @@
 {
   "alpha_span_levels": [
     1.95,
-    2.93
+    2.08
   ],
-  "duration_ceiling": {
-    "at_ceiling": 12,
-    "n": 330,
-    "pct": 3.6
-  },
   "exceedance_pct": {
     "10": [
       5.6,
@@ -71,18 +66,6 @@
       "xmin": 169,
       "xmin_max": 8628
     },
-    "L5": {
-      "alpha": 2.8,
-      "exp_sig": 96,
-      "iqr_high": 2.92,
-      "iqr_low": 2.51,
-      "label": "L5 duration, state-year",
-      "n": 330,
-      "pl_pref": 0,
-      "pl_sig": 0,
-      "xmin": 17,
-      "xmin_max": 28
-    },
     "L6": {
       "alpha": 2.03,
       "exp_sig": 0,
@@ -94,18 +77,6 @@
       "pl_sig": 100,
       "xmin": 730,
       "xmin_max": 7753
-    },
-    "L7": {
-      "alpha": 2.93,
-      "exp_sig": 100,
-      "iqr_high": 2.94,
-      "iqr_low": 2.91,
-      "label": "L7 duration, national-year",
-      "n": 15,
-      "pl_pref": 0,
-      "pl_sig": 0,
-      "xmin": 18,
-      "xmin_max": 22
     }
   },
   "national": {
@@ -123,8 +94,19 @@
     "pl_pref": 96,
     "xmin": 169
   },
-  "total_fits": 48681,
+  "total_fits": 48336,
   "warnings": [],
+  "xmin_extremes": {
+    "max": 40738,
+    "min": 1
+  },
+  "xmin_le5_pct": {
+    "L1": 77.0,
+    "L2": 81.0,
+    "L3": 0.0,
+    "L4": 0.0,
+    "L6": 0.0
+  },
   "xmin_span_levels": [
     2,
     730

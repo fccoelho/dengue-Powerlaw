@@ -16,7 +16,7 @@ Optionally pass a path to another copy of the database:
 python Manuscript/verification/verify_results.py path/to/powerlaw_results.db
 ```
 
-Expected output: Table 1 of the manuscript (7 aggregation levels), the
+Expected output: Table 1 of the manuscript (5 aggregation levels), the
 national year-by-year fits, the per-state exponents, and the α-vs-population
 correlations. If the database is regenerated with different settings, this
 script will report different numbers — that is the point.
@@ -39,9 +39,9 @@ These are easy to get wrong and they change the reported percentages:
   support inflates the power-law share substantially, especially at L2.
 - **`year = 0` in the `episcanner` tables is a pooled all-years fit**, not a
   calendar year (documented in `fitpl.py`: "Use 0 for combined/all-years
-  fits"). All year counts therefore exclude it; the national levels have 15
-  annual fits, not 16.
-- **`alpha` is not clipped at 3.** Only 0.02% of the 45,860 weekly fits return
+  fits"). All year counts therefore exclude it; the national levels have 16
+  annual fits, not 17.
+- **`alpha` is not clipped at 3.** Only 0.02% of the 46,882 weekly fits return
   α ≥ 2.9999. The apparent wall at 3.0 in the summary statistics is a handful
   of boundary cases, not a constraint imposed by the estimator.
 - **`xmin` is the diagnostic, not a nuisance parameter.** In L1/L2 the KS
@@ -57,6 +57,5 @@ These are easy to get wrong and they change the reported percentages:
 | L2 | `powerlaw_fits_yearly` | none |
 | L3 | `powerlaw_fits_total_cases` | none |
 | L4 | `episcanner_state_fits` | `metric='total_cases' AND year > 0` |
-| L5 | `episcanner_state_fits` | `metric='ep_dur' AND year > 0` |
 | L6 | `episcanner_fits` | `metric='total_cases' AND year > 0` |
-| L7 | `episcanner_fits` | `metric='ep_dur' AND year > 0` |
+| -- | *(duration levels removed; only epidemic size is fitted)* | -- |

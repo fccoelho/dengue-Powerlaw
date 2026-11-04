@@ -9,13 +9,19 @@ Three independent checks, because the repository drifted in three ways at once:
    manuscript states and looks for stale literals. This is the check that was
    missing: Table 1 was hand-typed for months while Methods claimed no
    statistic was transcribed by hand.
-3. **Orphan exports** -- ``parquet_cache/`` held Parquet exports of the same
+3. **Design** -- the forecasting artefacts must declare the estimator the
+   manuscript describes, and must not carry the duration target or the
+   duration scaling descriptors that were removed with that aggregation level.
+   A byte-identical artefact from a superseded design passes the manifest check
+   and fails this one, which is the point: hashes cannot tell you that the
+   experiment changed shape.
+4. **Orphan exports** -- ``parquet_cache/`` held Parquet exports of the same
    tables that no script read, so its row counts silently disagreed with the
    database (5,244 vs 5,247; 40,616 vs 41,635). Dead copies of the source of
    truth are how this class of bug survives. Any row-count disagreement is
    reported, and the directory is flagged for removal.
 
-Exit code 0 only when all three pass. Suitable for a pre-commit hook or CI.
+Exit code 0 only when all four pass. Suitable for a pre-commit hook or CI.
 """
 
 from __future__ import annotations
@@ -36,6 +42,75 @@ ORPHAN_EXPORTS = {
     "city_stats": "city_stats",
 }
 ORPHAN_DIR = "parquet_cache"
+
+#: Keys a forecasting artefact must carry, per file. Their absence means the
+#: run predates the estimator change.
+DESIGN_KEYS = {
+    "ablation_results.meta.json": ("extrapolating_regressor",
+                                   "extrapolating_classifier",
+                                   "classifier_model"),
+    "ablation_city.meta.json": ("extrapolating_regressor",
+                                "extrapolating_classifier",
+                                "classifier_model"),
+    "classifier_results.meta.json": ("classifier_model",),
+}
+
+#: Columns whose presence means the artefact still encodes the removed
+#: duration scaling rung.
+FORBIDDEN_COLUMNS = ("prev_alpha_dur", "prev_xmin_dur")
+
+#: Targets the ablation may report.
+ALLOWED_TARGETS = {"total_cases"}
+
+
+def check_design(root: str = ".") -> list[str]:
+    """Refuse artefacts that belong to the superseded experimental design."""
+    import json
+
+    problems = []
+    for name, keys in DESIGN_KEYS.items():
+        path = os.path.join(root, name)
+        if not os.path.exists(path):
+            continue
+        try:
+            meta = json.loads(open(path, encoding="utf-8").read())
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"{name} unreadable: {e}")
+            continue
+        missing = [k for k in keys if k not in meta]
+        if missing:
+            problems.append(
+                f"{name} lacks {missing}: it was produced before the estimator "
+                "change and must be regenerated (python run_ablation.py / "
+                "run_classifier.py)"
+            )
+        ladder = meta.get("ladder") or {}
+        stale = sorted({c for cols in ladder.values() for c in cols
+                        if c in FORBIDDEN_COLUMNS})
+        if stale:
+            problems.append(
+                f"{name} still carries the duration scaling descriptors {stale}"
+            )
+
+    for name in ("ablation_results.csv", "ablation_city.csv"):
+        path = os.path.join(root, name)
+        if not os.path.exists(path):
+            continue
+        try:
+            import pandas as pd
+
+            df = pd.read_csv(path)
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"{name} unreadable: {e}")
+            continue
+        if "target" in df.columns:
+            bad = sorted(set(df["target"].dropna()) - ALLOWED_TARGETS)
+            if bad:
+                problems.append(
+                    f"{name} still reports the target(s) {bad}; duration and "
+                    "peak timing are covariates now"
+                )
+    return problems
 
 
 def check_orphans(root: str = ".", db: str = "powerlaw_results.db") -> list[str]:
@@ -81,33 +156,42 @@ def main(argv=None) -> int:
     if not a.skip_manifest:
         try:
             rep = provenance.assert_snapshot(a.db, a.root)
-            print(f"[1/3] manifest      OK ({len(rep['ok'])} artifacts)")
+            print(f"[1/4] manifest      OK ({len(rep['ok'])} artifacts)")
         except provenance.SnapshotDrift as e:
-            print(f"[1/3] manifest      DRIFT: {e}", file=sys.stderr)
+            print(f"[1/4] manifest      DRIFT: {e}", file=sys.stderr)
             failed = True
     else:
-        print("[1/3] manifest      skipped")
+        print("[1/4] manifest      skipped")
 
     facts = make_tables.compute_facts(os.path.join(a.root, a.db))
     audit = make_tables.audit_prose(os.path.join(a.root, a.tex), facts)
     if audit["stale"] or audit["missing"]:
         failed = True
-        print(f"[2/3] prose         STALE ({facts['total_fits']:,} fits in db)", file=sys.stderr)
+        print(f"[2/4] prose         STALE ({facts['total_fits']:,} fits in db)", file=sys.stderr)
         for s in audit["stale"]:
             print(f"        {s['name']:<26} has {s['found']} want {s['want']!r}", file=sys.stderr)
         for m in audit["missing"]:
             print(f"        {m['name']:<26} missing {m['want']!r}", file=sys.stderr)
     else:
-        print(f"[2/3] prose         OK ({len(audit['ok'])} claims verified)")
+        print(f"[2/4] prose         OK ({len(audit['ok'])} claims verified)")
+
+    design = check_design(a.root)
+    if design:
+        failed = True
+        print("[3/4] design        STALE", file=sys.stderr)
+        for d in design:
+            print(f"        {d}", file=sys.stderr)
+    else:
+        print("[3/4] design        OK (current estimator, size-only targets)")
 
     orphans = check_orphans(a.root, a.db)
     if orphans:
         failed = True
-        print("[3/3] orphan exports  STALE", file=sys.stderr)
+        print("[4/4] orphan exports  STALE", file=sys.stderr)
         for o in orphans:
             print(f"        {o}", file=sys.stderr)
     else:
-        print("[3/3] orphan exports  OK (none)")
+        print("[4/4] orphan exports  OK (none)")
 
     return 1 if failed else 0
 

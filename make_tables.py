@@ -30,15 +30,25 @@ GEN_DIR = os.path.join("Manuscript", "generated")
 #: them inflates every per-year level by one row per unit (27 states). The
 #: authors' own reported counts (330 state-years, 15 national years) only
 #: reproduce with them excluded, so that is the convention used here.
+#: Every level fits the *same* variable class -- epidemic size, at five
+#: different constructions. The duration constructions (the former L5 and L7)
+#: were removed: a season is bounded above by the length of the year, so a
+#: scale-free law cannot apply to duration a priori, and the fits confirmed it
+#: by running into the estimator's ceiling. Keeping them in the table invited
+#: the reader to compare an exponent that means something with one that does
+#: not. Duration and peak timing survive in the paper as covariates of size.
 LEVELS = [
     ("L1", "L1 weekly, city",             "SELECT * FROM powerlaw_fits"),
     ("L2", "L2 weekly, city-year",        "SELECT * FROM powerlaw_fits_yearly WHERE year <> 0"),
     ("L3", "L3 annual total, city",       "SELECT * FROM powerlaw_fits_total_cases"),
     ("L4", "L4 size, state-year",         "SELECT * FROM episcanner_state_fits WHERE metric='total_cases' AND year <> 0"),
-    ("L5", "L5 duration, state-year",     "SELECT * FROM episcanner_state_fits WHERE metric='ep_dur' AND year <> 0"),
     ("L6", "L6 size, national-year",      "SELECT * FROM episcanner_fits WHERE metric='total_cases' AND year <> 0"),
-    ("L7", "L7 duration, national-year",  "SELECT * FROM episcanner_fits WHERE metric='ep_dur' AND year <> 0"),
 ]
+
+#: Levels are addressed by key, never by position. The old code indexed
+#: ``LEVELS[5]`` and ``LEVELS[3]``; dropping L5 shifted every index silently
+#: and the national summary would have been computed from the state table.
+SQL_BY_KEY = {key: sql for key, _label, sql in LEVELS}
 
 
 def _fmt(n: int) -> str:
@@ -48,6 +58,15 @@ def _fmt(n: int) -> str:
 
 def _f(x: float, d: int = 2) -> str:
     return f"{x:.{d}f}"
+
+
+def _sci(value: float) -> str:
+    """LaTeX for a round 'about N x 10^k', e.g. 40738 -> ``$4\\times10^{4}$``."""
+    import math
+
+    k = int(math.floor(math.log10(float(value))))
+    mantissa = int(round(float(value) / 10 ** k))
+    return f"${mantissa}\\times10^{{{k}}}$"
 
 
 def compute_facts(db_path: str = DB_DEFAULT) -> dict:
@@ -76,8 +95,8 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
             "exp_sig": int(round(100 * float(((R < 0) & (p < 0.05)).mean()))),
         }
 
-    nat = pd.read_sql(LEVELS[5][2], con).dropna(subset=["alpha", "xmin"])
-    st = pd.read_sql(LEVELS[3][2], con).dropna(subset=["alpha", "xmin"])
+    nat = pd.read_sql(SQL_BY_KEY["L6"], con).dropna(subset=["alpha", "xmin"])
+    st = pd.read_sql(SQL_BY_KEY["L4"], con).dropna(subset=["alpha", "xmin"])
     a_lo, a_hi = float(nat["alpha"].min()), float(nat["alpha"].max())
 
     # Exceedance above k*x_min for a Pareto tail: P(X > k x_min) = k^-(alpha-1).
@@ -107,10 +126,21 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
             "xmin": int(round(float(st["xmin"].median()))),
             "pl_pref": int(round(100 * float((st["R"] > 0).mean()))),
         },
-        "duration_ceiling": {
-            "n": levels["L5"]["n"],
-            "at_ceiling": int((pd.read_sql(LEVELS[4][2], con)["alpha"].dropna().round(6) == 3.0).sum()),
-            "pct": round(100 * float((pd.read_sql(LEVELS[4][2], con)["alpha"].dropna().round(6) == 3.0).mean()), 1),
+        #: Proportion of fits whose x_min collapsed into the bulk -- the
+        #: diagnostic that decides whether the tail language is vacuous.
+        "xmin_le5_pct": {
+            key: round(100 * float((pd.read_sql(sql, con)["xmin"]
+                                    .dropna() <= 5).mean()), 0)
+            for key, _label, sql in LEVELS
+        },
+        #: Largest selected lower bound anywhere, and where the smallest sits.
+        "xmin_extremes": {
+            "min": int(round(min(
+                float(pd.read_sql(sql, con)["xmin"].dropna().min())
+                for _k, _l, sql in LEVELS))),
+            "max": int(round(max(
+                float(pd.read_sql(sql, con)["xmin"].dropna().max())
+                for _k, _l, sql in LEVELS))),
         },
         "alpha_span_levels": [min(alphas), max(alphas)],
         "xmin_span_levels": [min(xmins), max(xmins)],
@@ -132,13 +162,15 @@ def render_table(f: dict) -> str:
         "% Regenerate with: python make_tables.py\n"
         "\\begin{table}[htbp]\n\\centering\n\\small\n"
         "\\setlength{\\tabcolsep}{3.5pt}\n"
-        "\\caption{Power-law fits by aggregation level. $\\alpha$ median with\n"
-        "interquartile range; $x_{\\min}$ median; PL$_{\\text{pref}}$ = proportion with\n"
-        "$R>0$; PL$_{\\text{sig}}$ = proportion with $R>0$ and $p<0.05$;\n"
+        "\\caption{Power-law fits of epidemic \\emph{size} under five nested\n"
+        "constructions. $\\alpha$ median with interquartile range; $x_{\\min}$\n"
+        "median; PL$_{\\text{pref}}$ = proportion with $R>0$;\n"
+        "PL$_{\\text{sig}}$ = proportion with $R>0$ and $p<0.05$;\n"
         "Exp$_{\\text{sig}}$ = proportion with $R<0$ and $p<0.05$. Shares are\n"
-        "percentages. The levels that survive the $x_{\\min}$ diagnostic \\emph{and} the\n"
-        "model comparison are the cross-sectional size constructions L4 and L6, which are\n"
-        "the object of the rest of the paper.}\n"
+        "percentages. The weekly levels produce apparent support that the\n"
+        "$x_{\\min}$ diagnostic removes; the cross-sectional constructions L4 and\n"
+        "L6 are the ones where the support survives both tests, and they are the\n"
+        "object of the rest of the paper.}\n"
         "\\label{tab:main}\n"
         "\\begin{tabular}{@{}lrrrrrrr@{}}\n\\toprule\n"
         "Level & $n$ & $\\alpha$ & IQR & $x_{\\min}$ & PL$_{\\text{pref}}$ & "
@@ -153,11 +185,21 @@ def claims(f: dict) -> list[dict]:
     Each claim pairs the string that *should* appear with the stale literal
     that must *not*. ``--check`` reports both directions, so a value that
     quietly disappears is as visible as one that is wrong.
+
+    The stale literals are not decoration: each one is a number that was
+    actually published in an earlier draft of this manuscript, so a regression
+    to it is caught by name.
     """
-    L, N, S, E = f["levels"], f["national"], f["state"], f["exceedance_pct"]
+    L, N, S, E, X = (
+        f["levels"], f["national"], f["state"], f["exceedance_pct"],
+        f["xmin_extremes"],
+    )
     return [
         {"name": "total fits", "want": _fmt(f["total_fits"]),
-         "stale": ["47{,}494", "47,494"], "count": 2},
+         "stale": ["47{,}494", "47,494", "48{,}681", "48,681"], "count": 2},
+        {"name": "number of constructions", "want": "five aggregation levels",
+         "stale": ["seven aggregation levels", "seven nested constructions",
+                   "the seven aggregation levels"]},
         {"name": "national cross-sections", "want": f"{N['n']} of {N['n']}",
          "stale": ["in 15 of 15 national cross-sections"]},
         {"name": "state-years", "want": _fmt(S["n"]),
@@ -173,9 +215,7 @@ def claims(f: dict) -> list[dict]:
          "stale": ["and 159 cases"]},
         {"name": "span of median exponents",
          "want": f"{_f(f['alpha_span_levels'][0])}$ to ${_f(f['alpha_span_levels'][1])}",
-         "stale": ["$1.95$ to $2.95$"]},
-        {"name": "L7 exponent", "want": _f(L["L7"]["alpha"]),
-         "stale": ["piling up at $2.95$"]},
+         "stale": ["$1.95$ to $2.95$", "$1.95$ to $2.93$"]},
         {"name": "exceedance 10x",
          "want": f"{E['10'][0]}--{E['10'][1]}\\%",
          "stale": ["5.4--16.5\\%"]},
@@ -196,11 +236,21 @@ def claims(f: dict) -> list[dict]:
          "want": f"SD ${N['alpha_sd']:.3f}$",
          "stale": ["SD $0.154$"]},
         {"name": "national alpha max",
-         "want": f"exceeds ${_f(N['alpha_max'])}",
+         # stated twice: in the Results as the top of the observed range and in
+         # the Limitations as the evidence that the estimator ceiling never
+         # binds for size.
+         "want": f"and ${_f(N['alpha_max'])}$ nationally",
          "stale": ["exceeds $2.27$"]},
-        {"name": "duration ceiling count",
-         "want": f"{f['duration_ceiling']['at_ceiling']} of them",
-         "stale": ["11 of them"]},
+        {"name": "xmin extremes",
+         # 40{,}738 cases is "about 4 x 10^4"; derive it rather than typing it
+         # so the phrase cannot drift from the database.
+         "want": _sci(X["max"]), "stale": ["$1.5\\times10^{5}$"]},
+        {"name": "share of weekly fits at xmin<=5 (L1)",
+         "want": f"{f['xmin_le5_pct']['L1']:.0f}\\% of L1",
+         "stale": ["76\\% of L1"]},
+        {"name": "share of weekly fits at xmin<=5 (L2)",
+         "want": f"{f['xmin_le5_pct']['L2']:.0f}\\% of L2",
+         "stale": ["82\\% of L2"]},
     ]
 
 

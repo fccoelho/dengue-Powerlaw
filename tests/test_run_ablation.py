@@ -38,8 +38,6 @@ def _panel(n_units=8, y0=2012, y1=2020, seed=0):
                 "prev_avg_umid_Q1": float(rng.normal(70, 5)),
                 "prev_alpha_size": float(rng.normal(2.0, 0.2)),
                 "prev_xmin_size": float(rng.uniform(50, 500)),
-                "prev_alpha_dur": float(rng.normal(2.9, 0.05)),
-                "prev_xmin_dur": float(rng.uniform(10, 30)),
                 "prev_alpha_trend": float(rng.normal(0, 0.05)),
             })
     return pd.DataFrame(rows)
@@ -111,12 +109,36 @@ def test_all_null_column_is_dropped_and_reported():
     assert "prev_R0" in dropped["M1"]
 
 
-def test_duration_rung_is_optional_and_adds_only_duration_scaling():
+def test_there_is_no_duration_rung_and_no_duration_target():
+    """Duration and peak timing are covariates, never outcomes.
+
+    The duration scaling rung was removed together with the two duration
+    aggregation levels, so ``build_ladder`` must not accept a flag for it and
+    the target map must carry epidemic size only. This is a design guarantee,
+    not a default: a ladder that can quietly grow a duration rung invites a
+    table that reports a scaling claim about a bounded variable.
+    """
     df = _panel()
-    assert "M3dur" not in ra.build_ladder(df)[0]
-    ladder, _, _ = ra.build_ladder(df, include_dur_scaling=True)
-    added = set(ladder["M3dur"]) - set(ladder["M3"])
-    assert added == set(ra.SCALING_DUR)
+    ladder = ra.build_ladder(df)[0]
+    assert {"M1", "M2", "M3"} <= set(ladder)
+    assert "M3dur" not in ladder
+    with pytest.raises(TypeError):
+        ra.build_ladder(df, include_dur_scaling=True)  # noqa: F841
+
+    assert ra.TARGETS == {"size": "total_cases"}
+    assert set(ra.PRIMARY_LOSS) == {"size", "exceedance"}
+
+    # ... and they are still predictors of size, which is where they carry
+    # information.
+    assert "prev_ep_dur" in ladder["M1"]
+    assert "prev_peak_week" in ladder["M1"]
+
+
+def test_no_duration_scaling_columns_anywhere_in_the_ladder():
+    ladder = ra.build_ladder(_panel())[0]
+    offenders = [c for cols in ladder.values() for c in cols
+                 if c.startswith(("prev_alpha_dur", "prev_xmin_dur"))]
+    assert offenders == []
 
 
 # ---------------------------------------------------------------------------

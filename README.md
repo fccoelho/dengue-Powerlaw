@@ -116,7 +116,20 @@ already reached the manuscript once.
    discrimination-free model an AUC near 0.60. Figures 12 and 13 plot
    per-origin curves and the permutation importance is computed on the
    held-out fold.
-6. **`parquet_cache/` must not come back.** It held Parquet exports of tables
+6. **The forecasting estimator must be the one the manuscript describes.**
+   The default is `--model spline_quantile` (linear in the covariates beyond
+   the boundary knot, so it can forecast outside its training range) and
+   `--classifier-model logistic`. An artefact produced before the estimator
+   change is byte-valid but experimentally different, so
+   `verify_snapshot.py` refuses meta files without `extrapolating_regressor`
+   and `classifier_model`.
+7. **Epidemic size is the only target and the only fitted variable.**
+   `TARGETS` in `run_ablation.py` has one entry, `FIT_METRICS` in
+   `fit_episcanner_pl.py` has one entry, and duration/peak timing appear only
+   as `COVARIATE_DUR`/`COVARIATE_PEAK` on the right-hand side. Reintroducing
+   them as outcomes means re-introducing a scaling claim about a bounded
+   variable.
+8. **`parquet_cache/` must not come back.** It held Parquet exports of tables
    that no script read; its row counts silently disagreed with the database.
    Dead copies of the source of truth are how this class of bug survives.
    `verify_snapshot.py` reports them.
@@ -127,7 +140,7 @@ already reached the manuscript once.
 pytest -q                     # 16 test modules, including the ablation guards
 python make_tables.py --check # prose literals still match the database
 python provenance.py --check  # no artefact came from a different run
-python verify_snapshot.py     # all three checks; exit 1 on any drift
+python verify_snapshot.py     # all four checks; exit 1 on any drift
 ```
 
 The same three checks belong in CI. They are cheap (seconds) and they are the
@@ -172,17 +185,30 @@ The project bridges statistical scaling with mechanistic epidemiological indicat
 - **Model Residuals**: Relationship between alpha values and sum of residuals from epidemic models.
 
 ### 5. Epidemic Metrics Power Laws (Episcanner Integration)
-Extended power law analysis applied to epidemic-level metrics:
+Power law analysis applied to epidemic-level metrics. **Only epidemic size is
+fitted.** Duration and peak timing are bounded above by the length of the
+season, so a scale-free law cannot apply to them a priori; they are carried
+through the analysis as *covariates* of size instead. `fit_episcanner_pl.py`
+fits `FIT_METRICS = ["total_cases"]` and offers `--purge-ep-dur` to remove any
+`metric='ep_dur'` rows left over from earlier runs.
 - **Epidemic Size**: Power law fitting of total case counts per epidemic event.
-- **Epidemic Duration**: Power law analysis of outbreak duration in weeks.
 - **Combined CCDF Analysis**: Multi-year cumulative distribution analysis with year-stratified visualization.
 - **Dispersion-Alpha Relationships**: Boxplot analysis of metric distributions overlaid with yearly alpha trends.
 - **State-Level Aggregation**: Comparative analysis of power law parameters across all Brazilian states.
 
 ### 6. Predictive Modeling
 A machine learning framework for forecasting epidemic characteristics using historical power law patterns:
-- **Model Architecture**: Random Forest Regressor ($f_{RF}$) trained on lagged features from year $t-1$ to predict year $t$ metrics.
-- **Target Variables**: Epidemic Size ($S_t$), Duration ($D_t$), and Peak Week ($P_t$).
+- **Model Architecture**: a quantile regression on a cubic-spline basis with
+  linear boundary extrapolation (`run_ablation.py --model spline_quantile`), the
+  default. A tree ensemble predicts a weighted average of its training
+  responses and therefore cannot produce a value outside their range, which
+  under a heavy tail is exactly where the interesting season sits; the spline
+  basis continues the boundary trend instead. Boosted alternatives
+  (`lightgbm`, `lightgbm_linear_tree`, `hist_gradient_boosting`) are kept as a
+  comparison arm, and a Random Forest is retained for the illustrative scatter
+  of figure 10.
+- **Target Variable**: Epidemic Size ($S_t$) only. Duration ($D_t$) and peak
+  week ($P_t$) are *predictors*, not outcomes.
 - **Feature Engineering**:
   - Lagged epidemic metrics from previous season ($S_{t-1}, D_{t-1}, P_{t-1}$)
   - Power law scaling factors ($\alpha_{S, t-1}, x_{\text{min}, S, t-1}$)
@@ -213,12 +239,12 @@ The Gradio-based dashboard provides four main analysis tabs:
 - **Data Tables**: General city statistics and yearly fit parameters
 
 ### Epidemic Metrics Power Laws
-- **Combined Fits**: Multi-year CCDF plots for epidemic size and duration
+- **Combined Fits**: Multi-year CCDF plots for epidemic size
 - **Dispersion Analysis**: Boxplots overlaid with yearly alpha trends
-- **State Alpha Maps**: Choropleth maps for epidemic size and duration parameters
+- **State Alpha Map**: Choropleth map of the epidemic-size exponent
 - **Regional Timeseries**: Weekly case trends at state or national level
 - **Residuals Analysis**: Alpha vs residuals scatter plots
-- **Fit Details Tables**: Comprehensive parameter tables for size and duration
+- **Fit Details Table**: Parameter table for the epidemic-size fits
 
 ### Predictive Modeling
 - **Forecast Configuration**: Select prediction level (State/City), region, and target year (2012-2025)

@@ -21,9 +21,11 @@ Four nested rungs built on the lagged panel returned by
                            aborts if the panel supplies none of them)
     M3  + scaling          M2 + alpha_{t-1}, x_min,t-1, alpha-dot_{t-1}
 
-An optional fifth rung ``M3dur`` (off by default, ``--include-dur-scaling``)
-adds the *duration* scaling descriptors. It is a diagnostic, never the
-quantity the manuscript's decision rule refers to.
+Epidemic size is the only regression target. Duration and peak timing are
+*not* targets and are not fitted as scaling objects either: a season is
+bounded above by the length of the year, so a scale-free law cannot apply to
+duration a priori. Both enter the size model as ordinary lagged covariates,
+where they are legitimate and, for duration, useful.
 
 The classifier rung (``--tasks exceedance``)
 -------------------------------------------
@@ -65,8 +67,7 @@ The script does not reinterpret that rule after seeing the numbers.
 
 Losses
 ------
-Primary: pinball loss at tau=0.5 for the regression targets (size, duration,
-peak week) and the Brier score for the classifier -- both proper scoring
+Primary: pinball loss at tau=0.5 for the regression target (epidemic size) and the Brier score for the classifier -- both proper scoring
 rules. Secondary: MAE, RMSE (case scale), and MASE scaled by the in-sample
 naive error. The pinball loss is also reported on the full tau grid, which
 is what Figure 11 needs.
@@ -179,6 +180,32 @@ except (ImportError, ValueError, OSError):
 
 SEED = 42
 
+#: Quantile regressors. The default is the one that can leave the range of
+#: its training responses; the boosted ones are kept as the comparison arm,
+#: so that "is it the estimator class?" can be answered instead of asserted.
+REGRESSORS = (
+    "spline_quantile",       # linear quantile regression on a spline basis
+    "lightgbm_linear_tree",  # boosted, piecewise-LINEAR leaves
+    "lightgbm",              # boosted, piecewise-constant leaves
+    "hist_gradient_boosting",
+)
+DEFAULT_REGRESSOR = "spline_quantile"
+
+CLASSIFIERS = ("logistic", "hist_gradient_boosting")
+DEFAULT_CLASSIFIER = "logistic"
+
+#: Predictors expressed in *cases*, spanning three orders of magnitude within a
+#: single panel. They are logged before entering a linear or spline model.
+#:
+#: This is not cosmetic. Extrapolating a spline linearly on the raw case scale
+#: is extrapolating a concave relationship with a straight line built from its
+#: last segment, and the error compounds: in a synthetic check reproducing the
+#: panel's scale, a raw-scale spline quantile model predicted $4.9\times10^{4}$
+#: cases where the truth was $10^{4}$, and $8.8\times10^{9}$ where the truth
+#: was $4\times10^{4}$. On the log scale the same model reproduces the
+#: multiplicative structure the tail actually has, and cannot explode.
+LOG1P_FEATURES = ("prev_total_cases", "prev_xmin_size")
+
 # --------------------------------------------------------------------------
 # Rung definitions
 # --------------------------------------------------------------------------
@@ -187,12 +214,18 @@ SEED = 42
 # climate aggregates (avg_temp_Q1..Q4) describe the target year and must
 # never appear here.
 LAGGED_SIZE = ["prev_total_cases"]
-LAGGED_DUR = ["prev_ep_dur"]
-LAGGED_PEAK = ["prev_peak_week"]
+#: Duration and peak timing of the previous season. They are *covariates* of
+#: epidemic size, never targets and never scaling objects: they describe the
+#: phenology of the last season, and the ablation asks whether that phenology
+#: helps forecast the next season's magnitude.
+COVARIATE_DUR = ["prev_ep_dur"]
+COVARIATE_PEAK = ["prev_peak_week"]
 EPI = ["prev_R0"]
 DEMO = ["prev_log_pop"]
+#: The scaling block: the object of the whole exercise. alpha and x_min are
+#: the power-law parameters of the previous season's size cross-section;
+#: alpha_trend is the OLS slope of alpha over all years before the origin.
 SCALING_SIZE = ["prev_alpha_size", "prev_xmin_size", "prev_alpha_trend"]
-SCALING_DUR = ["prev_alpha_dur", "prev_xmin_dur"]
 
 #: The climate block that *defines* M2, named instead of discovered.
 #:
@@ -211,12 +244,14 @@ CLIMATE_RE = re.compile(r"^prev_avg_(?:temp|umid)_Q[1-4]$")
 #: Loss reported as primary for each task (Section 2.10).
 PRIMARY_LOSS = {
     "size": ("pinball", 0.5),
-    "duration": ("pinball", 0.5),
-    "peak_week": ("pinball", 0.5),
     "exceedance": ("brier", None),
 }
 
-TARGETS = {"size": "total_cases", "duration": "ep_dur", "peak_week": "peak_week"}
+#: One regression target. Epidemic size is the quantity surveillance services
+#: act on and the only one with an unbounded support; duration and peak timing
+#: are covariates (COVARIATE_DUR, COVARIATE_PEAK) and appear on the right-hand
+#: side only.
+TARGETS = {"size": "total_cases"}
 
 
 # --------------------------------------------------------------------------
@@ -459,8 +494,7 @@ def _diagnose_missing_climate(df, missing):
     return "\n".join(lines)
 
 
-def build_ladder(df, include_dur_scaling=False, climate_block=None,
-                 require_climate=True):
+def build_ladder(df, climate_block=None, require_climate=True):
     """Return ``(ladder, dropped, climate_info)``.
 
     A column is dropped from a rung when it is absent from the panel or is
@@ -478,14 +512,12 @@ def build_ladder(df, include_dur_scaling=False, climate_block=None,
     if require_climate and not climate_cols:
         raise SystemExit(_diagnose_missing_climate(df, climate_missing))
 
-    m1 = LAGGED_SIZE + LAGGED_DUR + LAGGED_PEAK + EPI + DEMO
+    m1 = LAGGED_SIZE + COVARIATE_DUR + COVARIATE_PEAK + EPI + DEMO
     ladder = {
         "M1": m1,
         "M2": m1 + climate_cols,
         "M3": m1 + climate_cols + SCALING_SIZE,
     }
-    if include_dur_scaling:
-        ladder["M3dur"] = m1 + climate_cols + SCALING_SIZE + SCALING_DUR
 
     available, dropped = {}, {}
     for rung, cols in ladder.items():
@@ -509,7 +541,7 @@ def build_ladder(df, include_dur_scaling=False, climate_block=None,
     # A block that vanishes leaves two consecutive rungs with the very same
     # features, and their contrast would be a fabricated 0.0. Catch it here,
     # where the message can still say which column went missing.
-    order = [r for r in ("M1", "M2", "M3", "M3dur") if r in available]
+    order = [r for r in ("M1", "M2", "M3") if r in available]
     for prev, nxt in zip(order, order[1:]):
         if set(available[nxt]) == set(available[prev]):
             raise SystemExit(
@@ -540,7 +572,7 @@ def assert_ladder_is_nested(ladder, climate_block=None):
     well as in ``build_ladder`` so that a hand-built ladder handed to this
     function cannot slip through either.
     """
-    for rung in ("M1", "M2", "M3", "M3dur"):
+    for rung in ("M1", "M2", "M3"):
         cols = ladder.get(rung, [])
         dupes = sorted({c for c in cols if cols.count(c) > 1})
         if dupes:
@@ -552,7 +584,7 @@ def assert_ladder_is_nested(ladder, climate_block=None):
     expected_climate = set(
         CLIMATE_BLOCK if climate_block is None else climate_block
     )
-    order = [r for r in ("M1", "M2", "M3", "M3dur") if r in ladder]
+    order = [r for r in ("M1", "M2", "M3") if r in ladder]
     for prev, nxt in zip(order, order[1:]):
         added = set(ladder[nxt]) - set(ladder[prev])
         removed = set(ladder[prev]) - set(ladder[nxt])
@@ -573,17 +605,12 @@ def assert_ladder_is_nested(ladder, climate_block=None):
                     f"M2 must add only the declared climate block; it also added "
                     f"{bad}"
                 )
-        if nxt in ("M3", "M3dur") and prev == "M2":
-            bad = [c for c in added if c not in SCALING_SIZE + SCALING_DUR]
+        if nxt == "M3" and prev == "M2":
+            bad = [c for c in added if c not in SCALING_SIZE]
             if bad:
                 raise AssertionError(
-                    f"M3 must add only scaling descriptors; it also added {sorted(bad)}"
-                )
-        if nxt == "M3dur":
-            bad = [c for c in added if c not in SCALING_DUR]
-            if bad:
-                raise AssertionError(
-                    f"M3dur must add only duration scaling descriptors; it also added {sorted(bad)}"
+                    f"M3 must add only the size scaling descriptors; it also "
+                    f"added {sorted(bad)}"
                 )
     return True
 
@@ -658,19 +685,15 @@ def mase_denominators(train_df, unit_col, target):
 # Baselines and estimators
 # --------------------------------------------------------------------------
 def persistence_predictions(train_df, val_df, unit_col, target, tau, kind):
-    """The M0 forecast.
+    """The M0 forecast for epidemic size.
 
-    For size and duration, persistence is scaled by the empirical tau-quantile
-    of the training ratio (y_t / y_{t-1}) so that the rung also produces a
-    quantile forecast at every tau on the grid, not only at the median. For
-    peak week, which has no meaningful "previous value" forecast, the
-    climatological training tau-quantile is used (Table 4: "historical median
-    for P_t", generalised to the tau-quantile).
+    Plain persistence ``S_hat_t = S_{t-1}`` is only a point forecast. To
+    evaluate the benchmark at every tau on the grid, the previous season's
+    size is scaled by the empirical tau-quantile of the training ratio
+    ``y_t / y_{t-1}``. At tau = 0.5 the factor is close to unity and M0
+    reduces to persistence; at the other levels this is the honest analogue
+    of persistence rather than a straw man.
     """
-    if kind == "peak_week":
-        q = float(np.nanquantile(train_df[target].to_numpy(dtype=float), tau))
-        return np.full(len(val_df), q, dtype=float)
-
     prev_col = f"prev_{target}"
     prev = val_df[prev_col].to_numpy(dtype=float)
     if kind == "size":
@@ -696,22 +719,144 @@ def persistence_predictions(train_df, val_df, unit_col, target, tau, kind):
     return np.clip(prev * scale, 0.0, None)
 
 
-def fit_quantile_model(X_train, y_train, tau, model="hist_gradient_boosting", seed=SEED,
-                       max_iter=300):
-    """Fit the quantile regressor used for rungs M1..M3."""
-    if model == "lightgbm":
-        import lightgbm as lgb
+from sklearn.base import BaseEstimator, TransformerMixin
 
-        est = lgb.LGBMRegressor(
+
+class Log1pColumns(BaseEstimator, TransformerMixin):
+    """``log1p`` the named columns and pass the rest through untouched.
+
+    Placed before the imputer on purpose: the median of a case count and the
+    median of its logarithm are different numbers, and it is the logarithm
+    that the spline basis is asked to describe.
+    """
+
+    def __init__(self, columns=LOG1P_FEATURES):
+        self.columns = tuple(columns)
+
+    def fit(self, X, y=None):
+        """Record the input column order so transform can accept arrays."""
+        self.feature_names_in_ = (list(X.columns)
+                                  if hasattr(X, "columns") else None)
+        return self
+
+    def transform(self, X):
+        """Return a float array with the named columns logged."""
+        if hasattr(X, "columns"):
+            frame = X
+        else:
+            frame = pd.DataFrame(np.asarray(X), columns=self.feature_names_in_)
+        out = frame.copy()
+        for col in self.columns:
+            if col in out.columns:
+                # The two logged predictors are counts, so they are >= 0 by
+                # construction; the clip only guards against a negative
+                # sentinel arriving from an upstream join.
+                out[col] = np.log1p(np.clip(out[col].astype(float), 0, None))
+        return out.to_numpy(dtype=float)
+
+    def get_feature_names_out(self, input_features=None):
+        """sklearn API: the output columns are the input columns, transformed."""
+        names = input_features if input_features is not None else self.feature_names_in_
+        return np.asarray(names, dtype=object)
+
+
+def _spline_quantile_pipeline(tau, n_knots=3, penalty=1e-4):
+    """Linear quantile regression on a natural-spline basis.
+
+    This replaces the gradient-boosted quantile models as the primary
+    estimator, and the reason is structural rather than statistical. A tree
+    ensemble predicts a weighted average of training responses, so it cannot
+    produce a value outside the range it was trained on. Under alpha ~ 2 the
+    season of greatest public-health interest is precisely the one outside
+    that range, so an estimator bounded by its training responses is bounded
+    exactly where the question lives -- which makes the failure of the size
+    forecast unattributable: is the tail unpredictable, or is the model
+    unable to say the number?
+
+    A quantile regression on a spline basis answers that directly:
+
+    * the loss is the same pinball loss, so every number in the ablation stays
+      comparable with earlier runs -- the estimator is the only thing that
+      changes;
+    * inside the observed range the spline basis recovers the curvature the
+      trees were providing;
+    * outside it, ``SplineTransformer(extrapolation="linear")`` continues the
+      boundary segment, so the forecast follows the local trend instead of
+      flattening onto the most extreme leaf.
+
+    Because size is modelled as ``log1p(S)``, a linear extrapolation on that
+    scale is a multiplicative one on the case scale, which is the behaviour
+    the heavy-tail description actually implies.
+
+    ``penalty`` is the L1 strength of ``QuantileRegressor``; the default is
+    deliberately weak, because the design matrix is already small relative to
+    the number of rows and the point of the exercise is not shrinkage.
+    """
+    from sklearn.impute import SimpleImputer
+    from sklearn.linear_model import QuantileRegressor
+    from sklearn.pipeline import Pipeline
+    from sklearn.preprocessing import SplineTransformer
+
+    return Pipeline([
+        ("log", Log1pColumns()),
+        # Trees tolerate NaN natively; a linear model does not. The imputer is
+        # median-of-training, which is the same rule the classifier uses.
+        ("impute", SimpleImputer(strategy="median")),
+        ("spline", SplineTransformer(
+            n_knots=n_knots, degree=3, extrapolation="linear",
+            include_bias=False,
+        )),
+        ("quantile", QuantileRegressor(
+            quantile=tau, alpha=penalty, solver="highs",
+        )),
+    ])
+
+
+def _lightgbm_quantile(tau, seed, max_iter, linear_tree=False):
+    """LightGBM with a quantile objective, optionally with linear leaves."""
+    import lightgbm as lgb
+    from sklearn.impute import SimpleImputer
+    from sklearn.pipeline import Pipeline
+
+    return Pipeline([
+        ("log", Log1pColumns()),
+        ("impute", SimpleImputer(strategy="median")),
+        ("lgbm", lgb.LGBMRegressor(
             objective="quantile",
             alpha=tau,
+            linear_tree=bool(linear_tree),
             n_estimators=max_iter,
             learning_rate=0.05,
             num_leaves=16,
-            min_child_samples=5,
+            # Linear leaves need a few more points than constant ones to be
+            # identifiable; 5 would fit the leaf exactly and extrapolate wildly.
+            min_child_samples=20 if linear_tree else 5,
             random_state=seed,
             verbose=-1,
+        )),
+    ])
+
+
+def fit_quantile_model(X_train, y_train, tau, model=None, seed=SEED,
+                       max_iter=300):
+    """Fit the quantile regressor used for rungs M1..M3.
+
+    ``model`` defaults to :data:`DEFAULT_REGRESSOR`. See
+    ``_spline_quantile_pipeline`` for why the default is the one that can
+    extrapolate.
+    """
+    model = model or DEFAULT_REGRESSOR
+    if model not in REGRESSORS:
+        raise ValueError(
+            f"unknown quantile regressor {model!r}; choose from {list(REGRESSORS)}"
         )
+
+    if model == "spline_quantile":
+        est = _spline_quantile_pipeline(tau)
+    elif model == "lightgbm_linear_tree":
+        est = _lightgbm_quantile(tau, seed, max_iter, linear_tree=True)
+    elif model == "lightgbm":
+        est = _lightgbm_quantile(tau, seed, max_iter, linear_tree=False)
     else:
         from sklearn.ensemble import HistGradientBoostingRegressor
 
@@ -723,8 +868,54 @@ def fit_quantile_model(X_train, y_train, tau, model="hist_gradient_boosting", se
             max_depth=5,
             random_state=seed,
         )
+
     est.fit(X_train, y_train)
     return est
+
+
+def make_classifier(model=None, seed=SEED, max_iter=300, y_train=None):
+    """Classifier for the exceedance task.
+
+    ``logistic`` is a penalised logistic regression on the same spline basis.
+    It matters for the same reason as the regressor: a boosted classifier's
+    predicted probability is bounded by the base rates it saw in training, so
+    it cannot express "this season is far outside anything in the panel".
+    The logistic model extrapolates linearly in log-odds.
+
+    Class imbalance is handled with ``class_weight="balanced"``, which matches
+    the negative-to-positive weighting the boosted path applies through its
+    own imbalance flags.
+    """
+    model = model or DEFAULT_CLASSIFIER
+    if model not in CLASSIFIERS:
+        raise ValueError(f"unknown classifier {model!r}; choose from {list(CLASSIFIERS)}")
+
+    if model == "logistic":
+        from sklearn.impute import SimpleImputer
+        from sklearn.linear_model import LogisticRegression
+        from sklearn.pipeline import Pipeline
+        from sklearn.preprocessing import SplineTransformer, StandardScaler
+
+        return Pipeline([
+            ("log", Log1pColumns()),
+            ("impute", SimpleImputer(strategy="median")),
+            ("spline", SplineTransformer(
+                n_knots=3, degree=3, extrapolation="linear", include_bias=False,
+            )),
+            # lbfgs converges much faster on the spline basis once it is on a
+            # common scale; the transform is monotone, so it changes nothing
+            # about the fitted probabilities.
+            ("scale", StandardScaler()),
+            ("logistic", LogisticRegression(
+                C=1.0, max_iter=2000, class_weight="balanced", random_state=seed,
+            )),
+        ])
+
+    from sklearn.ensemble import HistGradientBoostingClassifier
+
+    return HistGradientBoostingClassifier(
+        max_iter=max_iter, learning_rate=0.05, max_depth=5, random_state=seed,
+    )
 
 
 def predict_cases(model, X, target):
@@ -850,7 +1041,7 @@ COLUMNS = [
 # --------------------------------------------------------------------------
 # The regression ladder
 # --------------------------------------------------------------------------
-ADJACENT = [("M1", "M0"), ("M2", "M1"), ("M3", "M2"), ("M3dur", "M3")]
+ADJACENT = [("M1", "M0"), ("M2", "M1"), ("M3", "M2")]
 
 
 def _row_key(frame, unit_col):
@@ -859,7 +1050,7 @@ def _row_key(frame, unit_col):
 
 def run_regression_ablation(df, ladder, unit_col, origins, tau_grid, model, seed,
                             n_boot, level, verbose=True, max_iter=300, tasks=None):
-    """Evaluate M0..M3 on size, duration and peak week over the origins.
+    """Evaluate M0..M3 on epidemic size over the origins.
 
     ``tasks`` restricts the loop to a subset of ``TARGETS``. It exists so that
     the classifier can be run on its own: at municipality level the panel is
@@ -868,7 +1059,7 @@ def run_regression_ablation(df, ladder, unit_col, origins, tau_grid, model, seed
     """
     selected = [t for t in (tasks if tasks else list(TARGETS)) if t in TARGETS]
     rows = []
-    rung_order = [r for r in ("M0", "M1", "M2", "M3", "M3dur") if r in ladder or r == "M0"]
+    rung_order = [r for r in ("M0", "M1", "M2", "M3") if r in ladder or r == "M0"]
     #: per-origin mean differentials, for the Diebold-Mariano summary
     origin_diffs = {}
 
@@ -909,9 +1100,7 @@ def run_regression_ablation(df, ladder, unit_col, origins, tau_grid, model, seed
                     if abs(tau - 0.5) < 1e-9:
                         preds_half["M0"] = pred0
                     notes["M0"] = ("persistence scaled by the training "
-                                   "tau-quantile of the ratio y_t/y_{t-1}"
-                                   if kind != "peak_week"
-                                   else "climatological training tau-quantile of peak week")
+                                   "tau-quantile of the ratio y_t/y_{t-1}")
                 except Exception as exc:  # noqa: BLE001
                     notes["M0"] = f"baseline failed: {type(exc).__name__}: {exc}"
 
@@ -1131,7 +1320,7 @@ def decision_rows(rows, origin_diffs, origins, level, min_origins=3,
     for (task, contrast, tau_key), per_origin in sorted(
         origin_diffs.items(), key=lambda kv: (kv[0][0], kv[0][1], str(kv[0][2]))
     ):
-        if contrast not in ("M1-M0", "M2-M1", "M3-M2", "M3dur-M3"):
+        if contrast not in ("M1-M0", "M2-M1", "M3-M2"):
             continue
         # only the primary loss of each task enters the decision
         if tau_key is None:
@@ -1258,7 +1447,7 @@ def _per_unit_thresholds(train, unit_col, percentile, min_unit_years):
 def classifier_fold(df, ladder, unit_col, origin, *, percentile=0.75,
                     threshold_scope="per_unit", min_unit_years=5,
                     seed=SEED, max_iter=300, verbose=True,
-                    pop_rung="prev_log_pop"):
+                    pop_rung="prev_log_pop", model=None):
     """Fit the classifier ladder for one forecast origin.
 
     The rarity label is ``Y = 1[S_t > Q_p]``, with ``Q_p`` estimated *inside*
@@ -1272,8 +1461,6 @@ def classifier_fold(df, ladder, unit_col, origin, *, percentile=0.75,
     the labels, the per-rung probabilities, a population-only model, and the
     bookkeeping the ablation and the out-of-fold exporter both need.
     """
-    from sklearn.ensemble import HistGradientBoostingClassifier
-
     train = df[df["year"] < origin]
     val = df[df["year"] == origin]
     if train.empty or val.empty:
@@ -1332,13 +1519,12 @@ def classifier_fold(df, ladder, unit_col, origin, *, percentile=0.75,
     units_val = _row_key(val_ok, unit_col).to_numpy()
 
     def _fit(feats):
-        clf = HistGradientBoostingClassifier(
-            max_iter=max_iter, learning_rate=0.05, max_depth=5, random_state=seed)
+        clf = make_classifier(model=model, seed=seed, max_iter=max_iter)
         clf.fit(train_ok[feats], y_train)
         return clf, clf.predict_proba(val_ok[feats])[:, 1]
 
     rungs, models = {}, {}
-    for rung in ("M1", "M2", "M3", "M3dur"):
+    for rung in ("M1", "M2", "M3"):
         feats = ladder.get(rung) or []
         if not feats:
             continue
@@ -1385,7 +1571,8 @@ def _auc(y_true, prob):
 
 def run_classifier_ablation(df, ladder, unit_col, origins, level, seed, n_boot,
                             percentile=0.75, threshold_scope="pooled",
-                            min_unit_years=5, verbose=True, max_iter=300):
+                            min_unit_years=5, verbose=True, max_iter=300,
+                            model=None):
     """Brier-score ablation for the rarity task, over the forecast origins.
 
     M0 is the training base rate, which is exactly the benchmark Table 4
@@ -1395,14 +1582,14 @@ def run_classifier_ablation(df, ladder, unit_col, origins, level, seed, n_boot,
     """
     rows = []
     origin_diffs = {}
-    rung_order = [r for r in ("M0", "M1", "M2", "M3", "M3dur")
+    rung_order = [r for r in ("M0", "M1", "M2", "M3")
                   if r in ladder or r == "M0"]
 
     for origin in origins:
         fold = classifier_fold(
             df, ladder, unit_col, origin, percentile=percentile,
             threshold_scope=threshold_scope, min_unit_years=min_unit_years,
-            seed=seed, max_iter=max_iter, verbose=verbose,
+            seed=seed, max_iter=max_iter, verbose=verbose, model=model,
         )
         if fold is None:
             continue
@@ -1499,7 +1686,7 @@ def run_classifier_ablation(df, ladder, unit_col, origins, level, seed, n_boot,
 # --------------------------------------------------------------------------
 def resolve_tasks(args):
     """The list of tasks to evaluate, from --tasks and --include-classifier."""
-    allowed = ["size", "duration", "peak_week", "exceedance"]
+    allowed = ["size", "exceedance"]
     tasks = [t.strip() for t in (args.tasks or "").split(",") if t.strip()]
     if args.include_classifier and "exceedance" not in tasks:
         tasks.append("exceedance")
@@ -1549,8 +1736,20 @@ def parse_args(argv=None):
     ap.add_argument("--tau-grid", default="default",
                     help="'default' for {0.05..0.95}, 'none' for tau=0.5 only, "
                          "or an explicit comma-separated list")
-    ap.add_argument("--model", choices=["hist_gradient_boosting", "lightgbm"],
-                    default="hist_gradient_boosting")
+    ap.add_argument("--model", choices=list(REGRESSORS),
+                    default=DEFAULT_REGRESSOR,
+                    help="quantile regressor for rungs M1..M3. 'spline_quantile' "
+                         "is a linear quantile regression on a spline basis and "
+                         "extrapolates beyond the training responses; the "
+                         "gradient-boosted options cannot, which is the limitation "
+                         "the manuscript is explicit about. The estimator used is "
+                         "recorded in the run metadata")
+    ap.add_argument("--classifier-model", choices=list(CLASSIFIERS),
+                    default=DEFAULT_CLASSIFIER,
+                    help="classifier for the exceedance task. 'logistic' is a "
+                         "penalised logistic regression on a spline basis and "
+                         "extrapolates in log-odds; 'hist_gradient_boosting' "
+                         "cannot extrapolate")
     ap.add_argument("--percentile", type=float, default=0.75,
                     help="rarity threshold for the classifier task")
     ap.add_argument("--threshold-scope", choices=["pooled", "per_unit"],
@@ -1570,14 +1769,13 @@ def parse_args(argv=None):
                     help="floor on the relative improvement of the primary loss "
                          "for verdict_effect_aware. Default: 0.02 at --level city, "
                          "0.0 at --level state. Never alters `verdict`")
-    ap.add_argument("--tasks", default="size,duration,peak_week",
+    ap.add_argument("--tasks", default="size",
                     help="comma-separated tasks to evaluate: any of "
-                         "size,duration,peak_week,exceedance. Use "
-                         "'--tasks exceedance' to run only the classifier")
+                         "size,exceedance. Use '--tasks exceedance' to run only "
+                         "the classifier. Duration and peak timing are covariates "
+                         "of size, not tasks")
     ap.add_argument("--include-classifier", action="store_true",
                     help="shorthand for adding the exceedance (Brier) task")
-    ap.add_argument("--include-dur-scaling", action="store_true",
-                    help="add the diagnostic rung M3dur (duration scaling descriptors)")
     ap.add_argument("--panel", default=None, help="reuse a cached panel parquet")
     ap.add_argument("--attach-climate", action="store_true",
                     help="build the climate block from data/[0-9]*.parquet when the "
@@ -1686,15 +1884,14 @@ def main(argv=None):
                 print(f"[panel] re-cached with climate to {args.save_panel}")
 
     ladder, dropped, climate_info = build_ladder(
-        df, include_dur_scaling=args.include_dur_scaling,
-        climate_block=climate_block,
+        df, climate_block=climate_block,
     )
     assert_ladder_is_nested(ladder, climate_block=climate_block)
     assert_no_contemporaneous_leak(ladder, df)
 
     if verbose:
         print("\n[rungs]")
-        for rung in [r for r in ("M1", "M2", "M3", "M3dur") if r in ladder]:
+        for rung in [r for r in ("M1", "M2", "M3") if r in ladder]:
             print(f"  {rung:6s} {len(ladder[rung]):2d} features  {ladder[rung]}")
         for rung, gone in dropped.items():
             print(f"  {rung:6s} unavailable in this panel: {gone}")
@@ -1729,7 +1926,8 @@ def main(argv=None):
         if run_classifier:
             print(f"[run] classifier: Q{int(args.percentile * 100)}, "
                   f"scope={threshold_scope}, min_unit_years={args.min_unit_years}, "
-                  f"effect floor={min_effect_rel:.0%}")
+                  f"effect floor={min_effect_rel:.0%}, "
+                  f"model={args.classifier_model}")
 
     # --dry-run: show the plan, fit nothing -------------------------------
     if args.dry_run:
@@ -1768,7 +1966,7 @@ def main(argv=None):
             df, ladder, unit_col, ready, args.level, args.seed, args.bootstrap,
             percentile=args.percentile, threshold_scope=threshold_scope,
             min_unit_years=args.min_unit_years, verbose=verbose,
-            max_iter=args.max_iter,
+            max_iter=args.max_iter, model=args.classifier_model,
         )
         rows += clf_rows
         origin_diffs.update(clf_diffs)
@@ -1810,6 +2008,10 @@ def main(argv=None):
         "origins_skipped": skipped,
         "tau_grid": tau_grid,
         "model": args.model,
+        "classifier_model": args.classifier_model,
+        "extrapolating_regressor": args.model in (
+            "spline_quantile", "lightgbm_linear_tree"),
+        "extrapolating_classifier": args.classifier_model == "logistic",
         "max_iter": args.max_iter,
         "seed": args.seed,
         "bootstrap_replicates": args.bootstrap,

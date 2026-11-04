@@ -24,20 +24,21 @@ forecastability: with an exponent near two, extreme seasons cannot be
 anticipated. We argue the fit supports a more useful conclusion --- the tail
 prices the risk --- and test that out of sample. On weekly surveillance for
 5{,}571 Brazilian municipalities (2010--2026) we fitted discrete power laws with
-Kolmogorov--Smirnov $x_{\min}$ selection at seven aggregation levels (48{,}681
-fits), compared each with an exponential by likelihood ratio, and evaluated
+Kolmogorov--Smirnov $x_{\min}$ selection under five aggregation levels of the
+same variable (48{,}336 fits), compared each with an exponential by likelihood
+ratio, and evaluated
 $(\alpha,x_{\min})$ on a rolling-origin design.
 
-The construction decides the verdict: median exponents span $1.95$ to $2.93$,
+The construction decides the verdict: median exponents span $1.95$ to $2.08$,
 and the same weekly counts support a power law in 75\% of municipalities pooled
 over a decade against 23\% cut into single seasons. Epidemic size survives every
 construction with a genuine tail --- median $\alpha=2.03$ across 16 national cross-sections and $1.98$ across 353 state-years, with $x_{\min}$ orders of
 magnitude above the bulk.
 
 Because $\alpha\approx2$ fixes the whole exceedance curve, the pair is a
-two-parameter risk statement, and it is calibrated: it reproduces the observed
-exceedance frequency, implying that 5.6--16.6\% of municipalities exceed ten
-times $x_{\min}$ in a year and 0.3--2.7\% a hundred times it. The exponent is
+two-parameter risk statement, and it is calibrated, reproducing the observed
+exceedance frequency: 5.6--16.6\% of municipalities exceed ten times
+$x_{\min}$, and 0.3--2.7\% a hundred times it. The exponent is
 also a readout of seasonal magnitude, rank-correlated with $x_{\min}$ at $0.87$
 nationally and $0.65$ within states --- a coupling absent under simulation.
 
@@ -97,11 +98,14 @@ We ask three questions in sequence, each conditional on the previous one.
 First, \emph{what is the exponent an exponent of?} Any epidemiological series can
 be cut into distributions in several legitimate ways --- the weekly counts of one
 city, the annual totals of one city, the set of epidemic sizes across cities in
-one year, the set of epidemic durations --- and these are different random
-variables with different supports. We fit the same estimator to the same data
-under seven nested constructions and report the exponent together with the
-diagnostic ($x_{\min}$) that makes it interpretable. Epidemic size, the quantity
-surveillance services actually act on, is the construction that survives.
+one year --- and these are different random variables with different supports.
+We fit the same estimator to the same data under five nested constructions and
+report the exponent together with the diagnostic ($x_{\min}$) that makes it
+interpretable. Epidemic size, the quantity surveillance services actually act
+on, is the construction that survives. Duration and peak timing are not put
+through that test at all: both are bounded by the length of the season, so a
+scale-free law cannot apply to them a priori, and asking the question would
+produce a verdict about the estimator rather than about the epidemic.
 
 Second, \emph{what does the fitted pair buy?} If $(\alpha,x_{\min})$ is a risk
 curve, it should reproduce the empirical frequency of large seasons. We test
@@ -120,11 +124,15 @@ decision rule fixed in advance.
 
 \begin{enumerate}
 \item \textbf{A robust exponent for epidemic size, with the diagnostic that
-makes it readable.} Across seven nested constructions on one dataset, epidemic
-size is the only one that gives a power law at every level without collapsing
-into the bulk: $\alpha=2.03$ in 16 of 16 national cross-sections and 96\% of 353 state-years, with median $x_{\min}$ of 730 and 169 cases respectively. We report
-$x_{\min}$ beside every exponent, which is what separates the fits that describe
-a tail from the fits that describe the data.
+makes it readable.} Under five nested constructions of the same variable on one
+dataset, the two weekly-window constructions tell us what the diagnostic is for:
+$x_{\min}$ collapses to five cases or fewer in 77\% of L1 and 81\% of L2 fits,
+so the ``power law'' is being fitted to counts of one and two. The
+cross-sectional constructions do not collapse, and they agree: $\alpha=2.03$ in
+16 of 16 national cross-sections and 96\% of 353 state-years, with median
+$x_{\min}$ of 730 and 169 cases respectively. We report $x_{\min}$ beside every
+exponent, which is what separates the fits that describe a tail from the fits
+that describe the data.
 
 \item \textbf{The fitted pair as a calibrated risk curve.} Equation
 \eqref{eq:exceed} turns $(\alpha,x_{\min})$ into $\Pr(S\ge s)$ for every $s$,
@@ -163,12 +171,14 @@ support.
 
 Annual epidemic descriptors were obtained from the EpiScanner module of the
 same platform, which partitions each municipal series into epidemic episodes
-and reports, for each episode, its total size (\emph{total cases}) and its
-duration in weeks (\emph{ep\_dur}). Annual cross-sections are available for
-the 15 epidemic years 2011--2025; the pooled all-years fit is stored
-separately (with a sentinel \texttt{year = 0}) and is excluded from all year
-counts. This yields, for each state-year and for
-each national year, a cross-section of municipal epidemics.
+and reports, for each episode, its total size (\emph{total cases}), its
+duration in weeks (\emph{ep\_dur}) and the week of its maximum. Annual
+cross-sections are available for the 16 years 2011--2026, the last of them
+bounded by the extraction date of 22 January 2026; the pooled all-years fit is
+stored separately (with a sentinel \texttt{year = 0}) and is excluded from all
+year counts. This yields, for each state-year and for each national year, a
+cross-section of municipal epidemics. Only the size is fitted as a power law;
+\emph{ep\_dur} and the peak week enter the analysis as covariates of size.
 
 Municipal population figures were taken from the estimates distributed with
 the platform (\texttt{city\_stats} table; 5{,}571 municipalities, one with a
@@ -177,20 +187,22 @@ the descriptive correlations of Section~\ref{sec:verdicts} and, as
 $\log_{10}$ population, as one predictor in the forecasting models of
 Section~\ref{sec:targets}.
 
-\subsection{Seven aggregation levels}
+\subsection{Five aggregation levels}
 
 The unit of analysis is the \emph{set of positive observations} passed to the
-estimator. Table~\ref{tab:levels} defines the seven constructions used. The
-first three treat the individual municipality as the sampling unit and vary
-the temporal window; the last four treat a cross-section of municipalities
-within a period as the sampling unit.
+estimator. Table~\ref{tab:levels} defines the five constructions used, all of
+them of the same variable --- epidemic size. The first three treat the
+individual municipality as the sampling unit and vary the temporal window; the
+last two treat a cross-section of municipalities within a period as the
+sampling unit.
 
 \begin{table}[htbp]
 \centering
 \small
 \setlength{\tabcolsep}{4pt}
-\caption{The seven aggregation levels. ``Unit'' is the sampling unit, i.e.\
-what each observation in the fitted sample represents.}
+\caption{The five aggregation levels. ``Unit'' is the sampling unit, i.e.\
+what each observation in the fitted sample represents. All five fit the same
+variable, epidemic size; they differ only in construction.}
 \label{tab:levels}
 \begin{tabular}{@{}llll@{}}
 \toprule
@@ -200,9 +212,7 @@ L1 & city & weekly cases, full series & \texttt{powerlaw\_fits}\\
 L2 & city-year & weekly cases, one season & \texttt{powerlaw\_fits\_yearly}\\
 L3 & city & annual total, across years & \texttt{powerlaw\_fits\_total\_cases}\\
 L4 & city $\subset$ state-year & epidemic size & \texttt{episcanner\_state\_fits}\\
-L5 & city $\subset$ state-year & epidemic duration & \texttt{episcanner\_state\_fits}\\
 L6 & city $\subset$ national-year & epidemic size & \texttt{episcanner\_fits}\\
-L7 & city $\subset$ national-year & epidemic duration & \texttt{episcanner\_fits}\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -211,22 +221,23 @@ Levels L1 and L2 differ only in the temporal window over which the weekly
 counts are pooled: L1 uses the complete available series for a municipality
 (January 2010 to January 2026), whereas L2 restricts to a single epidemic year
 (at most 52 weeks). Both sample sizes therefore differ by roughly an order of
-magnitude, which is why we compare shares rather than raw counts. Levels L4--L7 differ only in the spatial scope of the cross-section,
-not in the variable being measured. This nesting is deliberate: it allows each
+magnitude, which is why we compare shares rather than raw counts. Levels L4 and
+L6 differ only in the spatial scope of the cross-section, not in the variable
+being measured. This nesting is deliberate: it allows each
 contrast in Section~\ref{sec:results} to be read as the effect of a single
 change in construction. Figure~\ref{fig:levels} shows the scheme.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig01_aggregation_levels}
-\caption{The seven aggregation levels as nested constructions on a single
+\caption{The five aggregation levels as nested constructions on a single
 dataset. Starting from the same municipal weekly series (top), the analyst
 chooses a temporal window --- the full series, one season, or one year --- and
 a unit of observation --- either the municipality itself, or the cross-section
 of municipalities within a period --- and obtains random variables that differ
 in support, variance and tail behaviour. L1 and L2 differ only in the window;
-L3 aggregates each municipality over years; L4--L7 differ only in the spatial
-scope of the cross-section (state-year versus national-year). Every contrast
+L3 aggregates each municipality over years; L4 and L6 differ only in the
+spatial scope of the cross-section (state-year versus national-year). Every contrast
 reported in Section~\ref{sec:results} is a single step in this scheme, so a
 difference in the inferred regime is attributable to the construction rather
 than to a change of data source, period or software.}
@@ -252,17 +263,16 @@ $x_{\min}$. Because the data are counts, the discrete formulation is used
 throughout (\texttt{discrete=True}); the continuous approximation is not
 employed at any level.
 
-One property of the estimator has to be stated because it bears on the duration
-results. The numerical fit constrains $\alpha$ to $(1,3]$: the upper limit of
+One property of the estimator has to be stated for the table to be read
+correctly. The numerical fit constrains $\alpha$ to $(1,3]$: the upper limit of
 the optimiser's default parameter range is $3$, so an estimate cannot exceed it
 and a sample whose likelihood is maximised beyond that value returns $\alpha=3$
-rather than its unconstrained maximum. The bound is immaterial where the fitted
-exponents lie well inside the range. At the cross-sectional size levels the
-largest value is $2.95$ (L4) and $2.25$ (L6); at the two weekly levels it is
-reached by 2 and 5 fits respectively, under $0.05\%$ of each. It binds
-materially only for durations, where the upper quartile of the 330 state-year fits lies above $2.92$ and 12 of them ($3.6\%$) sit at the ceiling. Those fits
-should be read as \emph{at least} $3$, not as $3$, and a genuinely scale-free
-body would not systematically exhaust the upper bound of the estimator.
+rather than its unconstrained maximum. The bound is immaterial for epidemic
+size, which is the only variable fitted here. At the cross-sectional levels no
+fit reaches it at all, the largest values being $2.94$ (L4) and $2.25$ (L6);
+at the two weekly levels it is reached by 3 and 6 fits respectively, under
+$0.06\%$ of each. The exponents reported in this paper are therefore
+unconstrained maxima, not boundary values.
 
 The choice of $x_{\min}$ is not a nuisance parameter. It determines which
 fraction of the data the model actually describes, and therefore whether the
@@ -369,13 +379,17 @@ be faked and how each is prevented.
 The forecasting problem is posed at the level of an administrative unit
 (municipality or state) and a target year $t$: every predictor is measured in
 year $t-1$ or earlier, and the target is a property of the epidemic season of
-year $t$. Three targets are modelled, corresponding to the descriptors that
-surveillance services actually act on: epidemic size $S_t$ (total cases in the
-annual episode), epidemic duration $D_t$ (weeks), and peak timing $P_t$ (week
-of the seasonal maximum).
+year $t$. There is one target, epidemic size $S_t$ --- total cases in the annual
+episode --- because that is the quantity surveillance services act on and the
+only one of the three descriptors with unbounded support. Epidemic duration
+$D_t$ (weeks) and peak timing $P_t$ (week of the seasonal maximum) are
+predictors, not outcomes: they describe the phenology of the previous season and
+the ladder asks whether that phenology helps forecast the next one's
+magnitude.
 
 Predictors fall into six blocks, listed in Table~\ref{tab:features}: lagged
-epidemic metrics; the scaling descriptors $(\alpha_{S,t-1},
+epidemic metrics of the previous season, which include its duration and peak
+timing; the scaling descriptors $(\alpha_{S,t-1},
 x_{\min,S,t-1})$ from the power-law fit to the previous season; the historical
 trend $\dot\alpha_{t-1}$, defined as the ordinary least-squares slope of
 $\alpha_S$ over all years strictly before $t$ and set to zero where fewer than
@@ -420,20 +434,37 @@ $c=\overline{S}_{\text{train}}\big/\overline{(\exp\hat y-1)}_{\text{train}}$ is
 estimated on the training data and applied to the point predictions. The
 correction is a mean-matching device, not a distributional one, and it is
 deliberately not applied to the quantile models, whose losses are computed on
-the back-transformed quantiles themselves. Duration and peak week are modelled
-on their natural scale.
+the back-transformed quantiles themselves.
 
-Three estimators are used. (i) A random forest of 150 bootstrapped trees
-\citep{breiman2001random}, which additionally provides an out-of-bag $R^2$
-reported as an in-sample fit diagnostic. (ii) A LightGBM gradient-boosted
-model with quantile objective at level $\tau$
-\citep{ke2017lightgbm, koenker1978regression}, with 300 trees, learning rate
-0.05, 16 leaves and a minimum of 5 observations per leaf. (iii) A histogram
-gradient-boosting model, also with quantile loss, 300 iterations, learning rate
-0.05 and maximum depth 5. The quantile models are fitted on the grid
-$\tau\in\{0.05,0.10,\dots,0.95\}$, which yields a full predictive distribution
-per unit and year rather than a point forecast. All stochastic components use
-\texttt{random\_state=42}.
+The choice of estimator is not a tuning detail in this problem, and it is
+stated as a design decision rather than left for the limitations. A tree
+ensemble predicts a weighted average of the responses it was trained on, so it
+cannot produce a value outside their range. Under $\alpha\approx2$ the season
+of greatest public-health interest is precisely the one outside that range, so
+an estimator bounded by its training responses is bounded exactly where the
+question lives --- and a poor forecast from it cannot be interpreted, because
+"the tail is unpredictable" and "this model cannot name the number" predict the
+same loss. The primary estimator is therefore a quantile regression on a cubic
+spline basis with linear boundary extrapolation
+\citep{koenker1978regression}. It minimises the same pinball loss, so every
+comparison in this paper is unchanged by the substitution; inside the observed
+range the basis recovers the curvature a tree would provide; outside it the
+boundary segment is continued linearly, which on the $\log(1+S)$ scale is a
+multiplicative extrapolation on the case scale. The two predictors expressed in
+cases, $S_{t-1}$ and $x_{\min,t-1}$, are logged before entering the basis,
+without which the extrapolation is linear in the wrong variable. The $L_1$
+penalty is $10^{-4}$, deliberately weak.
+
+Three boosted alternatives are retained as a comparison arm, so that the
+question "is it the estimator class?" can be answered by holding everything
+else fixed: gradient boosting with quantile loss and piecewise-constant leaves,
+the same with piecewise-linear leaves, and a histogram gradient-boosted model.
+A random forest of 150 bootstrapped trees \citep{breiman2001random} appears
+only in the illustrative scatter of Figure~\ref{fig:predobs}, where showing the
+bounded prediction is the point of the panel. All quantile models are fitted on
+the grid $\tau\in\{0.05,0.10,\dots,0.95\}$, which yields a full predictive
+distribution per unit and year rather than a point forecast, and all stochastic
+components use \texttt{random\_state=42}.
 
 \subsection{Classification of large epidemics}
 \label{sec:classifier}
@@ -453,9 +484,14 @@ information unavailable to the model. The same discipline governs the
 class-imbalance weight, set to the negative-to-positive ratio of the training
 fold.
 
-Two gradient-boosted classifiers are used, XGBoost \citep{chen2016xgboost} and
-LightGBM, with imbalance handled by \texttt{scale\_pos\_weight} and
-\texttt{is\_unbalance} respectively. Validation is an expanding-window split
+The classifier is a penalised logistic regression on the same spline basis,
+with the class imbalance handled by weighting the training rows by the
+negative-to-positive ratio. The reason is the same as for the regressor: a
+boosted classifier's predicted probability is a function of the base rates it
+saw in training, so it cannot express "this season is far outside anything in
+the panel". A logistic model extrapolates linearly in log-odds. Gradient-boosted
+classifiers \citep{chen2016xgboost, ke2017lightgbm} are retained as the
+comparison arm. Validation is an expanding-window split
 defined on the year index. Fold $j$ trains on every unit-year whose year is
 earlier than $v_j$ and validates on year $v_j$ alone, where the $v_j$ are the
 $k=\min\{5,\,n_{\text{years}}-2\}$ most recent training years: a fold exists
@@ -529,7 +565,7 @@ the power-law scaling descriptors.}
 \toprule
 Rung & Name & Predictors\\
 \midrule
-M0 & Persistence       & $\hat S_t=S_{t-1}$, $\hat D_t=D_{t-1}$; historical median for $P_t$; training base rate for the classifier\\
+M0 & Persistence       & $\hat S_t=S_{t-1}$; training base rate for the classifier\\
 M1 & Lagged metrics    & M0 predictors + $P_{t-1}$, $R_{0,t-1}$, $\log_{10}(\text{pop})$\\
 M2 & \quad + climate   & M1 + quarterly $\bar T$, $\bar H$ from year $t-1$\\
 M3 & \quad + scaling   & M2 + $\alpha_{S,t-1}$, $x_{\min,S,t-1}$, $\dot\alpha_{t-1}$\\
@@ -618,7 +654,7 @@ can confirm or contradict each figure with a single SQL statement.
 \section{Results}
 \label{sec:results}
 
-Table~\ref{tab:main} summarises the 48{,}681 fits across the seven aggregation
+Table~\ref{tab:main} summarises the 48{,}336 fits across the five aggregation
 levels. We read it in the order of the questions above: what the exponent is an
 exponent of, what the fitted pair buys as a risk statement, and what it adds to a
 forecast. Figure~\ref{fig:alpha} shows the estimator's output at each level,
@@ -629,32 +665,29 @@ that are not.
 \subsection{The aggregation level decides the verdict}
 \label{sec:verdicts}
 
-One estimator, one body of surveillance data, seven ways of cutting it, and
-verdicts ranging from unanimous support for a power law (L6, 16 of 16 years) to
-unanimous rejection in favour of an exponential (L7). Median exponents span
-$1.95$ to $2.93$ and selected lower bounds run from a single case to about
-$1.5\times10^{5}$, five orders of magnitude. Nothing distinguished the analyses
-except the construction.
+One estimator, one body of surveillance data, five ways of cutting it, and
+verdicts that range from unanimous support for a power law (L6, 16 of 16 years)
+to the 23\% of L2. Median exponents span $1.95$ to $2.08$ and selected lower
+bounds run from a single case to about $4\times10^{4}$, four orders of
+magnitude. Nothing distinguished the analyses except the construction.
 
 \input{generated/tab_main}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig02_alpha_by_level}
-\caption{Distribution of the estimated exponent $\alpha$ at each aggregation
-level. Boxes give the median and interquartile range across fits, whiskers
-extend to 1.5 times the IQR, and the dashed line marks $\alpha=2$. The upper
-panel groups the size constructions (L1--L4, L6); the lower panel groups the
-duration constructions (L5, L7), which are shown here for completeness and are
-not used further. Size distributions concentrate near $\alpha\approx2$ at every
-level; durations pile up near $\alpha\approx2.9$, the value at which a discrete
-power law approximates a truncated or exponential body, so the estimator returns
-a near-constant exponent whatever the underlying process.}
+\caption{Distribution of the estimated exponent $\alpha$ at each construction.
+Boxes give the median and interquartile range across fits, whiskers extend to
+1.5 times the IQR, and the dashed line marks $\alpha=2$. All five
+constructions fit the same variable, so the movement of the box is the movement
+of the construction and not of the object. Sizes concentrate near
+$\alpha\approx2$ throughout, with the weekly levels producing the widest
+dispersion because most of their fits describe the bulk rather than a tail.}
 \label{fig:alpha}
 \end{figure}
 
-Two things disqualify half of the table as a basis for a scaling claim, and both
-are visible without a new experiment. Where the estimated lower bound collapses
+Two things disqualify the weekly constructions as a basis for a scaling claim,
+and both are visible without a new experiment. Where the estimated lower bound collapses
 into the bulk, the fit describes the whole distribution and the tail language is
 vacuous: 77\% of L1 and 81\% of L2 fits have $x_{\min}\le5$, i.e.\ the model is
 estimated on counts of one and two cases. And where the window changes, the
@@ -694,14 +727,13 @@ levels sit two to three orders of magnitude to its right.}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig06_example_fits}
-\caption{Individual fits across the aggregation levels, each with the power-law
+\caption{Individual fits at three constructions, each with the power-law
 (solid) and exponential (dashed) alternatives superimposed. (a) Weekly counts of
 a small municipality, where the selected $x_{\min}$ collapses to 2 and the
 ``power law'' is fitted to the entire distribution; (b) weekly counts of a large
-state capital; (c) a state-year cross-section of epidemic sizes, where $x_{\min}$
-lies in the hundreds of cases; (d) the corresponding cross-section of durations.
-Panels (a) and (c) are produced by the same estimator applied to different
-objects.}
+state capital; (c) a state-year cross-section of epidemic sizes, where
+$x_{\min}$ lies in the hundreds of cases. All three are produced by the same
+estimator applied to different objects, and only the third describes a tail.}
 \label{fig:examples}
 \end{figure}
 
@@ -721,14 +753,14 @@ significantly favouring the exponential rises from 4\% to 21\%.}
 
 The construction that survives both tests is the one that matters
 operationally: the distribution of epidemic \emph{size} across units within a
-year. At the national cross-section (L6) all 15 annual fits favour the power law
+year. At the national cross-section (L6) all 16 annual fits favour the power law
 and all are significant, with $\alpha=2.03$ (IQR 1.90--2.10) and $x_{\min}=730$ cases. The exponent is remarkably stable, ranging only from 1.78 to 2.25 over sixteen years, in a period in which annual case counts vary by two orders of
 magnitude. At state level (L4) the picture is consistent but weaker in
 significance, as expected from smaller cross-sections: the power law is preferred
 in 96\% of the 353 state-year fits, significant in 52\%, with median $\alpha=1.98$ and median $x_{\min}=159$ cases.
 
 This is the object the rest of the paper works with, and it is worth being
-precise about why. The median lower bound of 762 cases at national level and 159
+precise about why. The median lower bound of 730 cases at national level and 169
 at state level places the fit well above the bulk of a distribution whose
 observations span four orders of magnitude: what is being described is the upper
 region where the risk sits, not the body of small seasons. The empirical
@@ -737,14 +769,13 @@ thing graphically --- a straight line over two decades above $x_{\min}$.
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{figures/fig04_size_vs_duration}
-\caption{Empirical complementary cumulative distributions at the national
-cross-section, pooled over the 15 epidemic years, with the selected model
-superimposed. Left, epidemic size on log--log axes with the fitted power law: the
-curve is close to linear over two decades above $x_{\min}=762$ cases. Right,
-epidemic duration on the same axes, shown for contrast: the curve bends
-downwards and is captured by an exponential. A straight line on the left is the
-visual form of the claim this paper goes on to use.}
+\includegraphics[width=0.78\textwidth]{figures/fig04_size_ccdf}
+\caption{Empirical complementary cumulative distribution of epidemic size at
+the national cross-section, pooled over the 16 epidemic years, with the fitted
+power law and the exponential alternative superimposed. The empirical curve is
+close to linear on log--log axes over two decades above $x_{\min}=730$ cases,
+which is the visual form of the claim this paper goes on to use, and the
+exponential alternative bends away from it over the same region.}
 \label{fig:ccdf}
 \end{figure}
 
@@ -1005,23 +1036,20 @@ $-1.5\%$.
 \small
 \setlength{\tabcolsep}{4pt}
 \caption{Ablation ladder over the five forecast origins 2021--2025, state level
-(26 units, 23--25 evaluated per origin). Cells give the median across origins of
+(26 units, 23--25 evaluated per origin), for the single target. Cells give the
+median across origins of
 the skill score $1-L(\text{rung})/L(\text{M0})$ against calibrated persistence,
 with the range over origins in brackets; the primary loss is the pinball loss at
 $\tau=0.5$. The last column is the M3$-$M2 differential at that loss: median
 relative change, negative meaning that the scaling block worsens the forecast,
 and in parentheses the number of origins in which M3 improves on M2 by sign
-alone. Epidemic duration is included for completeness: it is the one target on
-which the lagged block is supported, and it enters the size model as a covariate.
-The classifier is reported separately in Table~\ref{tab:exceed}.}
+alone. The classifier is reported separately in Table~\ref{tab:exceed}.}
 \label{tab:ablation_results}
 \begin{tabular}{@{}lrrrr@{}}
 \toprule
 Target & M1 & M2 & M3 & M3$-$M2 \\
 \midrule
 Size $S_t$      & $0.10$ [$-$0.59, $0.71$] & $-0.02$ [$-$0.75, $0.71$] & $-0.14$ [$-$0.56, $0.71$] & $-1.5\%$ (2/5)\\
-Duration $D_t$  & $0.27$ [$-$0.02, $0.43$] & $0.29$ [$0.06$, $0.52$]  & $0.27$ [$-$0.06, $0.48$] & $-3.9\%$ (1/5)\\
-Peak week $P_t$ & $0.08$ [$-$0.16, $0.26$] & $-0.03$ [$-$0.69, $0.26$] & $0.06$ [$-$0.55, $0.26$] & $+1.4\%$ (3/5)\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -1052,22 +1080,30 @@ average.
 That regime shift is the substantive lesson of this subsection, and it is
 consistent with the descriptive result rather than in tension with it. If
 epidemic size follows $\alpha\approx2$, the largest season a municipality will
-experience is systematically outside the support of its observed history, and
-tree ensembles cannot extrapolate beyond their training responses. A model that
-already knows the previous season's size will therefore be approximately right in
-ordinary years, and wrong by a large factor in the exceptional one --- which is
-exactly the pattern of the table, and of Figure~\ref{fig:predobs}.
+experience is systematically outside the support of its observed history. A
+model that already knows the previous season's size is therefore approximately
+right in ordinary years and wrong by a large factor in the exceptional one ---
+which is exactly the pattern of the table, and of Figure~\ref{fig:predobs}.
+What the estimator choice of Section~\ref{sec:regression} changes is the
+interpretation of that pattern, not the pattern. With a model that cannot
+produce a number outside its training responses, a large error in a record year
+is uninformative, because it is what the estimator must do. With one that can,
+the error is a statement about the data, and the failure of the size forecast
+can be read as a finding rather than as an artefact of the fit.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig10_pred_vs_obs}
-\caption{Out-of-sample forecasts of epidemic size. Predicted against observed
-annual cases on log--log axes, one point per unit and forecast origin, for the
-random forest (left) and the median of the gradient-boosted quantile ensemble
-(right); the identity line is dashed and the 10:1 and 1:10 bands are shaded.
-Points inside the bands are forecasts within an order of magnitude of the truth.
-Because $\alpha\approx2$, a handful of points in the upper right dominate any
-squared-error summary, which is why the primary loss in
+\caption{Out-of-sample forecasts of epidemic size, predicted against observed
+annual cases on log--log axes, one point per unit and forecast origin. Left, a
+random forest; right, the spline-basis quantile regression that the ablation
+uses. The identity line is dashed, the 10:1 and 1:10 bands are shaded, and the
+dotted red line marks the largest annual total in the training window. A tree
+forecast cannot cross that line, because it is an average of training
+responses; the quantile regression continues the boundary trend, so in the tail
+it can be wrong in either direction rather than being wrong in one direction by
+construction. Because $\alpha\approx2$, a handful of points in the upper right
+dominate any squared-error summary, which is why the primary loss in
 Table~\ref{tab:ablation_results} is the pinball loss rather than the RMSE.}
 \label{fig:predobs}
 \end{figure}
@@ -1077,7 +1113,7 @@ Table~\ref{tab:ablation_results} is the pinball loss rather than the RMSE.}
 \includegraphics[width=\textwidth]{figures/fig11_ablation_skill}
 \caption{The ablation ladder, drawn directly from \texttt{ablation\_results.csv}
 rather than recomputed. (a) Skill score relative to the calibrated persistence
-benchmark (M0) for epidemic size, duration and peak week at the primary loss
+benchmark (M0) for epidemic size at the primary loss
 (pinball, $\tau=0.5$); bar height is the median over the five forecast origins and
 each dot is a single origin. The M2$\to$M3 step isolates the contribution of the
 scaling descriptors. (b) The quantity the decision rule turns on,
@@ -1125,11 +1161,12 @@ colour scale for the rest.}
 
 \subsection{What the exponent is, and what it is not}
 
-The seven-level comparison settles a question that the applied literature has
+The five-level comparison settles a question that the applied literature has
 treated as empirical when it is largely definitional. Median exponents span
-$1.95$ to $2.93$, unanimous support for a power law at one level coexists with
-unanimous rejection at another, and a single change of temporal window moves
-support from 75\% to 23\% with no transmission parameter altered. The step that
+$1.95$ to $2.08$ for the same variable, the share of fits favouring a power law
+ranges from 23\% to 100\% across constructions, and a single change of temporal
+window moves support from 75\% to 23\% with no transmission parameter
+altered. The step that
 does not survive is the inference from an exponent to a regime: the step that
 treats $\alpha$ as a property of the pathogen or the place, when it is a property
 of the tuple $(\text{unit},\ \text{window},\ \text{variable},\ \text{comparison
@@ -1298,17 +1335,6 @@ defeats every rung. The classifier orders municipalities within a season of
 familiar magnitude. It does not anticipate a regime change, and in a record year
 its probabilities should not be read as levels.
 
-\emph{Epidemic duration and peak timing are not scaling objects.} Both are
-bounded above by the length of a season, so a scale-free law cannot apply to them
-a priori, and the fits confirm it: the power law is rejected in 15 of 15 national duration cross-sections, with the estimated exponent piling up at $2.93$ against
-the estimator's ceiling of 3. A near-constant fitted exponent across independent
-cross-sections is not evidence of universality; it is evidence that the model is
-being asked the wrong question. For that reason we report duration and peak
-timing only as covariates and as forecast targets in their own right --- where,
-notably, duration is the one target on which the lagged block is supported
-(median skill $0.27$, 3 of 5 origins) --- and we do not build a scaling argument
-on them.
-
 \emph{The case series are nowcast-adjusted.} The variable analysed is the
 estimated case count produced by the platform's nowcasting model, not the raw
 notification count. This is the right series for a retrospective description,
@@ -1318,25 +1344,35 @@ shrinks extreme values, the fitted exponents are biased towards the bulk, and th
 size distribution reported here is somewhat less heavy than the notification
 distribution would be.
 
-\emph{The state level is an arithmetic aggregate.} State-level duration is the
-mean of municipal durations and state peak week is the median of municipal peaks.
-Neither is the duration or the peak of the aggregate epidemic, which is the
-quantity a state health secretariat actually experiences. The state-level results
-should be read as properties of the municipality distribution within a state, not
-as properties of the state epidemic.
+\emph{The state level is an arithmetic aggregate.} Where duration and peak
+timing enter as covariates, the state values are the mean of municipal durations
+and the median of municipal peaks. Neither is the duration or the peak of the
+aggregate epidemic, which is the quantity a state health secretariat actually
+experiences. The state-level results should be read as properties of the
+municipality distribution within a state, not as properties of the state
+epidemic.
 
-\emph{The cross-sections are short.} The national levels rest on 15 annual fits
-and the state levels on three to 15 years per state, so the correlations reported
+\emph{The cross-sections are short.} The national levels rest on 16 annual fits
+and the state levels on three to 16 years per state, so the correlations reported
 in Section~\ref{sec:coupling} are estimated on small samples even where the
 underlying cross-sections contain thousands of municipalities. The within-state
 estimates are more robust than the national ones because they pool over 24
 states.
 
-\emph{The trees cannot extrapolate.} This limitation cuts across both halves of
-the paper. Under $\alpha\approx2$ the largest season a municipality will
-experience is systematically outside the support of its observed history, so the
-models are weakest precisely where the heavy tail places the risk. No amount of
-feature engineering removes that; it is a property of the estimator class.
+\emph{Extrapolation is bought with an assumption, not with data.} The primary
+estimator continues the boundary trend of the spline basis linearly, which is
+what lets it name a season larger than any in its training window; but the
+number it produces in that region is an extrapolation of a local slope, and it
+is only as good as the assumption that the slope holds. In a synthetic check
+built at the scale of this panel --- a season twice the previous one, fitted on
+previous seasons of 10 to 1{,}000 cases --- the model recovered the doubling to
+within 0.1\% at five times the largest value in its training window and within
+0.2\% at twenty times, while every boosted variant returned the training maximum
+regardless of the input. That says the machinery works when the relationship is
+of the assumed form; it does not say it works on dengue. The honest reading is that the
+estimator removes the structural ceiling documented earlier, so a large error in
+a record year can now be attributed to the data; it does not remove the risk of
+a large error.
 
 \emph{The classification threshold is a choice.} Exceeding the 75th percentile of
 a unit's own history defines a large season; at the 90th percentile the positive
@@ -1346,9 +1382,11 @@ parameter, fixed before the runs and reported with them.
 
 \emph{The exponent cannot exceed three.} The fitting routine bounds $\alpha$
 above by $3$, so a tail steeper than that is reported as $3$ rather than as its
-unconstrained maximum. For the size results this is immaterial, since no national size fit exceeds $2.25$; for durations it is not, and 12 of the 330 state-year fits sit at the bound. This does not weaken the conclusion that durations are not
-power-law distributed, but the numerical value of those particular exponents
-should not be read as an estimate.
+unconstrained maximum. This is immaterial here: no national or state-year size
+fit approaches the bound, the largest values being $2.94$ at the state level
+and $2.25$ nationally, and it is reached only by 9 of the 46{,}882 weekly fits
+(0.02\%).
+Every exponent reported in this paper is an unconstrained maximum.
 
 \emph{Predictors are ecological and coarse.} No serotype composition, no
 seroprevalence and no vector index enters the model, although all three are
@@ -1364,7 +1402,7 @@ Three practices follow, none of them expensive.
 
 First, report the tuple. An exponent accompanied by its unit, its $x_{\min}$, its
 sample size and its comparison model can be assessed by a reader; an exponent
-alone cannot, and the seven levels here show that the same exponent can mean
+alone cannot, and the five levels here show that the same exponent can mean
 opposite things.
 
 Second, use the exceedance curve. Two parameters fitted to the current
@@ -1426,7 +1464,7 @@ Every quantity in Table~\ref{tab:main} is obtained from
 \end{center}
 Note that \texttt{year = 0} in the \texttt{episcanner} tables is a pooled
 all-years fit, not a calendar year, and is excluded from all year counts;
-the national levels therefore have 15 annual fits, not 16.
+the national levels therefore have 16 annual fits, not 17.
 
 \bibliographystyle{apalike}
 \bibliography{refs}
