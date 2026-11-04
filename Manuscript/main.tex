@@ -20,36 +20,34 @@ large dengue epidemics in Brazil}
 
 \begin{abstract}
 Power-law tails are reported for dengue incidence and read as a verdict on
-forecastability: if the exponent is near two, extreme seasons cannot be
-anticipated. We argue that the same fit supports a more useful conclusion ---
-that the tail prices the risk --- and test it out of sample. Using weekly
-surveillance for the 5{,}571 Brazilian municipalities from 2010 to 2026, we
-fitted discrete power laws by maximum likelihood with Kolmogorov--Smirnov
-$x_{\min}$ selection at seven nested aggregation levels (47{,}494 fits), tested
-each against an exponential by likelihood ratio, and evaluated the fitted pair
+forecastability: with an exponent near two, extreme seasons cannot be
+anticipated. We argue the fit supports a more useful conclusion --- the tail
+prices the risk --- and test that out of sample. On weekly surveillance for
+5{,}571 Brazilian municipalities (2010--2026) we fitted discrete power laws with
+Kolmogorov--Smirnov $x_{\min}$ selection at seven aggregation levels (48{,}681
+fits), compared each with an exponential by likelihood ratio, and evaluated
 $(\alpha,x_{\min})$ on a rolling-origin design.
 
-The construction decides the verdict --- median exponents span $1.95$ to $2.95$,
+The construction decides the verdict: median exponents span $1.95$ to $2.93$,
 and the same weekly counts support a power law in 75\% of municipalities pooled
-over a decade against 23\% when cut into single seasons --- but epidemic
-\emph{size} survives every construction that gives it a genuine tail:
-$\alpha=2.00$ in all 15 national cross-sections and 96\% of 330 state-years, with
-$x_{\min}$ two to three orders of magnitude above the bulk.
+over a decade against 23\% cut into single seasons. Epidemic size survives every
+construction with a genuine tail --- median $\alpha=2.03$ across 16 national cross-sections and $1.98$ across 353 state-years, with $x_{\min}$ orders of
+magnitude above the bulk.
 
 Because $\alpha\approx2$ fixes the whole exceedance curve, the pair is a
-two-parameter risk statement, and it is well calibrated: it reproduces the
-observed exceedance frequency over two decades, implying that 5.4--16.5\% of
-municipalities exceed ten times $x_{\min}$ in a year and 0.3--2.7\% exceed a
-hundred times it. The exponent is also a readout of seasonal magnitude ---
-rank-correlated with $x_{\min}$ at $0.87$ nationally and $0.65$ within states, a
-coupling absent under simulation.
+two-parameter risk statement, and it is calibrated: it reproduces the observed
+exceedance frequency, implying that 5.6--16.6\% of municipalities exceed ten
+times $x_{\min}$ in a year and 0.3--2.7\% a hundred times it. The exponent is
+also a readout of seasonal magnitude, rank-correlated with $x_{\min}$ at $0.87$
+nationally and $0.65$ within states --- a coupling absent under simulation.
 
-Predictively, the question worth asking is the exceedance one: lagged
-descriptors, with duration and peak timing as ordinary covariates, improve the
-Brier score over calibrated persistence in 3 of 5 origins, by up to $0.18$. The
-scaling block adds nothing to the size forecast (0 of 5) and degrades its 95th
-percentile by a median $18\%$, because it re-encodes the lagged count. The tail
-is worth reporting --- as a risk curve, not as a predictor.
+Asked as exceedance, prediction is tractable. At state level, lagged descriptors
+--- duration and peak timing among them --- beat calibrated persistence on the
+Brier score in 3 of 5 origins. At municipal level, with the label referred to
+each municipality's own history, AUC rises from $0.50$ to $0.64$, though no rung
+clears the pre-registered incremental test: the scaling block adds a median
+$+0.002$ Brier and worsens the state-level 95th-percentile size forecast by
+18\%. The tail belongs in a risk curve, not a predictor.
 \end{abstract}
 
 \section{Introduction}
@@ -124,8 +122,7 @@ decision rule fixed in advance.
 \item \textbf{A robust exponent for epidemic size, with the diagnostic that
 makes it readable.} Across seven nested constructions on one dataset, epidemic
 size is the only one that gives a power law at every level without collapsing
-into the bulk: $\alpha=2.00$ in 15 of 15 national cross-sections and 96\% of 330
-state-years, with median $x_{\min}$ of 762 and 159 cases respectively. We report
+into the bulk: $\alpha=2.03$ in 16 of 16 national cross-sections and 96\% of 353 state-years, with median $x_{\min}$ of 730 and 169 cases respectively. We report
 $x_{\min}$ beside every exponent, which is what separates the fits that describe
 a tail from the fits that describe the data.
 
@@ -261,10 +258,9 @@ the optimiser's default parameter range is $3$, so an estimate cannot exceed it
 and a sample whose likelihood is maximised beyond that value returns $\alpha=3$
 rather than its unconstrained maximum. The bound is immaterial where the fitted
 exponents lie well inside the range. At the cross-sectional size levels the
-largest value is $2.99$ (L4) and $2.27$ (L6); at the two weekly levels it is
+largest value is $2.95$ (L4) and $2.25$ (L6); at the two weekly levels it is
 reached by 2 and 5 fits respectively, under $0.05\%$ of each. It binds
-materially only for durations, where the upper quartile of the 330 state-year
-fits lies above $2.92$ and 11 of them ($3.3\%$) sit at the ceiling. Those fits
+materially only for durations, where the upper quartile of the 330 state-year fits lies above $2.92$ and 12 of them ($3.6\%$) sit at the ceiling. Those fits
 should be read as \emph{at least} $3$, not as $3$, and a genuinely scale-free
 body would not systematically exhaust the upper bound of the estimator.
 
@@ -330,14 +326,13 @@ First, the exponent summarises \emph{risk} rather than \emph{activity}. Two
 municipalities with the same expected annual incidence but different $\alpha$
 face different probabilities of a catastrophic season, and that difference is
 invisible to the mean. The fitted models quantify the claim rather than merely
-asserting it: using the 15 national size fits, they imply that between 5.4\%
-and 16.5\% of municipalities exceed ten times $x_{\min}$ in a given year, and
+asserting it: using the 16 national size fits, they imply that between 5.6\% and 16.6\% of municipalities exceed ten times $x_{\min}$ in a given year, and
 between 0.3\% and 2.7\% exceed one hundred times $x_{\min}$. Those are
 falsifiable implications of the description, and Figure~\ref{fig:exceed}
 confronts them with the empirical exceedance frequencies.
 
 Second, $\alpha$ is a low-variance quantity \emph{relative to its target}.
-Across the national cross-sections it takes values between 1.78 and 2.27, and it
+Across the national cross-sections it takes values between $1.78$ and $2.25$, and it
 is essentially unrelated to city size ($r=-0.065$). Annual case counts over the
 same period vary by two orders of magnitude. The dispersion of $\hat\alpha$ is
 not zero --- it exceeds sampling noise by about a factor of five in standard
@@ -498,7 +493,11 @@ area under the precision--recall curve (the more informative summary under
 class imbalance), the Brier score \citep{gneiting2007strictly}, the $F_1$ score
 at the Youden threshold and a calibration curve, and we test differences in AUC
 between nested feature sets by the method of \citet{delong1988comparing}.
-Feature attributions are obtained from SHAP values \citep{lundberg2017unified}.
+Feature attribution is measured by held-out permutation importance on the
+Brier score, reported both per predictor and for the scaling block shuffled
+as a unit \citep{breiman2001random}: under the collinearity that
+Section~\ref{sec:coupling} documents, a per-column ranking alone
+understates a block whose members can stand in for one another.
 
 \subsection{Evaluation protocol and ablation ladder}
 \label{sec:ablation}
@@ -619,7 +618,7 @@ can confirm or contradict each figure with a single SQL statement.
 \section{Results}
 \label{sec:results}
 
-Table~\ref{tab:main} summarises the 47{,}494 fits across the seven aggregation
+Table~\ref{tab:main} summarises the 48{,}681 fits across the seven aggregation
 levels. We read it in the order of the questions above: what the exponent is an
 exponent of, what the fitted pair buys as a risk statement, and what it adds to a
 forecast. Figure~\ref{fig:alpha} shows the estimator's output at each level,
@@ -631,38 +630,13 @@ that are not.
 \label{sec:verdicts}
 
 One estimator, one body of surveillance data, seven ways of cutting it, and
-verdicts ranging from unanimous support for a power law (L6, 15 of 15 years) to
+verdicts ranging from unanimous support for a power law (L6, 16 of 16 years) to
 unanimous rejection in favour of an exponential (L7). Median exponents span
-$1.95$ to $2.95$ and selected lower bounds run from a single case to about
+$1.95$ to $2.93$ and selected lower bounds run from a single case to about
 $1.5\times10^{5}$, five orders of magnitude. Nothing distinguished the analyses
 except the construction.
 
-\begin{table}[htbp]
-\centering
-\small
-\setlength{\tabcolsep}{3.5pt}
-\caption{Power-law fits by aggregation level. $\alpha$ median with
-interquartile range; $x_{\min}$ median; PL$_{\text{pref}}$ = proportion with
-$R>0$; PL$_{\text{sig}}$ = proportion with $R>0$ and $p<0.05$;
-Exp$_{\text{sig}}$ = proportion with $R<0$ and $p<0.05$. Shares are
-percentages. The levels that survive the $x_{\min}$ diagnostic \emph{and} the
-model comparison are the cross-sectional size constructions L4 and L6, which are
-the object of the rest of the paper.}
-\label{tab:main}
-\begin{tabular}{@{}lrrrrrrr@{}}
-\toprule
-Level & $n$ & $\alpha$ & IQR & $x_{\min}$ & PL$_{\text{pref}}$ & PL$_{\text{sig}}$ & Exp$_{\text{sig}}$\\
-\midrule
-L1 weekly, city            & 5{,}244  & 1.95 & 1.72--2.29 & 2   & 75 & 45 & 4\\
-L2 weekly, city-year       & 40{,}616 & 2.06 & 1.72--2.45 & 2   & 23 & 3  & 21\\
-L3 annual total, city      & 944      & 2.09 & 1.80--2.46 & 341 & 51 & 4  & 4\\
-L4 size, state-year        & 330      & 1.97 & 1.79--2.14 & 159 & 96 & 52 & 0\\
-L5 duration, state-year    & 330      & 2.80 & 2.52--2.92 & 17  & 0  & 0  & 95\\
-L6 size, national-year     & 15       & 2.00 & 1.92--2.11 & 762 & 100& 100& 0\\
-L7 duration, national-year & 15       & 2.95 & 2.90--2.96 & 18  & 0  & 0  & 100\\
-\bottomrule
-\end{tabular}
-\end{table}
+\input{generated/tab_main}
 
 \begin{figure}[htbp]
 \centering
@@ -748,13 +722,10 @@ significantly favouring the exponential rises from 4\% to 21\%.}
 The construction that survives both tests is the one that matters
 operationally: the distribution of epidemic \emph{size} across units within a
 year. At the national cross-section (L6) all 15 annual fits favour the power law
-and all are significant, with $\alpha=2.00$ (IQR 1.92--2.11) and $x_{\min}=762$
-cases. The exponent is remarkably stable, ranging only from 1.78 to 2.27 over
-fifteen years, in a period in which annual case counts vary by two orders of
+and all are significant, with $\alpha=2.03$ (IQR 1.90--2.10) and $x_{\min}=730$ cases. The exponent is remarkably stable, ranging only from 1.78 to 2.25 over sixteen years, in a period in which annual case counts vary by two orders of
 magnitude. At state level (L4) the picture is consistent but weaker in
 significance, as expected from smaller cross-sections: the power law is preferred
-in 96\% of the 330 state-year fits, significant in 52\%, with median
-$\alpha=1.97$ and median $x_{\min}=159$ cases.
+in 96\% of the 353 state-year fits, significant in 52\%, with median $\alpha=1.98$ and median $x_{\min}=159$ cases.
 
 This is the object the rest of the paper works with, and it is worth being
 precise about why. The median lower bound of 762 cases at national level and 159
@@ -816,8 +787,7 @@ significantly positive in 67\% --- but weak between states. It is therefore a
 within-unit, over-time relationship, not a contrast between places. The control
 recovers no such association, so the estimator does not manufacture it: it places
 the sampling dispersion of $\hat\alpha$ at $0.03$ (40 replicates, samples of
-800--4{,}000 points, true exponent fixed at $2.0$), against an observed standard
-deviation of $0.154$ across the 15 national fits. The year-to-year movement in
+800--4{,}000 points, true exponent fixed at $2.0$), against an observed standard deviation of $0.150$ across the 16 national fits. The year-to-year movement in
 $\alpha$ is real, roughly five times the sampling noise in standard deviation,
 even though it remains small next to the variation in the case counts themselves.
 
@@ -866,7 +836,7 @@ available from the current cross-section alone.
 Figure~\ref{fig:exceed} confronts the exceedance curve implied by each national
 fit with the empirical exceedance frequency of the same cross-section. The
 agreement holds over roughly two decades of epidemic size. Numerically, the 15
-national fits imply that between 5.4\% and 16.5\% of municipalities exceed ten
+national fits imply that between 5.6\% and 16.6\% of municipalities exceed ten
 times $x_{\min}$ in a given year, and between 0.3\% and 2.7\% exceed a hundred
 times it. Those are statements a surveillance service can act on and a
 subsequent season can falsify.
@@ -904,73 +874,112 @@ quartile of the unit's own history. This is the risk statement itself, and it is
 the natural place to look for value in the scaling descriptors, since a tail
 exponent is by construction a statement about upper-tail probabilities.
 
-It is also the one place where the answer is positive. Table~\ref{tab:exceed}
-reports the paired Brier-score differentials across the five forecast origins.
-Lagged epidemic descriptors --- which include the previous season's duration and
-peak timing as ordinary covariates, alongside size, $R_0$ and population ---
-improve on calibrated persistence with a 95\% bootstrap interval excluding zero
-in 3 of the 5 origins, by up to $0.175$ in absolute Brier score. Climate adds
-nothing (0 of 5), and the scaling block adds nothing (0 of 5), with point
-estimates close to zero.
+We posed it at the two levels where it is asked operationally. At state level
+(Table~\ref{tab:exceed}), lagged epidemic descriptors --- which include the
+previous season's duration and peak timing as ordinary covariates, alongside
+size, $R_0$ and population --- improve on calibrated persistence with a 95\%
+bootstrap interval excluding zero in 3 of the 5 origins, by up to $0.175$ in
+absolute Brier score. Climate adds nothing (0 of 5) and the scaling block adds
+nothing (0 of 5), with point estimates close to zero. Per origin, the M1$-$M0
+differentials are $-0.047$, $+0.074$, $+0.134$, $+0.175$ and $+0.159$ for 2021
+to 2025 --- negative in the first origin and increasingly positive thereafter,
+which is what one expects from a model that needs history to be trained on.
+
+At municipal level the same ladder runs over 3{,}976 municipalities with enough
+history for a within-unit threshold (at least five seasons), with between 579
+and 1{,}483 units evaluated per origin. Two things change, and only one of them
+is about the scaling descriptors. The first is a correction. With the threshold
+taken from each municipality's own seasons rather than pooled across the country,
+the population-only reference falls to a median AUC of $0.47$ (range
+$0.456$--$0.516$), against $0.94$ when the threshold is pooled: the pooled label
+was measuring municipality size, and the within-unit label is not. The second is
+that discrimination is real but modest. Median AUC rises from $0.50$ for the
+no-skill reference to $0.59$, $0.63$ and $0.64$ for M1, M2 and M3; M3 is the best
+of the three in 4 of 5 origins and gains a median $+0.008$ over M2. Against a
+rule that demands a bootstrap interval excluding zero in 3 of 5 origins, however,
+no rung passes at this level. The scaling block improves the Brier score in 4 of
+5 origins, by a median of $+0.002$, and in none of them does the interval
+exclude zero.
+
+The gap between the two levels is mostly an arithmetic one. Absolute Brier
+differentials are two orders of magnitude smaller at municipal level ($0.002$
+against $0.13$) because the loss is an average over hundreds of small units
+rather than over twenty-six large ones, so the same relative signal is a much
+smaller number. What does not change is the ranking: the scaling block clears
+the bar at neither level, and where it moves at all it moves in the right
+direction. Whether a municipality will have an exceptional season is partly
+predictable from how large the last one was; the exponent does not add to that.
+
+One origin deserves a flag. In 2024, 69.5\% of the evaluated municipalities
+exceeded their own upper quartile, against a training base rate of 26.4\%, and
+every rung scores a Brier score of about $0.40$. That season was a national
+record, and no model trained on earlier seasons anticipated its level. This is
+the honest boundary of the exercise: the classifier ranks units within a season
+of familiar magnitude; it does not foresee a regime break.
+
+Figures~\ref{fig:roc} and~\ref{fig:importance} report discrimination, calibration
+and attribution for the municipal classifier. The calibration panel is the one to
+read: a classifier that is useful for planning must track the diagonal in the
+upper deciles, not merely rank well on average.
 
 \begin{table}[htbp]
 \centering
 \small
 \setlength{\tabcolsep}{5pt}
-\caption{The large-season classifier, state level, five forecast origins
-2021--2025. The target is whether a unit exceeds the 75th percentile of its own
-history; the loss is the Brier score. Positive values mean the later rung has the
-lower Brier score. The decision rule of Section~\ref{sec:ablation} requires a
-same-direction improvement with a 95\% unit-bootstrap interval excluding zero in
-at least 3 of 5 origins.}
+\caption{The large-season classifier at both aggregation levels, five forecast
+origins 2021--2025. The target is whether a unit exceeds the 75th percentile of
+its own history; the loss is the Brier score. Positive values mean the later rung
+has the lower Brier score, and ``median'' is over the five origins. The decision
+rule of Section~\ref{sec:ablation} requires a same-direction improvement with a
+95\% unit-bootstrap interval excluding zero in at least 3 of 5 origins. The
+municipal rows use a within-unit threshold, without which the label is a
+population indicator; there the population-only reference reaches a median AUC of
+$0.47$ against $0.62$--$0.65$ for the fitted rungs.}
 \label{tab:exceed}
-\begin{tabular}{@{}lrrrr@{}}
+\begin{tabular}{@{}llrrrr@{}}
 \toprule
-Contrast & $\Delta$Brier, median & Origins $\Delta>0$ & Origins CI excl.\ 0 & Verdict\\
+Level & Contrast & $\Delta$Brier, median & Origins $\Delta>0$ & Origins CI excl.\ 0 & Verdict\\
 \midrule
-M1$-$M0 (lagged metrics) & $+0.134$ & 4/5 & \textbf{3/5} & \textbf{supported}\\
-M2$-$M1 (climate)        & $-0.001$ & 2/5 & 0/5 & not supported\\
-M3$-$M2 (scaling)        & $+0.008$ & 3/5 & 0/5 & not supported\\
+State (26 units) & M1$-$M0 (lagged metrics) & $+0.134$ & 4/5 & \textbf{3/5} & \textbf{supported}\\
+                 & M2$-$M1 (climate)        & $-0.001$ & 2/5 & 0/5 & not supported\\
+                 & M3$-$M2 (scaling)        & $+0.008$ & 3/5 & 0/5 & not supported\\
+\addlinespace
+Municipal (3{,}976 units) & M1$-$M0 (lagged metrics) & $+0.003$ & 3/5 & 2/5 & not supported\\
+                 & M2$-$M1 (climate)        & $+0.001$ & 3/5 & 1/5 & not supported\\
+                 & M3$-$M2 (scaling)        & $+0.002$ & 4/5 & 0/5 & not supported\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Per origin, the M1$-$M0 differentials are $-0.047$, $+0.074$, $+0.134$, $+0.175$
-and $+0.159$ for 2021 to 2025 --- negative in the first origin and increasingly
-positive thereafter, which is what one expects from a model that needs history to
-be trained on. The scaling block's differentials are $-0.009$, $-0.001$,
-$+0.008$, $+0.036$ and $+0.010$: three of five have the right sign and none has
-an interval excluding zero. Whatever the exponent contributes to the probability
-of a large season, it is not detectable against a model that already knows how
-large the previous season was.
-
-Figures~\ref{fig:roc} and~\ref{fig:shap} report discrimination, calibration and
-attribution for the classifier. The calibration panel is the one to read: a
-classifier that is useful for planning must track the diagonal in the upper
-deciles, not merely rank well on average.
-
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig12_roc_pr_calibration}
-\caption{Classification of large epidemics. (a) ROC curves; (b)
-precision--recall curves, the more informative summary when the positive class
-is the minority; (c) calibration of the predicted probability of exceeding the
-75th percentile; (d) $F_1$ as a function of the decision threshold, with the
-Youden point marked. All curves are drawn from out-of-fold predictions so that
-they are honest. Solid lines denote M2 (without scaling descriptors) and dashed
-lines M3 (with them).}
+\caption{Classification of large epidemics at municipal level. (a) ROC curves;
+(b) precision--recall curves, the more informative summary when the positive
+class is the minority; (c) calibration of the predicted probability of exceeding
+the 75th percentile; (d) $F_1$ as a function of the decision threshold, with the
+Youden point marked. All curves are computed out of fold and averaged over the
+five forecast origins rather than pooled across them: pooling is not neutral here,
+because the base rate ranges from $0.21$ to $0.70$ between origins and a
+prediction that knows only the calendar year reaches a pooled AUC of $0.60$ while
+having no within-origin discrimination at all. Solid lines denote M2 (without
+scaling descriptors), dashed lines M3 (with them), the dash-dot curve the
+no-skill M0 reference and the dotted grey curve the population-only reference.}
 \label{fig:roc}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{figures/fig13_shap}
-\caption{Where the scaling descriptors rank. Mean absolute SHAP values for the
-large-season classifier, pooled over forecast origins, with the power-law block
-highlighted. The left panel ranks all features; the right panel isolates
-$\alpha_{t-1}$, $x_{\min,t-1}$ and $\dot\alpha_{t-1}$ and shows the direction of
-their effect on the predicted probability.}
-\label{fig:shap}
+\includegraphics[width=\textwidth]{figures/fig13_importance}
+\caption{What the classifier is actually using. Held-out permutation importance,
+measured as the increase in Brier score when a predictor is shuffled, so a
+negative value means the predictor hurts. Panel (a) ranks the individual
+predictors, with the power-law block in red; panel (b) tracks the three scaling
+descriptors across forecast origins. The joint bar is the scaling block shuffled
+as a single unit: permuting one column while its correlated partners remain in
+place understates a collinear block, and $\alpha_{t-1}$ and $x_{\min,t-1}$ are
+rank-correlated at $0.65$ within units.}
+\label{fig:importance}
 \end{figure}
 
 \subsection{Predicting epidemic size}
@@ -1118,7 +1127,7 @@ colour scale for the rest.}
 
 The seven-level comparison settles a question that the applied literature has
 treated as empirical when it is largely definitional. Median exponents span
-$1.95$ to $2.95$, unanimous support for a power law at one level coexists with
+$1.95$ to $2.93$, unanimous support for a power law at one level coexists with
 unanimous rejection at another, and a single change of temporal window moves
 support from 75\% to 23\% with no transmission parameter altered. The step that
 does not survive is the inference from an exponent to a regime: the step that
@@ -1128,8 +1137,7 @@ model})$.
 
 But the same comparison identifies which construction \emph{does} carry a stable
 tail. Epidemic size across units within a year is power-law at every level where
-$x_{\min}$ lies above the bulk: $\alpha=2.00$ in 15 of 15 national
-cross-sections, 96\% support across 330 state-years, and a lower bound in the
+$x_{\min}$ lies above the bulk: $\alpha=2.03$ in 16 of 16 national cross-sections, 96\% support across 353 state-years, and a lower bound in the
 hundreds of cases, two to three orders of magnitude above the body of the
 distribution. That is not a fragile result, and it is the one worth building on.
 The distinction between this and the weekly-count fits that collapse to
@@ -1151,8 +1159,7 @@ epidemics are unforecastable.
 
 Read as a risk specification, the fitted pair performs well and cheaply.
 Two parameters reproduce the empirical exceedance frequency over two decades of
-epidemic size (Figure~\ref{fig:exceed}), and they imply that between 5.4\% and
-16.5\% of municipalities exceed ten times $x_{\min}$ in a given year against
+epidemic size (Figure~\ref{fig:exceed}), and they imply that between 5.6\% and 16.6\% of municipalities exceed ten times $x_{\min}$ in a given year against
 0.3--2.7\% exceeding a hundred times it. No covariate, no training period and no
 fitted case count is involved: the statement is available from the current
 cross-section, for every municipality, including those that have never
@@ -1161,10 +1168,13 @@ reserve, that is closer to the decision than a point forecast is.
 
 The predictive evaluation confirms the division of labour. Where the question is
 posed as a probability --- will this municipality exceed its own upper quartile?
---- the answer is yes, and detectably so: lagged epidemic descriptors improve the
-Brier score over calibrated persistence in 3 of 5 origins, by up to $0.18$
-(Table~\ref{tab:exceed}). Where the question is posed as a magnitude, the answer
-is no, and the failure is orderly rather than mysterious.
+--- the answer is yes at state level, and detectably so: lagged epidemic descriptors
+improve the Brier score over calibrated persistence in 3 of 5 origins, by up to
+$0.18$ (Table~\ref{tab:exceed}). At municipal level the same design lifts
+discrimination from $0.50$ to $0.64$ AUC, though the Brier differentials fall to
+$0.002$ and no rung clears the pre-registered bar --- a ranking device rather than
+a level forecast. Where the question is posed as a magnitude, the answer is no,
+and the failure is orderly rather than mysterious.
 
 \subsection{Why the coupling explains both results}
 
@@ -1177,7 +1187,7 @@ the data, not of the estimator.
 
 Descriptively, that makes the pair a compact readout of seasonal magnitude: two
 numbers that move with the size of the season, vary far less than the case counts
-they summarise (SD $0.154$ against a sampling noise of $0.03$), and are available
+they summarise (SD $0.150$ against a sampling noise of $0.03$), and are available
 for every unit. This is a real contribution to how a season can be characterised
 --- it is a shrinkage of a two-order-of-magnitude quantity into a stable
 low-dimensional summary.
@@ -1278,10 +1288,19 @@ in Section~\ref{sec:coupling}. A rung containing the scaling descriptors
 interesting question --- whether three power-law parameters can substitute for the
 full covariate stack --- and is not reported here.
 
+\emph{The municipal classifier is a ranking device, not a level forecast.} With the
+exceedance label referred to each municipality's own history, the population-only
+reference falls to a median AUC of $0.47$, so the task no longer measures unit
+size; but discrimination reaches only $0.64$, no rung clears the pre-registered
+incremental test at that level, and the 2024 origin --- in which 69.5\% of units
+exceeded their own upper quartile against a training base rate of 26.4\% ---
+defeats every rung. The classifier orders municipalities within a season of
+familiar magnitude. It does not anticipate a regime change, and in a record year
+its probabilities should not be read as levels.
+
 \emph{Epidemic duration and peak timing are not scaling objects.} Both are
 bounded above by the length of a season, so a scale-free law cannot apply to them
-a priori, and the fits confirm it: the power law is rejected in 15 of 15 national
-duration cross-sections, with the estimated exponent piling up at $2.95$ against
+a priori, and the fits confirm it: the power law is rejected in 15 of 15 national duration cross-sections, with the estimated exponent piling up at $2.93$ against
 the estimator's ceiling of 3. A near-constant fitted exponent across independent
 cross-sections is not evidence of universality; it is evidence that the model is
 being asked the wrong question. For that reason we report duration and peak
@@ -1327,9 +1346,7 @@ parameter, fixed before the runs and reported with them.
 
 \emph{The exponent cannot exceed three.} The fitting routine bounds $\alpha$
 above by $3$, so a tail steeper than that is reported as $3$ rather than as its
-unconstrained maximum. For the size results this is immaterial, since no national
-size fit exceeds $2.27$; for durations it is not, and 11 of the 330 state-year
-fits sit at the bound. This does not weaken the conclusion that durations are not
+unconstrained maximum. For the size results this is immaterial, since no national size fit exceeds $2.25$; for durations it is not, and 12 of the 330 state-year fits sit at the bound. This does not weaken the conclusion that durations are not
 power-law distributed, but the numerical value of those particular exponents
 should not be read as an estimate.
 
@@ -1365,8 +1382,7 @@ intact --- and the exceedance statement is usually the one a health service need
 
 The distribution of dengue epidemic size in Brazil is heavy-tailed with an
 exponent close to two, and this is one of the few robust facts in the applied
-literature on epidemic scaling: 15 of 15 national cross-sections, 96\% of 330
-state-years, and a lower bound two to three orders of magnitude above the bulk.
+literature on epidemic scaling: 16 of 16 national cross-sections, 96\% of 353 state-years, and a lower bound two to three orders of magnitude above the bulk.
 Which of these statements a study reports, and whether it reports a power law or
 an exponential at all, is determined by the construction it imposes on the data;
 that heterogeneity is methodological before it is biological.
@@ -1377,7 +1393,8 @@ two-parameter risk specification, and it is well calibrated against the empirica
 frequency of large seasons over two decades of epidemic size. Posed as a
 probability --- will this municipality exceed its own upper quartile? --- the
 problem is tractable: lagged epidemic descriptors improve the Brier score over
-calibrated persistence in 3 of 5 forecast origins. Posed as a magnitude, it is
+calibrated persistence in 3 of 5 state-level origins, and lift municipal
+discrimination from $0.50$ to $0.64$ AUC. Posed as a magnitude, it is
 not: no rung achieves skill for size, and the scaling block specifically adds
 nothing (0 of 5) while degrading the upper quantile by a median $18\%$.
 

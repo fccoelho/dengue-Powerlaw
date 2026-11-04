@@ -1,0 +1,101 @@
+{
+  "level": "city",
+  "region": "BR",
+  "panel_rows": 21939,
+  "panel_units": 3976,
+  "origins": [
+    2021,
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "percentile": 0.75,
+  "threshold_scope": "per_unit",
+  "min_unit_years": 5,
+  "ladder": {
+    "M1": [
+      "prev_total_cases",
+      "prev_ep_dur",
+      "prev_peak_week",
+      "prev_R0",
+      "prev_log_pop"
+    ],
+    "M2": [
+      "prev_total_cases",
+      "prev_ep_dur",
+      "prev_peak_week",
+      "prev_R0",
+      "prev_log_pop",
+      "prev_avg_temp_Q1",
+      "prev_avg_temp_Q2",
+      "prev_avg_temp_Q3",
+      "prev_avg_temp_Q4",
+      "prev_avg_umid_Q1",
+      "prev_avg_umid_Q2",
+      "prev_avg_umid_Q3",
+      "prev_avg_umid_Q4"
+    ],
+    "M3": [
+      "prev_total_cases",
+      "prev_ep_dur",
+      "prev_peak_week",
+      "prev_R0",
+      "prev_log_pop",
+      "prev_avg_temp_Q1",
+      "prev_avg_temp_Q2",
+      "prev_avg_temp_Q3",
+      "prev_avg_temp_Q4",
+      "prev_avg_umid_Q1",
+      "prev_avg_umid_Q2",
+      "prev_avg_umid_Q3",
+      "prev_avg_umid_Q4",
+      "prev_alpha_size",
+      "prev_xmin_size",
+      "prev_alpha_trend"
+    ]
+  },
+  "unavailable_columns": {},
+  "climate": {
+    "block": [
+      "prev_avg_temp_Q1",
+      "prev_avg_temp_Q2",
+      "prev_avg_temp_Q3",
+      "prev_avg_temp_Q4",
+      "prev_avg_umid_Q1",
+      "prev_avg_umid_Q2",
+      "prev_avg_umid_Q3",
+      "prev_avg_umid_Q4"
+    ],
+    "available": [
+      "prev_avg_temp_Q1",
+      "prev_avg_temp_Q2",
+      "prev_avg_temp_Q3",
+      "prev_avg_temp_Q4",
+      "prev_avg_umid_Q1",
+      "prev_avg_umid_Q2",
+      "prev_avg_umid_Q3",
+      "prev_avg_umid_Q4"
+    ],
+    "missing": []
+  },
+  "panel_notes": [],
+  "max_iter": 300,
+  "seed": 42,
+  "importance_rungs": [
+    "M3"
+  ],
+  "n_repeats": 5,
+  "auc_gap_full_minus_population_only": 0.14813270614440227,
+  "files": {
+    "oof": "classifier_results.parquet",
+    "metrics": "classifier_results_metrics.csv",
+    "importance": "classifier_results_importance.csv"
+  },
+  "versions": {
+    "python": "3.12.11",
+    "pandas": "2.3.3",
+    "numpy": "2.5.4"
+  },
+  "elapsed_seconds": 136.5
+}

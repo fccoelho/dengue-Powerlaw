@@ -1,0 +1,103 @@
+{
+  "manifest_version": 1,
+  "written_utc": "2026-11-04T12:27:01+00:00",
+  "database": {
+    "path": "powerlaw_results.db",
+    "sha256": "2115c0f689f6c1f85c869217fee553f0fd70fc12aa8c8293eeb9702d2974f5f6",
+    "inventory": {
+      "city_stats": {
+        "rows": 5571,
+        "schema": "ceb31573ec7b5a5b",
+        "columns": [
+          "geocode",
+          "total_cases",
+          "population",
+          "incidence"
+        ]
+      },
+      "episcanner_fits": {
+        "rows": 33,
+        "schema": "9138888c1cf4f63b",
+        "columns": [
+          "metric",
+          "year",
+          "alpha",
+          "xmin",
+          "xmax",
+          "R",
+          "p"
+        ]
+      },
+      "episcanner_state_fits": {
+        "rows": 737,
+        "schema": "15ce0ccc6d02236f",
+        "columns": [
+          "state",
+          "metric",
+          "year",
+          "alpha",
+          "xmin",
+          "xmax",
+          "R",
+          "p"
+        ]
+      },
+      "powerlaw_fits": {
+        "rows": 5247,
+        "schema": "79a82f03c45d1165",
+        "columns": [
+          "geocode",
+          "city_name",
+          "alpha",
+          "xmin",
+          "xmax",
+          "R",
+          "p",
+          "start_date",
+          "end_date"
+        ]
+      },
+      "powerlaw_fits_total_cases": {
+        "rows": 1085,
+        "schema": "5d4309ce5fc58f72",
+        "columns": [
+          "geocode",
+          "city_name",
+          "alpha",
+          "xmin",
+          "xmax",
+          "R",
+          "p"
+        ]
+      },
+      "powerlaw_fits_yearly": {
+        "rows": 41635,
+        "schema": "c114855b3bd86308",
+        "columns": [
+          "geocode",
+          "city_name",
+          "year",
+          "alpha",
+          "xmin",
+          "xmax",
+          "R",
+          "p"
+        ]
+      }
+    }
+  },
+  "artifacts": {
+    "powerlaw_results.db": "2115c0f689f6c1f85c869217fee553f0fd70fc12aa8c8293eeb9702d2974f5f6",
+    "Manuscript/main.tex": "0fe341aab2ffcb51add8350c96dc4c90b6468e7fc34f0facf29497b11e070818",
+    "Manuscript/generated/facts.json": "e825eec95f6ae9980f1b1997d73944c1af6ea6dbdef2119eeadbd27d7d8a8888",
+    "Manuscript/generated/tab_main.tex": "33197cfb854989d5af1218503b2e546115e05008b7ccc79dbc63cdaa7155ef35",
+    "ablation_results.csv": "865fd8f3b7369d4b070529aed2570b0bb4aad16784f6c6a528432db480fd824c",
+    "ablation_results.meta.json": "0ddd15f6007d5897bbf5b353afb747e9438625813bfacc12ed3143c6c5fa5cb0",
+    "ablation_city.csv": "d1324bb793fd53095a1bce8b7542de3c90d86df65a99ed22642ba43c43a4ec96",
+    "ablation_city.meta.json": "94e8c6a6a26575d641cff951733b32a5b27686d409ddc5a1c149c4aff93c6d0f",
+    "classifier_results.parquet": "c05d22a681ef832e8032baf700289d40859cdaf7da51c752ef9ce4c3dd56b42d",
+    "classifier_results_metrics.csv": "3d7b8cb62a833a35322a0e434759826da2c81926d2546212cceae46f59fe01f7",
+    "classifier_results_importance.csv": "1d77e29f34ae1703e6891e9629c5a7bcc103bac4fbbc8244f8c82bc935fdbd57",
+    "classifier_results.meta.json": "a2f1d9c1cd3ec4c80b92c168d2f69be858611af93c4e3ddeadeee5e0e0956b5f"
+  }
+}

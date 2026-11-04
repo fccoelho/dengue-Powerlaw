@@ -35,7 +35,19 @@ test_powerlaw*.db
 # figure-generation panel cache
 Manuscript/figures/_panel_*.parquet
 
-# run_ablation.py outputs and its optional panel cache
-ablation_results.csv
-ablation_results.meta.json
+# run_ablation.py optional panel cache. The ablation *outputs*
+# (ablation_results.csv, ablation_city.csv and their .meta.json) are tracked:
+# snapshot_manifest.json hashes them, so a regeneration must show up in
+# `git status` instead of being hidden by an ignore rule.
 _ablation_panel*.parquet
+
+# Vendored JS deps and slide build output (restored by `npm ci` / `node compile.js`)
+node_modules/
+slides/output/
+
+# LaTeX structural aux (the PDFs stay tracked on purpose)
+*.fdb_latexmk
+*.fls
+*.nav
+*.snm
+*.vrb
