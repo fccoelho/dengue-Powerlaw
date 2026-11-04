@@ -876,12 +876,17 @@ def fig11(abl):
                              color=colors[tgt], alpha=0.12, lw=0,
                              label="range over origins")
     ax2.axhline(0, color="k", lw=0.9)
+    # a tiny L_M2 in one origin makes the relative change explode (to
+    # several hundred percent), squashing a linear axis; symlog keeps the
+    # region around zero linear and compresses the tails instead of
+    # hiding them
+    ax2.set_yscale("symlog", linthresh=50)
     ax2.axhspan(ax2.get_ylim()[0], 0, color="0.9", zorder=0)
     ax2.set_xlabel(r"quantile level $\tau$")
     ax2.set_ylabel(r"$100\,(L_{M2}-L_{M3})/L_{M2}$  (%)")
     ax2.set_title("(b) scaling block vs $\\tau$: negative = M3 worse",
                   fontsize=9)
-    ax2.legend(fontsize=7, loc="lower left")
+    ax2.legend(fontsize=7, loc="upper right")
 
     # the headline number, stated on the panel
     d95 = rel[(rel.target == "total_cases") & np.isclose(rel.tau, 0.95)]["rel"]
@@ -893,8 +898,8 @@ def fig11(abl):
             textcoords="axes fraction", fontsize=6.5,
             arrowprops=dict(arrowstyle="->", lw=0.7, color="0.3"),
             bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="0.7", lw=0.5))
-    ax2.text(0.02, 0.03, "no $\\tau$ meets the 3/5 criterion",
-             transform=ax2.transAxes, fontsize=6.5, color="0.35")
+    ax2.text(0.02, 0.97, "no $\\tau$ meets the 3/5 criterion",
+             transform=ax2.transAxes, fontsize=6.5, color="0.35", va="top")
 
     fig.tight_layout()
     fig.savefig(OUT / "fig11_ablation_skill.pdf", bbox_inches="tight")
