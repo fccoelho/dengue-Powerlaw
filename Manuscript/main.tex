@@ -20,40 +20,35 @@ large dengue epidemics in Brazil}
 
 \begin{abstract}
 Power-law tails are reported for dengue incidence and read as a verdict on
-forecastability: if the exponent is near two, extreme seasons cannot be
-anticipated. We argue the same fit supports a more useful conclusion --- the tail prices
-the risk --- and test it out of sample. Using weekly
-surveillance for the 5{,}571 Brazilian municipalities (2010--2026), we fitted
-discrete power laws by maximum likelihood with Kolmogorov--Smirnov
-$x_{\min}$ selection at seven nested aggregation levels (47{,}494 fits), tested
-each against an exponential by likelihood ratio, and evaluated the fitted pair
+forecastability: with an exponent near two, extreme seasons cannot be
+anticipated. We argue the fit supports a more useful conclusion --- the tail
+prices the risk --- and test that out of sample. On weekly surveillance for
+5{,}571 Brazilian municipalities (2010--2026) we fitted discrete power laws with
+Kolmogorov--Smirnov $x_{\min}$ selection at seven aggregation levels (47{,}494
+fits), compared each with an exponential by likelihood ratio, and evaluated
 $(\alpha,x_{\min})$ on a rolling-origin design.
 
-The construction decides the verdict --- median exponents span $1.95$ to $2.95$,
+The construction decides the verdict: median exponents span $1.95$ to $2.95$,
 and the same weekly counts support a power law in 75\% of municipalities pooled
-over a decade against 23\% when cut into single seasons --- but epidemic
-\emph{size} survives every construction that gives it a genuine tail:
-$\alpha=2.00$ in all 15 national cross-sections and 96\% of 330 state-years, with
-$x_{\min}$ two to three orders of magnitude above the bulk.
+over a decade against 23\% cut into single seasons. Epidemic size survives every
+construction with a genuine tail --- median $\alpha=2.00$ across 15 national
+cross-sections and $1.97$ across 330 state-years, with $x_{\min}$ orders of
+magnitude above the bulk.
 
 Because $\alpha\approx2$ fixes the whole exceedance curve, the pair is a
-two-parameter risk statement, and it is well calibrated: it reproduces the
-observed exceedance frequency over two decades, implying that 5.4--16.5\% of
-municipalities exceed ten times $x_{\min}$ in a year and 0.3--2.7\% a hundred
-times it. The exponent is also a readout of seasonal magnitude ---
-rank-correlated with $x_{\min}$ at $0.87$ nationally and $0.65$ within states, a
-coupling absent under simulation.
+two-parameter risk statement, and it is calibrated: it reproduces the observed
+exceedance frequency, implying that 5.4--16.5\% of municipalities exceed ten
+times $x_{\min}$ in a year and 0.3--2.7\% a hundred times it. The exponent is
+also a readout of seasonal magnitude, rank-correlated with $x_{\min}$ at $0.87$
+nationally and $0.65$ within states --- a coupling absent under simulation.
 
-Predictively, the exceedance question is the tractable one. At state level,
-lagged descriptors --- with duration and peak timing as ordinary covariates ---
-beat calibrated persistence on the Brier score in 3 of 5 origins, by up to
-$0.18$. At municipal level, with the label referred to each municipality's own
-history, AUC rises from $0.50$ to $0.64$, but no rung clears the pre-registered
-incremental test, and the scaling block contributes at most $+0.002$ Brier (4 of
-5 origins, no interval excluding zero). That block adds nothing to the size
-forecast and degrades its 95th percentile by a median $18\%$, because it
-re-encodes the lagged count. The tail is worth reporting --- as a risk curve, not
-as a predictor.
+Asked as exceedance, prediction is tractable. At state level, lagged descriptors
+--- duration and peak timing among them --- beat calibrated persistence on the
+Brier score in 3 of 5 origins. At municipal level, with the label referred to
+each municipality's own history, AUC rises from $0.50$ to $0.64$, though no rung
+clears the pre-registered incremental test: the scaling block adds a median
+$+0.002$ Brier and worsens the state-level 95th-percentile size forecast by
+18\%. The tail belongs in a risk curve, not a predictor.
 \end{abstract}
 
 \section{Introduction}
