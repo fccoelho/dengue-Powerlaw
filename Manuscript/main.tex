@@ -24,20 +24,19 @@ forecastability: with an exponent near two, extreme seasons cannot be
 anticipated. We argue the fit supports a more useful conclusion --- the tail
 prices the risk --- and test that out of sample. On weekly surveillance for
 5{,}571 Brazilian municipalities (2010--2026) we fitted discrete power laws with
-Kolmogorov--Smirnov $x_{\min}$ selection at seven aggregation levels (47{,}494
+Kolmogorov--Smirnov $x_{\min}$ selection at seven aggregation levels (48{,}681
 fits), compared each with an exponential by likelihood ratio, and evaluated
 $(\alpha,x_{\min})$ on a rolling-origin design.
 
-The construction decides the verdict: median exponents span $1.95$ to $2.95$,
+The construction decides the verdict: median exponents span $1.95$ to $2.93$,
 and the same weekly counts support a power law in 75\% of municipalities pooled
 over a decade against 23\% cut into single seasons. Epidemic size survives every
-construction with a genuine tail --- median $\alpha=2.00$ across 15 national
-cross-sections and $1.97$ across 330 state-years, with $x_{\min}$ orders of
+construction with a genuine tail --- median $\alpha=2.03$ across 16 national cross-sections and $1.98$ across 353 state-years, with $x_{\min}$ orders of
 magnitude above the bulk.
 
 Because $\alpha\approx2$ fixes the whole exceedance curve, the pair is a
 two-parameter risk statement, and it is calibrated: it reproduces the observed
-exceedance frequency, implying that 5.4--16.5\% of municipalities exceed ten
+exceedance frequency, implying that 5.6--16.6\% of municipalities exceed ten
 times $x_{\min}$ in a year and 0.3--2.7\% a hundred times it. The exponent is
 also a readout of seasonal magnitude, rank-correlated with $x_{\min}$ at $0.87$
 nationally and $0.65$ within states --- a coupling absent under simulation.
@@ -123,8 +122,7 @@ decision rule fixed in advance.
 \item \textbf{A robust exponent for epidemic size, with the diagnostic that
 makes it readable.} Across seven nested constructions on one dataset, epidemic
 size is the only one that gives a power law at every level without collapsing
-into the bulk: $\alpha=2.00$ in 15 of 15 national cross-sections and 96\% of 330
-state-years, with median $x_{\min}$ of 762 and 159 cases respectively. We report
+into the bulk: $\alpha=2.03$ in 16 of 16 national cross-sections and 96\% of 353 state-years, with median $x_{\min}$ of 730 and 169 cases respectively. We report
 $x_{\min}$ beside every exponent, which is what separates the fits that describe
 a tail from the fits that describe the data.
 
@@ -260,10 +258,9 @@ the optimiser's default parameter range is $3$, so an estimate cannot exceed it
 and a sample whose likelihood is maximised beyond that value returns $\alpha=3$
 rather than its unconstrained maximum. The bound is immaterial where the fitted
 exponents lie well inside the range. At the cross-sectional size levels the
-largest value is $2.99$ (L4) and $2.27$ (L6); at the two weekly levels it is
+largest value is $2.95$ (L4) and $2.25$ (L6); at the two weekly levels it is
 reached by 2 and 5 fits respectively, under $0.05\%$ of each. It binds
-materially only for durations, where the upper quartile of the 330 state-year
-fits lies above $2.92$ and 11 of them ($3.3\%$) sit at the ceiling. Those fits
+materially only for durations, where the upper quartile of the 330 state-year fits lies above $2.92$ and 12 of them ($3.6\%$) sit at the ceiling. Those fits
 should be read as \emph{at least} $3$, not as $3$, and a genuinely scale-free
 body would not systematically exhaust the upper bound of the estimator.
 
@@ -329,14 +326,13 @@ First, the exponent summarises \emph{risk} rather than \emph{activity}. Two
 municipalities with the same expected annual incidence but different $\alpha$
 face different probabilities of a catastrophic season, and that difference is
 invisible to the mean. The fitted models quantify the claim rather than merely
-asserting it: using the 15 national size fits, they imply that between 5.4\%
-and 16.5\% of municipalities exceed ten times $x_{\min}$ in a given year, and
+asserting it: using the 16 national size fits, they imply that between 5.6\% and 16.6\% of municipalities exceed ten times $x_{\min}$ in a given year, and
 between 0.3\% and 2.7\% exceed one hundred times $x_{\min}$. Those are
 falsifiable implications of the description, and Figure~\ref{fig:exceed}
 confronts them with the empirical exceedance frequencies.
 
 Second, $\alpha$ is a low-variance quantity \emph{relative to its target}.
-Across the national cross-sections it takes values between 1.78 and 2.27, and it
+Across the national cross-sections it takes values between $1.78$ and $2.25$, and it
 is essentially unrelated to city size ($r=-0.065$). Annual case counts over the
 same period vary by two orders of magnitude. The dispersion of $\hat\alpha$ is
 not zero --- it exceeds sampling noise by about a factor of five in standard
@@ -622,7 +618,7 @@ can confirm or contradict each figure with a single SQL statement.
 \section{Results}
 \label{sec:results}
 
-Table~\ref{tab:main} summarises the 47{,}494 fits across the seven aggregation
+Table~\ref{tab:main} summarises the 48{,}681 fits across the seven aggregation
 levels. We read it in the order of the questions above: what the exponent is an
 exponent of, what the fitted pair buys as a risk statement, and what it adds to a
 forecast. Figure~\ref{fig:alpha} shows the estimator's output at each level,
@@ -634,38 +630,13 @@ that are not.
 \label{sec:verdicts}
 
 One estimator, one body of surveillance data, seven ways of cutting it, and
-verdicts ranging from unanimous support for a power law (L6, 15 of 15 years) to
+verdicts ranging from unanimous support for a power law (L6, 16 of 16 years) to
 unanimous rejection in favour of an exponential (L7). Median exponents span
-$1.95$ to $2.95$ and selected lower bounds run from a single case to about
+$1.95$ to $2.93$ and selected lower bounds run from a single case to about
 $1.5\times10^{5}$, five orders of magnitude. Nothing distinguished the analyses
 except the construction.
 
-\begin{table}[htbp]
-\centering
-\small
-\setlength{\tabcolsep}{3.5pt}
-\caption{Power-law fits by aggregation level. $\alpha$ median with
-interquartile range; $x_{\min}$ median; PL$_{\text{pref}}$ = proportion with
-$R>0$; PL$_{\text{sig}}$ = proportion with $R>0$ and $p<0.05$;
-Exp$_{\text{sig}}$ = proportion with $R<0$ and $p<0.05$. Shares are
-percentages. The levels that survive the $x_{\min}$ diagnostic \emph{and} the
-model comparison are the cross-sectional size constructions L4 and L6, which are
-the object of the rest of the paper.}
-\label{tab:main}
-\begin{tabular}{@{}lrrrrrrr@{}}
-\toprule
-Level & $n$ & $\alpha$ & IQR & $x_{\min}$ & PL$_{\text{pref}}$ & PL$_{\text{sig}}$ & Exp$_{\text{sig}}$\\
-\midrule
-L1 weekly, city            & 5{,}244  & 1.95 & 1.72--2.29 & 2   & 75 & 45 & 4\\
-L2 weekly, city-year       & 40{,}616 & 2.06 & 1.72--2.45 & 2   & 23 & 3  & 21\\
-L3 annual total, city      & 944      & 2.09 & 1.80--2.46 & 341 & 51 & 4  & 4\\
-L4 size, state-year        & 330      & 1.97 & 1.79--2.14 & 159 & 96 & 52 & 0\\
-L5 duration, state-year    & 330      & 2.80 & 2.52--2.92 & 17  & 0  & 0  & 95\\
-L6 size, national-year     & 15       & 2.00 & 1.92--2.11 & 762 & 100& 100& 0\\
-L7 duration, national-year & 15       & 2.95 & 2.90--2.96 & 18  & 0  & 0  & 100\\
-\bottomrule
-\end{tabular}
-\end{table}
+\input{generated/tab_main}
 
 \begin{figure}[htbp]
 \centering
@@ -751,13 +722,10 @@ significantly favouring the exponential rises from 4\% to 21\%.}
 The construction that survives both tests is the one that matters
 operationally: the distribution of epidemic \emph{size} across units within a
 year. At the national cross-section (L6) all 15 annual fits favour the power law
-and all are significant, with $\alpha=2.00$ (IQR 1.92--2.11) and $x_{\min}=762$
-cases. The exponent is remarkably stable, ranging only from 1.78 to 2.27 over
-fifteen years, in a period in which annual case counts vary by two orders of
+and all are significant, with $\alpha=2.03$ (IQR 1.90--2.10) and $x_{\min}=730$ cases. The exponent is remarkably stable, ranging only from 1.78 to 2.25 over sixteen years, in a period in which annual case counts vary by two orders of
 magnitude. At state level (L4) the picture is consistent but weaker in
 significance, as expected from smaller cross-sections: the power law is preferred
-in 96\% of the 330 state-year fits, significant in 52\%, with median
-$\alpha=1.97$ and median $x_{\min}=159$ cases.
+in 96\% of the 353 state-year fits, significant in 52\%, with median $\alpha=1.98$ and median $x_{\min}=159$ cases.
 
 This is the object the rest of the paper works with, and it is worth being
 precise about why. The median lower bound of 762 cases at national level and 159
@@ -819,8 +787,7 @@ significantly positive in 67\% --- but weak between states. It is therefore a
 within-unit, over-time relationship, not a contrast between places. The control
 recovers no such association, so the estimator does not manufacture it: it places
 the sampling dispersion of $\hat\alpha$ at $0.03$ (40 replicates, samples of
-800--4{,}000 points, true exponent fixed at $2.0$), against an observed standard
-deviation of $0.154$ across the 15 national fits. The year-to-year movement in
+800--4{,}000 points, true exponent fixed at $2.0$), against an observed standard deviation of $0.150$ across the 16 national fits. The year-to-year movement in
 $\alpha$ is real, roughly five times the sampling noise in standard deviation,
 even though it remains small next to the variation in the case counts themselves.
 
@@ -869,7 +836,7 @@ available from the current cross-section alone.
 Figure~\ref{fig:exceed} confronts the exceedance curve implied by each national
 fit with the empirical exceedance frequency of the same cross-section. The
 agreement holds over roughly two decades of epidemic size. Numerically, the 15
-national fits imply that between 5.4\% and 16.5\% of municipalities exceed ten
+national fits imply that between 5.6\% and 16.6\% of municipalities exceed ten
 times $x_{\min}$ in a given year, and between 0.3\% and 2.7\% exceed a hundred
 times it. Those are statements a surveillance service can act on and a
 subsequent season can falsify.
@@ -1160,7 +1127,7 @@ colour scale for the rest.}
 
 The seven-level comparison settles a question that the applied literature has
 treated as empirical when it is largely definitional. Median exponents span
-$1.95$ to $2.95$, unanimous support for a power law at one level coexists with
+$1.95$ to $2.93$, unanimous support for a power law at one level coexists with
 unanimous rejection at another, and a single change of temporal window moves
 support from 75\% to 23\% with no transmission parameter altered. The step that
 does not survive is the inference from an exponent to a regime: the step that
@@ -1170,8 +1137,7 @@ model})$.
 
 But the same comparison identifies which construction \emph{does} carry a stable
 tail. Epidemic size across units within a year is power-law at every level where
-$x_{\min}$ lies above the bulk: $\alpha=2.00$ in 15 of 15 national
-cross-sections, 96\% support across 330 state-years, and a lower bound in the
+$x_{\min}$ lies above the bulk: $\alpha=2.03$ in 16 of 16 national cross-sections, 96\% support across 353 state-years, and a lower bound in the
 hundreds of cases, two to three orders of magnitude above the body of the
 distribution. That is not a fragile result, and it is the one worth building on.
 The distinction between this and the weekly-count fits that collapse to
@@ -1193,8 +1159,7 @@ epidemics are unforecastable.
 
 Read as a risk specification, the fitted pair performs well and cheaply.
 Two parameters reproduce the empirical exceedance frequency over two decades of
-epidemic size (Figure~\ref{fig:exceed}), and they imply that between 5.4\% and
-16.5\% of municipalities exceed ten times $x_{\min}$ in a given year against
+epidemic size (Figure~\ref{fig:exceed}), and they imply that between 5.6\% and 16.6\% of municipalities exceed ten times $x_{\min}$ in a given year against
 0.3--2.7\% exceeding a hundred times it. No covariate, no training period and no
 fitted case count is involved: the statement is available from the current
 cross-section, for every municipality, including those that have never
@@ -1222,7 +1187,7 @@ the data, not of the estimator.
 
 Descriptively, that makes the pair a compact readout of seasonal magnitude: two
 numbers that move with the size of the season, vary far less than the case counts
-they summarise (SD $0.154$ against a sampling noise of $0.03$), and are available
+they summarise (SD $0.150$ against a sampling noise of $0.03$), and are available
 for every unit. This is a real contribution to how a season can be characterised
 --- it is a shrinkage of a two-order-of-magnitude quantity into a stable
 low-dimensional summary.
@@ -1335,8 +1300,7 @@ its probabilities should not be read as levels.
 
 \emph{Epidemic duration and peak timing are not scaling objects.} Both are
 bounded above by the length of a season, so a scale-free law cannot apply to them
-a priori, and the fits confirm it: the power law is rejected in 15 of 15 national
-duration cross-sections, with the estimated exponent piling up at $2.95$ against
+a priori, and the fits confirm it: the power law is rejected in 15 of 15 national duration cross-sections, with the estimated exponent piling up at $2.93$ against
 the estimator's ceiling of 3. A near-constant fitted exponent across independent
 cross-sections is not evidence of universality; it is evidence that the model is
 being asked the wrong question. For that reason we report duration and peak
@@ -1382,9 +1346,7 @@ parameter, fixed before the runs and reported with them.
 
 \emph{The exponent cannot exceed three.} The fitting routine bounds $\alpha$
 above by $3$, so a tail steeper than that is reported as $3$ rather than as its
-unconstrained maximum. For the size results this is immaterial, since no national
-size fit exceeds $2.27$; for durations it is not, and 11 of the 330 state-year
-fits sit at the bound. This does not weaken the conclusion that durations are not
+unconstrained maximum. For the size results this is immaterial, since no national size fit exceeds $2.25$; for durations it is not, and 12 of the 330 state-year fits sit at the bound. This does not weaken the conclusion that durations are not
 power-law distributed, but the numerical value of those particular exponents
 should not be read as an estimate.
 
@@ -1420,8 +1382,7 @@ intact --- and the exceedance statement is usually the one a health service need
 
 The distribution of dengue epidemic size in Brazil is heavy-tailed with an
 exponent close to two, and this is one of the few robust facts in the applied
-literature on epidemic scaling: 15 of 15 national cross-sections, 96\% of 330
-state-years, and a lower bound two to three orders of magnitude above the bulk.
+literature on epidemic scaling: 16 of 16 national cross-sections, 96\% of 353 state-years, and a lower bound two to three orders of magnitude above the bulk.
 Which of these statements a study reports, and whether it reports a power law or
 an exponential at all, is determined by the construction it imposes on the data;
 that heterogeneity is methodological before it is biological.

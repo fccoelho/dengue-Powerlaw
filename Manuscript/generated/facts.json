@@ -1,0 +1,132 @@
+{
+  "alpha_span_levels": [
+    1.95,
+    2.93
+  ],
+  "duration_ceiling": {
+    "at_ceiling": 12,
+    "n": 330,
+    "pct": 3.6
+  },
+  "exceedance_pct": {
+    "10": [
+      5.6,
+      16.6
+    ],
+    "100": [
+      0.3,
+      2.7
+    ],
+    "1000": [
+      0.0,
+      0.5
+    ]
+  },
+  "levels": {
+    "L1": {
+      "alpha": 1.95,
+      "exp_sig": 4,
+      "iqr_high": 2.29,
+      "iqr_low": 1.73,
+      "label": "L1 weekly, city",
+      "n": 5247,
+      "pl_pref": 75,
+      "pl_sig": 45,
+      "xmin": 2,
+      "xmin_max": 815
+    },
+    "L2": {
+      "alpha": 2.07,
+      "exp_sig": 21,
+      "iqr_high": 2.46,
+      "iqr_low": 1.72,
+      "label": "L2 weekly, city-year",
+      "n": 41635,
+      "pl_pref": 23,
+      "pl_sig": 3,
+      "xmin": 2,
+      "xmin_max": 1876
+    },
+    "L3": {
+      "alpha": 2.08,
+      "exp_sig": 3,
+      "iqr_high": 2.49,
+      "iqr_low": 1.81,
+      "label": "L3 annual total, city",
+      "n": 1085,
+      "pl_pref": 52,
+      "pl_sig": 4,
+      "xmin": 300,
+      "xmin_max": 40738
+    },
+    "L4": {
+      "alpha": 1.98,
+      "exp_sig": 0,
+      "iqr_high": 2.15,
+      "iqr_low": 1.8,
+      "label": "L4 size, state-year",
+      "n": 353,
+      "pl_pref": 96,
+      "pl_sig": 52,
+      "xmin": 169,
+      "xmin_max": 8628
+    },
+    "L5": {
+      "alpha": 2.8,
+      "exp_sig": 96,
+      "iqr_high": 2.92,
+      "iqr_low": 2.51,
+      "label": "L5 duration, state-year",
+      "n": 330,
+      "pl_pref": 0,
+      "pl_sig": 0,
+      "xmin": 17,
+      "xmin_max": 28
+    },
+    "L6": {
+      "alpha": 2.03,
+      "exp_sig": 0,
+      "iqr_high": 2.1,
+      "iqr_low": 1.9,
+      "label": "L6 size, national-year",
+      "n": 16,
+      "pl_pref": 100,
+      "pl_sig": 100,
+      "xmin": 730,
+      "xmin_max": 7753
+    },
+    "L7": {
+      "alpha": 2.93,
+      "exp_sig": 100,
+      "iqr_high": 2.94,
+      "iqr_low": 2.91,
+      "label": "L7 duration, national-year",
+      "n": 15,
+      "pl_pref": 0,
+      "pl_sig": 0,
+      "xmin": 18,
+      "xmin_max": 22
+    }
+  },
+  "national": {
+    "alpha": 2.03,
+    "alpha_max": 2.25,
+    "alpha_min": 1.78,
+    "alpha_sd": 0.15,
+    "n": 16,
+    "xmin": 730
+  },
+  "source_db": "powerlaw_results.db",
+  "state": {
+    "alpha": 1.98,
+    "n": 353,
+    "pl_pref": 96,
+    "xmin": 169
+  },
+  "total_fits": 48681,
+  "warnings": [],
+  "xmin_span_levels": [
+    2,
+    730
+  ]
+}
