@@ -54,3 +54,4 @@ slides/output/
 
 # chain run logs
 logs/
+powerlaw_results.db.bak*
