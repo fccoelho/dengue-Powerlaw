@@ -1,7 +1,8 @@
 {
+  "classifier_model": "logistic",
   "level": "city",
   "region": "BR",
-  "panel_rows": 21939,
+  "panel_rows": 21943,
   "panel_units": 3976,
   "origins": [
     2021,
@@ -86,7 +87,7 @@
     "M3"
   ],
   "n_repeats": 5,
-  "auc_gap_full_minus_population_only": 0.14813270614440227,
+  "auc_gap_full_minus_population_only": 0.14944929859054534,
   "files": {
     "oof": "classifier_results.parquet",
     "metrics": "classifier_results_metrics.csv",
@@ -97,5 +98,5 @@
     "pandas": "2.3.3",
     "numpy": "2.5.4"
   },
-  "elapsed_seconds": 136.5
+  "elapsed_seconds": 151.0
 }

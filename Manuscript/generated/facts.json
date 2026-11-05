@@ -20,23 +20,23 @@
   "levels": {
     "L1": {
       "alpha": 1.95,
-      "exp_sig": 4,
+      "exp_sig": 3,
       "iqr_high": 2.29,
-      "iqr_low": 1.73,
+      "iqr_low": 1.75,
       "label": "L1 weekly, city",
-      "n": 5247,
-      "pl_pref": 75,
-      "pl_sig": 45,
+      "n": 5264,
+      "pl_pref": 77,
+      "pl_sig": 47,
       "xmin": 2,
-      "xmin_max": 815
+      "xmin_max": 816
     },
     "L2": {
       "alpha": 2.07,
-      "exp_sig": 21,
+      "exp_sig": 22,
       "iqr_high": 2.46,
-      "iqr_low": 1.72,
+      "iqr_low": 1.73,
       "label": "L2 weekly, city-year",
-      "n": 41635,
+      "n": 43673,
       "pl_pref": 23,
       "pl_sig": 3,
       "xmin": 2,
@@ -94,7 +94,7 @@
     "pl_pref": 96,
     "xmin": 169
   },
-  "total_fits": 48336,
+  "total_fits": 50391,
   "warnings": [],
   "xmin_extremes": {
     "max": 40738,

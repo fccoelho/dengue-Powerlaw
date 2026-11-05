@@ -161,6 +161,6 @@
     "numpy": "2.5.4",
     "sklearn": "1.9.1"
   },
-  "elapsed_seconds": 101.2,
+  "elapsed_seconds": 107.9,
   "output": "/mnt/Datos/MEGAsync/Papers/2026-PowerLaw/dengue-Powerlaw/ablation_results.csv"
 }

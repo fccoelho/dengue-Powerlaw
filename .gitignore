@@ -51,3 +51,6 @@ slides/output/
 *.nav
 *.snm
 *.vrb
+
+# chain run logs
+logs/
