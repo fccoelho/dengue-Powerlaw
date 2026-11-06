@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "written_utc": "2026-11-06T17:45:29+00:00",
+  "written_utc": "2026-11-06T18:20:48+00:00",
   "database": {
     "path": "powerlaw_results.db",
     "sha256": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
@@ -88,12 +88,12 @@
   },
   "artifacts": {
     "powerlaw_results.db": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
-    "Manuscript/main.tex": "bdc7cc45bb96d488965d9ea089a82158f068f0ed69732b4602f03bb0d0e1251e",
-    "Manuscript/generated/facts.json": "8b863f367414b77e49af2eff84813c645180880ab7b60816cd81840c977aff25",
+    "Manuscript/main.tex": "82b617481ff90ac3f1367d018e07832ba12ca057228a1029b9ae436e74c4ccd9",
+    "Manuscript/generated/facts.json": "4d6423577dd455cc5971d9a020f5c05dd259f274b91a796c9911cbdfc94fdd7b",
     "Manuscript/generated/tab_main.tex": "35f0085ee7e72e792c28da58fffd90ec7b30a503f872b2ca8b730d6db6517325",
     "Manuscript/generated/tab_ablation.tex": "7c097d99a734210bfedc85bf8d0ce98831edd2955a43cfa2c04828da25a8e52c",
     "Manuscript/generated/tab_exceed.tex": "a45c528190a77e49ee1ea944a6ec5d410f34b7c226f6b0099683c55852e82738",
-    "Manuscript/generated/ablation_facts.json": "62b95b81c70bbc53c1dae761b8e62f7860acaf0023852430378ae2ad61a79f51",
+    "Manuscript/generated/ablation_facts.json": "558509ce5b5fd6869dcfd852c0a15d674d75fbf3dc3cf06454570bb6d0bf45b2",
     "ablation_results.csv": "c3a78574e5cba0ab1c8c6a358032865421616cf8259075cb4d5db34f9ae0bbbc",
     "ablation_results.meta.json": "bac62addf7f21795a39566ff5286c5ab73b2867f74245e80f485e499d5e5cf09",
     "ablation_city.csv": "55578e2ecdc789bcbe03feb21724aacba52cff9763f93e43710e045a565632ea",

@@ -27,8 +27,8 @@ DB_DEFAULT = "powerlaw_results.db"
 GEN_DIR = os.path.join("Manuscript", "generated")
 
 #: ``year = 0`` rows are pooled all-years fits, not a calendar year. Including
-#: them inflates every per-year level by one row per unit (27 states). The
-#: authors' own reported counts (330 state-years, 15 national years) only
+#: them inflates every per-year level by one row per unit (26 states). The
+#: year counts the manuscript reports (353 state-years, 16 national years) only
 #: reproduce with them excluded, so that is the convention used here.
 #: Every level fits the *same* variable class -- epidemic size, at five
 #: different constructions. The duration constructions (the former L5 and L7)
@@ -69,6 +69,93 @@ def _sci(value: float) -> str:
     return f"${mantissa}\\times10^{{{k}}}$"
 
 
+def _exceedance_pct(nat) -> dict:
+    """Exceedance percentages implied by each national fit, via Equation (2)."""
+    from scipy.special import zeta as hurwitz
+
+    out = {}
+    for k in (10, 100, 1000):
+        vals = [
+            100.0 * float(hurwitz(a, k * x) / hurwitz(a, x))
+            for a, x in zip(nat["alpha"].astype(float), nat["xmin"].astype(float))
+        ]
+        out[str(k)] = [round(min(vals), 1), round(max(vals), 1)]
+    return out
+
+
+def _coupling(con) -> dict:
+    """Rank association between the two fitted parameters (Table 4).
+
+    Computed rather than typed: these are the numbers that moved when the
+    extraction was refreshed, and Table 4 had no artefact tying it to the
+    database at all.
+    """
+    import numpy as np
+    import pandas as pd
+    from scipy.stats import spearmanr
+
+    def _rho(a, b) -> float:
+        return float(spearmanr(np.asarray(a, float), np.asarray(b, float)).statistic)
+
+    nat = pd.read_sql(SQL_BY_KEY["L6"], con).dropna(subset=["alpha", "xmin"])
+    st = pd.read_sql(SQL_BY_KEY["L4"], con).dropna(subset=["alpha", "xmin"])
+
+    per_rho, per_p = [], []
+    for _state, g in st.groupby("state"):
+        # A rank correlation needs a handful of points; states with fewer than
+        # six seasons are dropped rather than reported as if they were stable.
+        if len(g) < 6:
+            continue
+        r = spearmanr(g["alpha"].astype(float),
+                      np.log10(g["xmin"].astype(float)))
+        per_rho.append(float(r.statistic))
+        per_p.append(float(r.pvalue))
+    per_rho = np.asarray(per_rho, float)
+    per_p = np.asarray(per_p, float)
+
+    means = pd.DataFrame({
+        "alpha": st.groupby("state")["alpha"].mean(),
+        "lx": np.log10(st.groupby("state")["xmin"].mean()),
+    })
+
+    return {
+        "national": {
+            "rho": round(_rho(nat["alpha"], np.log10(nat["xmin"])), 2),
+            "n": int(len(nat)),
+        },
+        "within_state": {
+            "median_rho": round(float(np.median(per_rho)), 2),
+            "n_states": int(len(per_rho)),
+            "min_years": 6,
+            "pct_positive": int(round(100 * float((per_rho > 0).mean()))),
+            "pct_sig_positive": int(
+                round(100 * float(((per_rho > 0) & (per_p < 0.05)).mean()))),
+        },
+        "between_state": {
+            "rho": round(_rho(means["alpha"], means["lx"]), 2),
+            "n": int(len(means)),
+        },
+    }
+
+
+def _size_correlation(con, column: str) -> dict:
+    """Pearson/Spearman of alpha against a municipal covariate (Section 5.3)."""
+    import numpy as np
+    import pandas as pd
+
+    d = pd.read_sql(
+        "SELECT f.alpha AS alpha, c." + column + " AS x "
+        "FROM powerlaw_fits f JOIN city_stats c USING (geocode) "
+        "WHERE c.population > 0", con).dropna()
+    d["x"] = np.log10(d["x"].astype(float)) if column == "population" \
+        else d["x"].astype(float)
+    return {
+        "pearson": round(float(d["x"].corr(d["alpha"])), 3),
+        "spearman": round(float(d["x"].corr(d["alpha"], method="spearman")), 3),
+        "n": int(len(d)),
+    }
+
+
 def compute_facts(db_path: str = DB_DEFAULT) -> dict:
     """Every quantity the manuscript states about the fits."""
     import pandas as pd
@@ -99,11 +186,14 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
     st = pd.read_sql(SQL_BY_KEY["L4"], con).dropna(subset=["alpha", "xmin"])
     a_lo, a_hi = float(nat["alpha"].min()), float(nat["alpha"].max())
 
-    # Exceedance above k*x_min for a Pareto tail: P(X > k x_min) = k^-(alpha-1).
-    # Evaluated at the two extremes of the national exponent, which is the
-    # range the manuscript quotes.
-    exceed = {str(k): [round(100 * k ** -(a_hi - 1), 1), round(100 * k ** -(a_lo - 1), 1)]
-              for k in (10, 100, 1000)}
+    # Exceedance above k*x_min, from Equation (2) of the manuscript:
+    #     P(S >= s) = zeta(alpha, s) / zeta(alpha, x_min),  s = k * x_min
+    # with zeta the Hurwitz (generalised) zeta function -- the same expression
+    # fig09 plots. The continuous Pareto limit k^-(alpha-1) was used here
+    # before and disagrees in the first decimal for the small national lower
+    # bounds (16.6\% against 16.5\% at ten times x_min), which put the
+    # generated facts at odds with the paper's own equation.
+    exceed = _exceedance_pct(nat)
 
     alphas = [d["alpha"] for d in levels.values()]
     xmins = [d["xmin"] for d in levels.values()]
@@ -145,6 +235,11 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
         "alpha_span_levels": [min(alphas), max(alphas)],
         "xmin_span_levels": [min(xmins), max(xmins)],
         "exceedance_pct": exceed,
+        "coupling": _coupling(con),
+        "correlations": {
+            "population": _size_correlation(con, "population"),
+            "incidence": _size_correlation(con, "incidence"),
+        },
         "warnings": warnings,
     }
 
@@ -194,6 +289,7 @@ def claims(f: dict) -> list[dict]:
         f["levels"], f["national"], f["state"], f["exceedance_pct"],
         f["xmin_extremes"],
     )
+    C, R = f["coupling"], f["correlations"]
     return [
         {"name": "total fits", "want": _fmt(f["total_fits"]),
          "stale": ["47{,}494", "47,494", "48{,}681", "48,681"], "count": 2},
@@ -218,7 +314,7 @@ def claims(f: dict) -> list[dict]:
          "stale": ["$1.95$ to $2.95$", "$1.95$ to $2.93$"]},
         {"name": "exceedance 10x",
          "want": f"{E['10'][0]}--{E['10'][1]}\\%",
-         "stale": ["5.4--16.5\\%"]},
+         "stale": ["5.4--16.5\\%", "5.6--16.6\\%"]},
         {"name": "exceedance 100x",
          "want": f"{E['100'][0]}--{E['100'][1]}\\%",
          "stale": ["0.3--2.6\\%"]},
@@ -251,6 +347,35 @@ def claims(f: dict) -> list[dict]:
         {"name": "share of weekly fits at xmin<=5 (L2)",
          "want": f"{f['xmin_le5_pct']['L2']:.0f}\\% of L2",
          "stale": ["82\\% of L2"]},
+        # Table 4 and the coupling paragraph. Every entry here is a number a
+        # reader could check, and none of them existed as an artefact before.
+        {"name": "coupling rho, national",
+         "want": f"at ${C['national']['rho']:.2f}$ nationally",
+         "stale": ["at $0.87$ nationally"]},
+        {"name": "coupling rho, within state",
+         "want": f"${C['within_state']['median_rho']:.2f}$ "
+                 f"(median over {C['within_state']['n_states']} states)",
+         "stale": ["$0.65$ (median over"]},
+        {"name": "coupling rho, between states",
+         "want": f"& ${C['between_state']['rho']:.2f}$ & "
+                 f"{C['between_state']['n']}",
+         "stale": ["& $0.22$ & 26"]},
+        {"name": "share of states with a positive within-state rho",
+         "want": f"positive in {C['within_state']['pct_positive']}\\% of the "
+                 f"{C['within_state']['n_states']} states",
+         "stale": ["positive in 88\\% of the 24 states"]},
+        {"name": "alpha vs city size",
+         "want": f"Pearson $r={R['population']['pearson']:.3f}$, "
+                 f"Spearman ${R['population']['spearman']:.3f}$",
+         "stale": ["Pearson $r=-0.065$"]},
+        {"name": "alpha vs city size, n",
+         "want": f"$n={_fmt(R['population']['n'])}$",
+         "stale": ["$n=5{,}244$"]},
+        {"name": "alpha vs incidence",
+         "want": f"Pearson ${R['incidence']['pearson']:.3f}$, "
+                 f"Spearman ${R['incidence']['spearman']:.3f}$; "
+                 f"$n={_fmt(R['incidence']['n'])}$",
+         "stale": ["Pearson $-0.136$"]},
     ]
 
 
