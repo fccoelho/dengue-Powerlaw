@@ -34,9 +34,11 @@ table it illustrates, and once did.
 | `powerlaw_results.db` | `update_data.py` | everything below |
 | `city_stats` table | `aggregate_city_stats.py` | `generate_figures.py`, dashboard |
 | `Manuscript/generated/tab_main.tex`, `facts.json` | `make_tables.py` | `main.tex` (Table 1) |
-| `ablation_results.csv` + `.meta.json` | `run_ablation.py --level state` | Table 4, Figure 11 |
-| `ablation_city.csv` + `.meta.json` | `run_ablation.py --level city` | Table 5, Figure 11 |
-| `classifier_results.{parquet,metrics.csv,importance.csv,meta.json}` | `run_classifier.py` | Figures 12, 13 |
+| `Manuscript/generated/tab_ablation.tex`, `tab_exceed.tex`, `ablation_facts.json` | `make_ablation_tables.py` | `main.tex` (ablation + classifier tables) |
+| `ablation_results.csv` + `.meta.json` | `run_ablation.py --level state` | `tab_ablation.tex`, Figure 11 |
+| `ablation_state_exceedance.csv` + `.meta.json` | `run_ablation.py --level state --tasks exceedance` | `tab_exceed.tex` (state block) |
+| `ablation_city.csv` + `.meta.json` | `run_ablation.py --level city --tasks exceedance --output ablation_city.csv` | `tab_exceed.tex` (municipal block) |
+| `classifier_results.{parquet,metrics.csv,importance.csv,meta.json}` | `run_classifier.py` | Figures 12, 13, `tab_exceed.tex` fallback |
 | `Manuscript/figures/fig*.png` / `.pdf` | `Manuscript/figures/generate_figures.py` | `main.tex` |
 | `snapshot_manifest.json` | `provenance.py --write` | `verify_snapshot.py` |
 
@@ -54,37 +56,49 @@ python update_data.py
 # 2. rebuild the population/case join table used by figures and dashboard
 python aggregate_city_stats.py
 
-# 3. ablation ladder - state level (Table 4, Figure 11 right-hand context)
+# 3. ablation ladder - state level, size (Table 3, Figure 11)
 python run_ablation.py                     # --dry-run first to see the plan
 
-# 4. ablation ladder - municipality level (Table 5, Figure 11)
-python run_ablation.py --level city --tasks exceedance
+# 4. ablation ladder - state level, exceedance classifier (Table 4, state block)
+python run_ablation.py --level state --tasks exceedance \
+    --output ablation_state_exceedance.csv
 
-# 5. out-of-fold rarity classifier (Figures 12 and 13)
+# 5. ablation ladder - municipality level, exceedance (Table 4, municipal block)
+python run_ablation.py --level city --tasks exceedance --output ablation_city.csv
+
+# 6. out-of-fold rarity classifier (Figures 12 and 13)
 python run_classifier.py --level city
 
-# 6. regenerate Table 1 and the derived facts from the database
+# 7. regenerate Table 1 and the derived facts from the database
 python make_tables.py
 
-# 7. regenerate every figure (or a subset: ... 2 4 6)
+# 8. regenerate the ablation and classifier tables from the artefacts
+python make_ablation_tables.py
+
+# 9. regenerate every figure (or a subset: ... 2 4 6)
 python Manuscript/figures/generate_figures.py
 
-# 8. freeze the new state as THE snapshot
+# 10. freeze the new state as THE snapshot
 python provenance.py --write
 
-# 9. prove the repository is internally consistent
+# 11. prove the repository is internally consistent
 python verify_snapshot.py
 ```
 
-Step 9 must exit `0` before the PDF is rebuilt:
+Step 11 must exit `0` before the PDF is rebuilt:
 
 ```bash
 cd Manuscript && pdflatex main && bibtex main && pdflatex main && pdflatex main
 ```
 
-A partial refresh is fine as long as it is followed by steps 6--9: the
+A partial refresh is fine as long as it is followed by steps 7--11: the
 artefacts are hashed, so a stale table is a hard error rather than a subtle
 one.
+
+`verify_snapshot.py` failing is normal right after a partial run and is the
+point of steps 8 and 11: it names the artefact that is behind. If it reports
+a number as *unverifiable*, the artefact that should back it does not exist --
+run the command in the message rather than editing the prose.
 
 ### Snapshot invariants
 
@@ -129,7 +143,18 @@ already reached the manuscript once.
    as `COVARIATE_DUR`/`COVARIATE_PEAK` on the right-hand side. Reintroducing
    them as outcomes means re-introducing a scaling claim about a bounded
    variable.
-8. **`parquet_cache/` must not come back.** It held Parquet exports of tables
+8. **No ablation number is typed, and no number is drawn from a superseded
+   run.** `make_ablation_tables.py` renders both predictive tables from
+   `ablation_results.csv`, `ablation_city.csv` and
+   `classifier_results_metrics.csv`, and `--check` compares every ablation
+   figure in the prose against them. An artefact whose `.meta.json` lacks
+   `extrapolating_regressor` / `classifier_model` predates the current design
+   and is refused even though it is byte-valid: `ablation_city.csv` carried a
+   tree classifier into the published table for exactly that reason. A figure
+   and its own caption once reported opposite signs for the same contrast on
+   the same page.
+
+9. **`parquet_cache/` must not come back.** It held Parquet exports of tables
    that no script read; its row counts silently disagreed with the database.
    Dead copies of the source of truth are how this class of bug survives.
    `verify_snapshot.py` reports them.
@@ -137,13 +162,14 @@ already reached the manuscript once.
 ### Before every commit that touches data or numbers
 
 ```bash
-pytest -q                     # 16 test modules, including the ablation guards
-python make_tables.py --check # prose literals still match the database
-python provenance.py --check  # no artefact came from a different run
-python verify_snapshot.py     # all four checks; exit 1 on any drift
+pytest -q                          # test modules, including the ablation guards
+python make_tables.py --check      # fit literals still match the database
+python make_ablation_tables.py --check  # ablation literals still match the artefacts
+python provenance.py --check       # no artefact came from a different run
+python verify_snapshot.py          # all five checks; exit 1 on any drift
 ```
 
-The same three checks belong in CI. They are cheap (seconds) and they are the
+The same checks belong in CI. They are cheap (seconds) and they are the
 difference between a manuscript that describes its database and one that
 merely agrees with it today.
 
@@ -152,7 +178,10 @@ merely agrees with it today.
 | symptom | cause | fix |
 | --- | --- | --- |
 | `DRIFT: ... changed since the snapshot was frozen` | `powerlaw_results.db` was re-fitted but the tables were not regenerated | run steps 6--8 above, or `python make_tables.py` then `python provenance.py --write` if the new database is the intended one |
-| `[2/3] prose STALE` lists a value with the wrong occurrence count | a number appears twice in `main.tex` and only one site was updated | grep for the stale literal; both sites must change together |
+| `[2/5] prose STALE` lists a value with the wrong occurrence count | a number appears twice in `main.tex` and only one site was updated | grep for the stale literal; both sites must change together |
+| `[5/5] ablation INCOMPLETE` names a source as absent | the artefact that should back a quoted number does not exist (e.g. the state-level exceedance run was never committed) | run the command in the message; do not edit the prose to match the gap |
+| `[5/5] ablation STALE` names a contrast | the artefact was regenerated and the prose still carries the old median, or the reverse | re-run `make_ablation_tables.py` first: the tables fix themselves. Then update the prose the message names |
+| `[3/5] design STALE` names `ablation_city.meta.json` | the municipal exceedance run predates the estimator change | `python run_ablation.py --level city --tasks exceedance --output ablation_city.csv` |
 | `0/8 block columns available` | the climate block is missing from the panel, so `M2` would equal `M1` | `python run_ablation.py --attach-climate` (rebuilds from `data/[0-9]*.parquet`) or `--climate-parquet <file>` |
 | every `M2-M1` contrast is exactly `0.0` with CI `[0, 0]` | a pre-fix artefact; the rungs were identical | regenerate the ablation; the current script aborts instead of writing zeros |
 | `RuntimeError: ... refuses to plot` from `generate_figures.py` | a figure was pointed at a defective artefact | fix the artefact, do not relax the check |

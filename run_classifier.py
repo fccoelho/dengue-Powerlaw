@@ -272,6 +272,11 @@ def main(argv=None):
                 "auc": _auc(y_val, p),
                 "log_loss": _log_loss(y_val, p),
                 "prevalence": float(np.mean(y_val)),
+                # The base rate the model actually learned. Without it the
+                # manuscript cannot justify comparing a season's prevalence to
+                # the training frequency, which is the whole content of the 2024
+                # paragraph.
+                "train_prevalence": float(base),
                 "n_val": int(len(y_val)),
                 "n_units": int(val_ok[unit_col].nunique()),
                 "n_train": int(len(fold["train_ok"])),

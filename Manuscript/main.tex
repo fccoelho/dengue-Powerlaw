@@ -21,34 +21,35 @@ large dengue epidemics in Brazil}
 \begin{abstract}
 Power-law tails are reported for dengue incidence and read as a verdict on
 forecastability: with an exponent near two, extreme seasons cannot be
-anticipated. We argue the fit supports a more useful conclusion --- the tail
-prices the risk --- and test that out of sample. On weekly surveillance for
+anticipated. The fit supports a more useful conclusion --- the tail prices the
+risk --- and we test it out of sample. On weekly surveillance for
 5{,}571 Brazilian municipalities (2010--2026) we fitted discrete power laws with
-Kolmogorov--Smirnov $x_{\min}$ selection under five aggregation levels of the
-same variable (50{,}391 fits), compared each with an exponential by likelihood
-ratio, and evaluated
+Kolmogorov--Smirnov $x_{\min}$ selection under five aggregations of the same
+variable (50{,}391 fits), compared each with an exponential, and evaluated
 $(\alpha,x_{\min})$ on a rolling-origin design.
 
 The construction decides the verdict: median exponents span $1.95$ to $2.08$,
-and the same weekly counts support a power law in 75\% of municipalities pooled
-over a decade against 23\% cut into single seasons. Epidemic size survives every
-construction with a genuine tail --- median $\alpha=2.03$ across 16 national cross-sections and $1.98$ across 353 state-years, with $x_{\min}$ orders of
-magnitude above the bulk.
+and the same counts support a power law in 75\% of municipalities pooled over a
+decade against 23\% in single seasons. Epidemic size survives every construction
+with a genuine tail --- median $\alpha=2.03$ across 16 national cross-sections
+and $1.98$ across 353 state-years, with $x_{\min}$ far above the bulk.
 
-Because $\alpha\approx2$ fixes the whole exceedance curve, the pair is a
-two-parameter risk statement, and it is calibrated, reproducing the observed
-exceedance frequency: 5.6--16.6\% of municipalities exceed ten times
-$x_{\min}$, and 0.3--2.7\% a hundred times it. The exponent is
-also a readout of seasonal magnitude, rank-correlated with $x_{\min}$ at $0.87$
-nationally and $0.65$ within states --- a coupling absent under simulation.
+Because $\alpha\approx2$ fixes the exceedance curve, the pair is a two-parameter
+risk statement, calibrated against the observed frequency: 5.6--16.6\%
+of municipalities exceed ten times $x_{\min}$, and 0.3--2.7\% a hundred times
+it. The exponent is a readout of seasonal magnitude, rank-correlated with
+$x_{\min}$ at $0.87$ nationally and $0.65$ within states --- a coupling absent
+under simulation.
 
-Asked as exceedance, prediction is tractable. At state level, lagged descriptors
+Asked as exceedance, prediction is tractable: at state level, lagged descriptors
 --- duration and peak timing among them --- beat calibrated persistence on the
-Brier score in 3 of 5 origins. At municipal level, with the label referred to
-each municipality's own history, AUC rises from $0.50$ to $0.64$, though no rung
+Brier score in 3 of 5 origins. At municipal level, referring the label to each
+municipality's own history, AUC rises from $0.50$ to $0.65$, though no rung
 clears the pre-registered incremental test: the scaling block adds a median
-$+0.002$ Brier and worsens the state-level 95th-percentile size forecast by
-18\%. The tail belongs in a risk curve, not a predictor.
+$+0.002$ Brier. For size, that block is indistinguishable from zero:
+at $\tau=0.95$ its median differential is $+4.9\%$, positive in 4 of 5 origins
+but with intervals excluding zero in only 2 of 5, in opposite directions. The
+tail belongs in a risk curve, not a predictor.
 \end{abstract}
 
 \section{Introduction}
@@ -150,9 +151,9 @@ case count, which is what a feature-based reading of it would require.
 \item \textbf{An out-of-sample answer in the form the question can be answered.}
 The probability of a large season is predictable: lagged descriptors improve the
 Brier score over calibrated persistence in 3 of 5 origins. The scaling block adds
-no incremental skill to the size forecast (0 of 5) and degrades its upper
-quantile. The scaling description earns its place as a risk statement, not as a
-feature.
+no incremental skill to the size forecast (0 of 5) and leaves its upper quantile
+where it was. The scaling description earns its place as a risk statement, not as
+a feature.
 \end{enumerate}
 
 \section{Methods}
@@ -925,12 +926,14 @@ the population-only reference falls to a median AUC of $0.47$ (range
 $0.456$--$0.516$), against $0.94$ when the threshold is pooled: the pooled label
 was measuring municipality size, and the within-unit label is not. The second is
 that discrimination is real but modest. Median AUC rises from $0.50$ for the
-no-skill reference to $0.59$, $0.63$ and $0.64$ for M1, M2 and M3; M3 is the best
-of the three in 4 of 5 origins and gains a median $+0.008$ over M2. Against a
+no-skill reference to $0.58$, $0.63$ and $0.65$ for M1, M2 and M3; M3 is the best of the three in 3 of 5 origins
+and gains a median $+0.013$ over M2. Against a
 rule that demands a bootstrap interval excluding zero in 3 of 5 origins, however,
-no rung passes at this level. The scaling block improves the Brier score in 4 of
-5 origins, by a median of $+0.002$, and in none of them does the interval
-exclude zero.
+no rung can be credited at this level: the ablation that carries those intervals
+was run with the tree classifier and must be repeated before its verdicts mean
+anything (Table~\ref{tab:exceed}). What the out-of-fold classifier does show is
+the direction. The scaling block improves the Brier score in 5 of 5 origins, by a
+median of $+0.002$.
 
 The gap between the two levels is mostly an arithmetic one. Absolute Brier
 differentials are two orders of magnitude smaller at municipal level ($0.002$
@@ -942,45 +945,20 @@ direction. Whether a municipality will have an exceptional season is partly
 predictable from how large the last one was; the exponent does not add to that.
 
 One origin deserves a flag. In 2024, 69.5\% of the evaluated municipalities
-exceeded their own upper quartile, against a training base rate of 26.4\%, and
-every rung scores a Brier score of about $0.40$. That season was a national
-record, and no model trained on earlier seasons anticipated its level. This is
-the honest boundary of the exercise: the classifier ranks units within a season
-of familiar magnitude; it does not foresee a regime break.
+exceeded their own upper quartile, against a training base rate of 26.4\%. The
+no-skill reference scores a Brier of $0.40$ there and the fitted rungs about $0.25$
+--- better than the reference, but worse than the $0.21$ a predictor that
+knew the year's own frequency would earn. That season was a national record, and
+no model trained on earlier seasons anticipated its level. This is the honest
+boundary of the exercise: the classifier ranks units within a season of familiar
+magnitude; it does not foresee a regime break.
 
 Figures~\ref{fig:roc} and~\ref{fig:importance} report discrimination, calibration
 and attribution for the municipal classifier. The calibration panel is the one to
 read: a classifier that is useful for planning must track the diagonal in the
 upper deciles, not merely rank well on average.
 
-\begin{table}[htbp]
-\centering
-\small
-\setlength{\tabcolsep}{5pt}
-\caption{The large-season classifier at both aggregation levels, five forecast
-origins 2021--2025. The target is whether a unit exceeds the 75th percentile of
-its own history; the loss is the Brier score. Positive values mean the later rung
-has the lower Brier score, and ``median'' is over the five origins. The decision
-rule of Section~\ref{sec:ablation} requires a same-direction improvement with a
-95\% unit-bootstrap interval excluding zero in at least 3 of 5 origins. The
-municipal rows use a within-unit threshold, without which the label is a
-population indicator; there the population-only reference reaches a median AUC of
-$0.47$ against $0.62$--$0.65$ for the fitted rungs.}
-\label{tab:exceed}
-\begin{tabular}{@{}llrrrr@{}}
-\toprule
-Level & Contrast & $\Delta$Brier, median & Origins $\Delta>0$ & Origins CI excl.\ 0 & Verdict\\
-\midrule
-State (26 units) & M1$-$M0 (lagged metrics) & $+0.134$ & 4/5 & \textbf{3/5} & \textbf{supported}\\
-                 & M2$-$M1 (climate)        & $-0.001$ & 2/5 & 0/5 & not supported\\
-                 & M3$-$M2 (scaling)        & $+0.008$ & 3/5 & 0/5 & not supported\\
-\addlinespace
-Municipal (3{,}976 units) & M1$-$M0 (lagged metrics) & $+0.003$ & 3/5 & 2/5 & not supported\\
-                 & M2$-$M1 (climate)        & $+0.001$ & 3/5 & 1/5 & not supported\\
-                 & M3$-$M2 (scaling)        & $+0.002$ & 4/5 & 0/5 & not supported\\
-\bottomrule
-\end{tabular}
-\end{table}
+\input{generated/tab_exceed}
 
 \begin{figure}[htbp]
 \centering
@@ -1023,49 +1001,30 @@ Section~\ref{sec:coupling}.
 
 Table~\ref{tab:ablation_results} reports the ladder over the five origins at
 state level. Against calibrated persistence, the lagged-metrics rung M1 carries
-essentially nothing for size (median skill $0.10$, range $-0.59$ to $0.71$,
+essentially nothing for size (median skill $0.30$, range $-0.06$ to $0.86$,
 positive in 3 of 5 origins and 2 of 5 with an interval excluding zero), and
-successive rungs do not improve on it: M2 has median $-0.02$ and M3 $-0.14$. The
+successive rungs do not improve on it: M2 has median $0.12$ and M3 $0.15$. The
 M3$\to$M2 contrast --- the one that isolates $(\alpha_{t-1},x_{\min,t-1},
 \dot\alpha_{t-1})$ and nothing else --- excludes zero in 0 of 5 origins against
-the 3 required, with a median relative change in pinball loss at $\tau=0.5$ of
-$-1.5\%$.
+the 3 required, with a median relative change in pinball loss at $\tau=0.5$ of $-5.2\%$.
 
-\begin{table}[htbp]
-\centering
-\small
-\setlength{\tabcolsep}{4pt}
-\caption{Ablation ladder over the five forecast origins 2021--2025, state level
-(26 units, 23--25 evaluated per origin), for the single target. Cells give the
-median across origins of
-the skill score $1-L(\text{rung})/L(\text{M0})$ against calibrated persistence,
-with the range over origins in brackets; the primary loss is the pinball loss at
-$\tau=0.5$. The last column is the M3$-$M2 differential at that loss: median
-relative change, negative meaning that the scaling block worsens the forecast,
-and in parentheses the number of origins in which M3 improves on M2 by sign
-alone. The classifier is reported separately in Table~\ref{tab:exceed}.}
-\label{tab:ablation_results}
-\begin{tabular}{@{}lrrrr@{}}
-\toprule
-Target & M1 & M2 & M3 & M3$-$M2 \\
-\midrule
-Size $S_t$      & $0.10$ [$-$0.59, $0.71$] & $-0.02$ [$-$0.75, $0.71$] & $-0.14$ [$-$0.56, $0.71$] & $-1.5\%$ (2/5)\\
-\bottomrule
-\end{tabular}
-\end{table}
+\input{generated/tab_ablation}
 
-The block is also worst exactly where it was expected to be best. The argument
-for $\alpha_{t-1}$ is that it encodes how much of the risk sits in the tail, so
-any gain should concentrate at high $\tau$; Figure~\ref{fig:ablation}b was drawn
-to test precisely that (Figure~\ref{fig:ablation}b). At $\tau=0.95$ the point estimate of the M3$-$M2
-differential is negative in \emph{all five} origins --- $-24.9\%$, $-23.7\%$,
-$-0.2\%$, $-1.6\%$ and $-18.3\%$ of the M2 loss, median $-18.3\%$ --- although
-with 23--25 units per origin no individual interval excludes zero. Adding
-$\hat\alpha_{t-1}$ and $\hat{x}_{\min,t-1}$ makes the upper quantile of the size
-forecast worse. This is what the coupling predicts: both statistics are
-themselves functions of the magnitude of the previous season, so at the upper
-tail the model is handed a second and noisier copy of $S_{t-1}$ and weights it as
-if it were independent information.
+The block was also expected to be worth most at high $\tau$. The argument for
+$\alpha_{t-1}$ is that it encodes how much of the risk sits in the tail, so any
+gain should concentrate at high $\tau$, and Figure~\ref{fig:ablation}b was drawn
+to test precisely that. What it shows is not a degradation but an absence of
+signal. At $\tau=0.95$ the median differential is $+4.9\%$ --- M3 ahead --- and
+it is positive in 4 of 5 origins, but the intervals exclude zero in only 2 of 5,
+and those two point in \emph{opposite} directions ($+32.7\%$ in 2021, $-15.4\%$
+in 2024). The same holds across the grid: the median of the per-origin
+differential moves between $-13.6\%$ and $+7.2\%$ with no trend, and there is no
+quantile at which 3 of 5 origins agree in direction with an interval excluding
+zero --- 0 of 19 quantiles clear the bar. This is what the coupling predicts. Both
+statistics are functions of the magnitude of the previous season, so the block is
+at best a second and noisier copy of $S_{t-1}$; the ablation shows that the copy
+carries no usable increment, which leaves the upper quantile where it was rather
+than moving it in either direction.
 
 Two origins dominate the size column and need separate mention. The 2024 season
 was the largest on record and 2025 fell back sharply; persistence extrapolated
@@ -1121,9 +1080,11 @@ $100\,(L_{M2}-L_{M3})/L_{M2}$, against $\tau$: a gain confined to high $\tau$
 would mean the scaling information concerns extreme seasons specifically, which
 is what a heavy-tail description should deliver, so negative values here are the
 opposite of the intended effect. Lines are medians over origins and the band is
-the range across origins. The block degrades the extreme quantile of the size
-forecast, with a median loss of $18.3\%$ at $\tau=0.95$ and a negative
-differential in all five origins. Skill scores carry no interval of their own:
+the range across origins. At $\tau=0.95$ the median differential is $+4.9\%$
+and positive in 4 of 5 origins, so the panel does not show the degradation an
+earlier draft reported; but intervals exclude zero in only 2 of 5 and point in
+opposite directions, which is an absence of signal rather than a gain. Skill
+scores carry no interval of their own:
 the unit-bootstrap interval belongs to the paired differential.}
 \label{fig:ablation}
 \end{figure}
@@ -1208,7 +1169,7 @@ posed as a probability --- will this municipality exceed its own upper quartile?
 --- the answer is yes at state level, and detectably so: lagged epidemic descriptors
 improve the Brier score over calibrated persistence in 3 of 5 origins, by up to
 $0.18$ (Table~\ref{tab:exceed}). At municipal level the same design lifts
-discrimination from $0.50$ to $0.64$ AUC, though the Brier differentials fall to
+discrimination from $0.50$ to $0.65$ AUC, though the Brier differentials fall to
 $0.002$ and no rung clears the pre-registered bar --- a ranking device rather than
 a level forecast. Where the question is posed as a magnitude, the answer is no,
 and the failure is orderly rather than mysterious.
@@ -1233,13 +1194,15 @@ Predictively, the same fact is the explanation for the null. An exponent that
 co-varies with the scale of the season is, to that extent, a re-encoding of
 $S_{t-1}$, which the model already has. The ablation measures exactly that
 redundancy: the scaling block adds nothing to a rung that already knows last
-season's size (0 of 5 origins), and at $\tau=0.95$ it is actively harmful
-(median $-18.3\%$, negative in all five origins), because at the upper tail the
-model receives a second, noisier copy of $S_{t-1}$ and weights it as independent
-information. The redundancy was predictable from the coupling before the ablation
-was run, and the ablation confirmed the prediction. That is a stronger form of
-evidence than a bare null: the sign and the location of the effect were specified
-in advance.
+season's size (0 of 5 origins), and at $\tau=0.95$ its differential is
+$+4.9\%$ in median with intervals that exclude zero in only 2 of 5 origins and
+in opposite directions, so the test has no power there to sign the effect either
+way. The redundancy was predictable from the coupling before the ablation was run,
+and the ablation confirmed it where the prediction had content: a re-encoding of a
+variable already in the model must deliver no incremental information, and none
+appears at any quantile of the grid. What the earlier draft of this paper claimed
+on the same data --- that the block actively damages the upper quantile --- does
+not survive the estimator change, and we withdraw it.
 
 It also explains why the exceedance question behaves differently. Asking whether
 a season will be large is a question about upper-tail probability, and the
@@ -1256,16 +1219,18 @@ calibrated persistence no rung achieves skill in more than 2 of 5 origins, and
 two of the five origins dominate the loss because they straddle a regime shift:
 2024 was the largest season on record and 2025 fell back sharply.
 
-This is not an anomaly to be explained away; it is what $\alpha\approx2$ implies
-for the estimator class we used. Tree ensembles predict within the support of
-their training responses, and under a heavy tail the season of greatest
-public-health interest is systematically outside that support. A model that
-already knows the previous season will be approximately right in ordinary years
-and wrong by a large factor in the exceptional one. The quantile models
-partially address this --- a regression at $\tau=0.95$ at least attempts to
-represent the upper region rather than interpolating within the observed range
---- but the limitation is structural to the method, not a matter of feature
-engineering.
+It would be convenient to attribute that to the estimator, and an earlier draft
+of this paper did. The attribution does not hold. Tree ensembles predict within
+the support of their training responses, so under a heavy tail the season of
+greatest public-health interest sits systematically outside it; but the primary
+model here is a spline-basis quantile regression, which by construction continues
+the boundary trend past the largest response it was trained on
+(Figure~\ref{fig:predobs}). A record year is therefore a statement about the data
+rather than an artefact of a fit that cannot leave its support. The quantile
+regression at $\tau=0.95$ represents the upper region instead of interpolating
+inside it, and the forecast still fails in 2024: knowing last season's size and
+duration, its peak week, the climate covariates and the scaling descriptors does
+not order five origins at 23--25 units each.
 
 The honest summary is therefore a division of labour rather than a verdict. The
 tail does not tell you how big next season will be; it tells you how likely an
@@ -1318,8 +1283,12 @@ Results rather than only here because it is a measured outcome, but it is the
 principal negative result of the paper and should travel with any use of it.
 Against a benchmark that already carries the lagged case count, the block of
 $(\alpha_{t-1},x_{\min,t-1},\dot\alpha_{t-1})$ fails the pre-registered test on
-size in 0 of 5 origins, and at the 95th percentile it degrades the loss in every
-origin tested, by a median of $18.3\%$. The mechanism is the coupling documented
+size in 0 of 5 origins. At the 95th percentile its differential is $+4.9\%$ in
+median, with intervals excluding zero in only 2 of 5 origins and in opposite
+directions, so this design cannot sign the effect there: with 23--25 units per
+origin the test is underpowered at the extreme quantile, and we report the
+absence of a measured gain rather than a measured harm. The mechanism is the
+coupling documented
 in Section~\ref{sec:coupling}. A rung containing the scaling descriptors
 \emph{alone}, without the lagged metrics, would answer a different and
 interesting question --- whether three power-law parameters can substitute for the
@@ -1432,9 +1401,10 @@ frequency of large seasons over two decades of epidemic size. Posed as a
 probability --- will this municipality exceed its own upper quartile? --- the
 problem is tractable: lagged epidemic descriptors improve the Brier score over
 calibrated persistence in 3 of 5 state-level origins, and lift municipal
-discrimination from $0.50$ to $0.64$ AUC. Posed as a magnitude, it is
+discrimination from $0.50$ to $0.65$ AUC. Posed as a magnitude, it is
 not: no rung achieves skill for size, and the scaling block specifically adds
-nothing (0 of 5) while degrading the upper quantile by a median $18\%$.
+nothing (0 of 5), its differential at the 95th percentile being $+4.9\%$ in
+median with intervals that exclude zero in only 2 of 5 origins.
 
 That last result is not an accident of the data. The exponent co-varies with the
 lower bound and hence with the scale of the season, at $0.87$ nationally and

@@ -1,9 +1,9 @@
 {
   "manifest_version": 1,
-  "written_utc": "2026-11-04T13:35:45+00:00",
+  "written_utc": "2026-11-06T12:23:10+00:00",
   "database": {
     "path": "powerlaw_results.db",
-    "sha256": "2115c0f689f6c1f85c869217fee553f0fd70fc12aa8c8293eeb9702d2974f5f6",
+    "sha256": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
     "inventory": {
       "city_stats": {
         "rows": 5571,
@@ -16,7 +16,7 @@
         ]
       },
       "episcanner_fits": {
-        "rows": 33,
+        "rows": 17,
         "schema": "9138888c1cf4f63b",
         "columns": [
           "metric",
@@ -29,7 +29,7 @@
         ]
       },
       "episcanner_state_fits": {
-        "rows": 737,
+        "rows": 380,
         "schema": "15ce0ccc6d02236f",
         "columns": [
           "state",
@@ -43,7 +43,7 @@
         ]
       },
       "powerlaw_fits": {
-        "rows": 5247,
+        "rows": 5264,
         "schema": "79a82f03c45d1165",
         "columns": [
           "geocode",
@@ -71,7 +71,7 @@
         ]
       },
       "powerlaw_fits_yearly": {
-        "rows": 41635,
+        "rows": 43673,
         "schema": "c114855b3bd86308",
         "columns": [
           "geocode",
@@ -87,17 +87,20 @@
     }
   },
   "artifacts": {
-    "powerlaw_results.db": "2115c0f689f6c1f85c869217fee553f0fd70fc12aa8c8293eeb9702d2974f5f6",
-    "Manuscript/main.tex": "451f11574fbb0ed054e70465b6ff85c872984eb9fb0fc5a711f79f44459148bd",
-    "Manuscript/generated/facts.json": "ed6f14a5eef467f9a8c3b8d375e649bdff05be3789642ff56113ba8e1dbc804c",
-    "Manuscript/generated/tab_main.tex": "b7842a2d287317198a34f535bd6700e02bfb28907a4d5f2b8538130f8742b300",
-    "ablation_results.csv": "865fd8f3b7369d4b070529aed2570b0bb4aad16784f6c6a528432db480fd824c",
-    "ablation_results.meta.json": "0ddd15f6007d5897bbf5b353afb747e9438625813bfacc12ed3143c6c5fa5cb0",
+    "powerlaw_results.db": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
+    "Manuscript/main.tex": "bdc7cc45bb96d488965d9ea089a82158f068f0ed69732b4602f03bb0d0e1251e",
+    "Manuscript/generated/facts.json": "8b863f367414b77e49af2eff84813c645180880ab7b60816cd81840c977aff25",
+    "Manuscript/generated/tab_main.tex": "35f0085ee7e72e792c28da58fffd90ec7b30a503f872b2ca8b730d6db6517325",
+    "Manuscript/generated/tab_ablation.tex": "7c097d99a734210bfedc85bf8d0ce98831edd2955a43cfa2c04828da25a8e52c",
+    "Manuscript/generated/tab_exceed.tex": "ad1028aa6380b29498bbc81e83d9e93a2bbcd015c0c375c9ca3949bd879382f9",
+    "Manuscript/generated/ablation_facts.json": "c6796680fb5d29c46d4f51bbfe80dd4786068b4bf3b99bf235166bc3eb04e80e",
+    "ablation_results.csv": "c3a78574e5cba0ab1c8c6a358032865421616cf8259075cb4d5db34f9ae0bbbc",
+    "ablation_results.meta.json": "48fcaf07baae6c223cc5d12c0c758256703ee061404ebfe832c22680b04628c6",
     "ablation_city.csv": "d1324bb793fd53095a1bce8b7542de3c90d86df65a99ed22642ba43c43a4ec96",
     "ablation_city.meta.json": "94e8c6a6a26575d641cff951733b32a5b27686d409ddc5a1c149c4aff93c6d0f",
-    "classifier_results.parquet": "c05d22a681ef832e8032baf700289d40859cdaf7da51c752ef9ce4c3dd56b42d",
-    "classifier_results_metrics.csv": "3d7b8cb62a833a35322a0e434759826da2c81926d2546212cceae46f59fe01f7",
-    "classifier_results_importance.csv": "1d77e29f34ae1703e6891e9629c5a7bcc103bac4fbbc8244f8c82bc935fdbd57",
-    "classifier_results.meta.json": "a2f1d9c1cd3ec4c80b92c168d2f69be858611af93c4e3ddeadeee5e0e0956b5f"
+    "classifier_results.parquet": "899dd983efd45d0978f9d4354dce6422957215004cf651039a516e95b5ba44e6",
+    "classifier_results_metrics.csv": "6ce519e3a77c663d03acae134b603e8a5d3984d1f36db01febc4c420f309cc46",
+    "classifier_results_importance.csv": "efae74c323f33eb91b3022853fd635003f56aa01726266358fed9a833f25fe2a",
+    "classifier_results.meta.json": "ca1fe7dec0b24092ad069f889c35e39157f454f4b69ec37a769dba0040c6e2d9"
   }
 }
