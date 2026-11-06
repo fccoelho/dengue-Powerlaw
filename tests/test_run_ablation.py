@@ -6,6 +6,8 @@ added". That sentence is only true if M2 and M3 differ *only* in the scaling
 columns, so the assertion that enforces it is pinned here rather than left to
 review.
 """
+import types
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -283,3 +285,54 @@ def test_decision_is_supported_at_three_of_five_origins():
     dec = ra.decision_rows(rows, diffs, list(origins), "state")
     assert dec[0]["verdict"] == "supported"
     assert dec[0]["value"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Output routing
+#
+# ``--output`` used to default to ``ablation_results.csv`` for every run, so a
+# city exceedance run silently replaced the state size ladder Table 3 is built
+# from. The symptom was a table generator reporting that no size ladder existed
+# anywhere in the repository.
+# ---------------------------------------------------------------------------
+def test_default_output_names_follow_the_experiment():
+    assert ra.default_output_name("state", ["size"]) == "ablation_results.csv"
+    assert (ra.default_output_name("state", ["exceedance"])
+            == "ablation_state_exceedance.csv")
+    assert ra.default_output_name("city", ["exceedance"]) == "ablation_city.csv"
+    assert ra.default_output_name("city", ["size"]) == "ablation_city_size.csv"
+    assert (ra.default_output_name("city", ["size", "exceedance"])
+            == "ablation_city_size_exceedance.csv")
+
+
+def test_guard_refuses_to_overwrite_a_different_experiment(tmp_path):
+    target = tmp_path / "ablation_results.csv"
+    pd.DataFrame({"level": ["state"], "task": ["size"]}).to_csv(target, index=False)
+    args = types.SimpleNamespace(level="city", output=str(target), force=False)
+    with pytest.raises(SystemExit, match="refusing to overwrite"):
+        ra.guard_output(args, ["exceedance"])
+
+
+def test_guard_allows_a_rerun_and_honours_force(tmp_path):
+    target = tmp_path / "ablation_results.csv"
+    pd.DataFrame({"level": ["state"], "task": ["size"]}).to_csv(target, index=False)
+    ra.guard_output(
+        types.SimpleNamespace(level="state", output=str(target), force=False), ["size"])
+    ra.guard_output(
+        types.SimpleNamespace(level="city", output=str(target), force=True), ["exceedance"])
+
+
+def test_guard_derives_the_name_when_output_is_omitted(tmp_path):
+    args = types.SimpleNamespace(level="state", output=None, force=False)
+    assert ra.guard_output(args, ["exceedance"]) == "ablation_state_exceedance.csv"
+    assert args.output == "ablation_state_exceedance.csv"
+
+
+def test_guard_treats_a_new_or_unreadable_target_as_new(tmp_path):
+    args = types.SimpleNamespace(level="state", output=str(tmp_path / "nope.csv"),
+                                force=False)
+    assert ra.guard_output(args, ["size"]) == str(tmp_path / "nope.csv")
+    junk = tmp_path / "junk.csv"
+    junk.write_text("not,a,real,ablation\n")
+    ra.guard_output(types.SimpleNamespace(level="state", output=str(junk),
+                                          force=False), ["size"])

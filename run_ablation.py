@@ -2,7 +2,14 @@
 """
 run_ablation.py -- rolling-origin ablation ladder for the dengue power-law paper.
 
-Writes ``ablation_results.csv``: the M0..M3 ladder of Manuscript
+Writes one CSV named after the experiment: ``ablation_results.csv`` for the
+state-level size ladder (the default), ``ablation_state_exceedance.csv`` and
+``ablation_city.csv`` for the two exceedance blocks of Table 4. The name
+follows ``--level``/``--tasks`` because a single shared default let a
+city-level exceedance run overwrite the state size ladder that Table 3 is
+built from -- with matching columns, so nothing complained.
+
+What it writes: the M0..M3 ladder of Manuscript
 Section 2.10 ("Evaluation protocol and ablation ladder", Table 4),
 evaluated by rolling origin over 2021-2025 at one aggregation level.
 
@@ -1718,6 +1725,73 @@ def resolve_min_effect_rel(args):
     return 0.02 if args.level == "city" else 0.0
 
 
+def default_output_name(level: str, tasks) -> str:
+    """The artefact a run writes when ``--output`` is not given.
+
+    The default used to be ``ablation_results.csv`` for *every* run, whatever the
+    level or the task. That is not a naming quirk: ``--level city --tasks
+    exceedance`` silently replaced the state-level size ladder that Table 3 and
+    Figure 11 are built from, and the only symptom was
+    ``make_ablation_tables.py`` reporting that the repository contained no size
+    ladder. It did. The wrong run had overwritten it. So the name now follows
+    the run.
+    """
+    ts = [t for t in ("size", "exceedance") if t in set(tasks)]
+    if level == "state" and ts == ["size"]:
+        return "ablation_results.csv"            # Table 3 / Figure 11
+    if level == "state" and ts == ["exceedance"]:
+        return "ablation_state_exceedance.csv"   # state block of Table 4
+    if level == "city" and ts == ["exceedance"]:
+        return "ablation_city.csv"               # municipal block of Table 4
+    return f"ablation_{level}_{'_'.join(ts)}.csv"
+
+
+def existing_output_signature(path):
+    """``(levels, tasks)`` stored in *path*, or ``None`` when the file is new.
+
+    Read from the CSV rather than from the sidecar meta: the CSV is what the
+    table generator consumes, so a file whose rows describe one experiment
+    while its meta describes another is precisely the failure being guarded
+    against. Unreadable counts as new -- the guard is there to protect data,
+    not to block a first run into a directory that happens to have junk in it.
+    """
+    p = Path(path)
+    if not p.exists() or p.stat().st_size == 0:
+        return None
+    try:
+        d = pd.read_csv(p, usecols=lambda c: c in ("level", "task"))
+    except Exception:  # noqa: BLE001
+        return None
+    if d.empty:
+        return None
+    lv = sorted(str(x) for x in d["level"].dropna().unique()) if "level" in d else []
+    tk = sorted(str(x) for x in d["task"].dropna().unique()) if "task" in d else []
+    return (lv, tk)
+
+
+def guard_output(args, tasks):
+    """Resolve ``--output``, refusing to overwrite a different experiment.
+
+    Runs before the fit, not before the write: learning about the collision
+    after twenty minutes of fitting is the same as losing the run.
+    """
+    if not args.output:
+        args.output = default_output_name(args.level, tasks)
+    want = ([args.level], sorted(tasks))
+    prev = existing_output_signature(args.output)
+    if prev is None or args.force or prev == want:
+        return args.output
+    raise SystemExit(
+        f"refusing to overwrite {args.output}\n"
+        f"  the file holds  level={prev[0]} tasks={prev[1]}\n"
+        f"  this run wants  level={want[0]} tasks={want[1]}\n"
+        "That file is a source artefact for the manuscript, so writing a "
+        "different experiment over it deletes results the text quotes. "
+        f"Use --output {default_output_name(args.level, tasks)}, or --force to "
+        "replace it deliberately."
+    )
+
+
 def default_tau_grid():
     """The grid of Section 2.8: tau in {0.05, 0.10, ..., 0.95}."""
     return [round(0.05 * i, 2) for i in range(1, 20)]
@@ -1789,7 +1863,14 @@ def parse_args(argv=None):
                     help="override the eight column names that define M2 "
                          "(comma-separated); default is the declared CLIMATE_BLOCK")
     ap.add_argument("--save-panel", default=None, help="write the panel here for reuse")
-    ap.add_argument("--output", default="ablation_results.csv")
+    ap.add_argument("--output", default=None,
+                    help="target CSV. Default: derived from --level and "
+                         "--tasks -> ablation_results.csv for the state size "
+                         "ladder, ablation_state_exceedance.csv, "
+                         "ablation_city.csv")
+    ap.add_argument("--force", action="store_true",
+                    help="overwrite --output even when it holds a different "
+                         "level/tasks combination")
     ap.add_argument("--bootstrap", type=int, default=2000)
     ap.add_argument("--min-origins", type=int, default=3,
                     help="origins required by the pre-registered decision rule")
@@ -1838,6 +1919,11 @@ def parse_tau_grid(spec):
 def main(argv=None):
     args = parse_args(argv)
     verbose = not args.quiet
+    # Resolve --output and refuse a collision *before* loading the panel. The
+    # panel build and the climate merge are the slow part of this script, and
+    # discovering an output collision after them costs as much as the run.
+    tasks = resolve_tasks(args)
+    guard_output(args, tasks)
     t0 = time.time()
     warnings.filterwarnings("ignore", category=FutureWarning)
 
@@ -1901,7 +1987,6 @@ def main(argv=None):
                   f"{climate_info['missing']}")
 
     # -- what to evaluate ------------------------------------------------
-    tasks = resolve_tasks(args)
     regression_tasks = [t for t in tasks if t in TARGETS]
     run_classifier = "exceedance" in tasks
     threshold_scope = resolve_threshold_scope(args)
