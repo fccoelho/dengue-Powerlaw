@@ -33,7 +33,7 @@ table it illustrates, and once did.
 | --- | --- | --- |
 | `powerlaw_results.db` | `update_data.py` | everything below |
 | `city_stats` table | `aggregate_city_stats.py` | `generate_figures.py`, dashboard |
-| `Manuscript/generated/tab_main.tex`, `facts.json` | `make_tables.py` | `main.tex` (Table 1) |
+| `Manuscript/generated/tab_main.tex`, `facts.json` | `make_tables.py` | `main.tex` (Table 1, Table 4, §5.3 correlations) |
 | `Manuscript/generated/tab_ablation.tex`, `tab_exceed.tex`, `ablation_facts.json` | `make_ablation_tables.py` | `main.tex` (ablation + classifier tables) |
 | `ablation_results.csv` + `.meta.json` | `run_ablation.py --level state` | `tab_ablation.tex`, Figure 11 |
 | `ablation_state_exceedance.csv` + `.meta.json` | `run_ablation.py --level state --tasks exceedance` | `tab_exceed.tex` (state block) |
@@ -166,6 +166,21 @@ already reached the manuscript once.
    that no script read; its row counts silently disagreed with the database.
    Dead copies of the source of truth are how this class of bug survives.
    `verify_snapshot.py` reports them.
+
+10. **Exceedance comes from Equation (2), not from the Pareto limit.**
+    `P(S >= s) = zeta(alpha, s) / zeta(alpha, x_min)`, evaluated at
+    `s = k * x_min` with the Hurwitz zeta function -- the expression Figure 9
+    plots. `make_tables.py` used the continuous approximation
+    `k^-(alpha-1)` and reported 16.6\% where the equation gives 16.5\%, a
+    0.1pp disagreement between the prose and the figure it cites. The
+    generated facts now come from the same formula as the plot.
+11. **Table 4 and the coupling paragraph are derived too.** The rank
+    correlations ($\rho$ national, within-state median, between-state) and the
+    alpha-vs-population/incidence correlations are computed by `make_tables.py`
+    from `powerlaw_results.db` and audited by `--check`. They were the last
+    numbers in the manuscript typed by hand, and when the extraction was
+    refreshed they all moved at once: $0.87 \to 0.89$ nationally, $0.65 \to
+    0.64$ within states, $0.22 \to 0.34$ between states.
 
 ### Before every commit that touches data or numbers
 

@@ -3,10 +3,39 @@
     1.95,
     2.08
   ],
+  "correlations": {
+    "incidence": {
+      "n": 4663,
+      "pearson": -0.143,
+      "spearman": -0.248
+    },
+    "population": {
+      "n": 5264,
+      "pearson": -0.043,
+      "spearman": -0.048
+    }
+  },
+  "coupling": {
+    "between_state": {
+      "n": 26,
+      "rho": 0.34
+    },
+    "national": {
+      "n": 16,
+      "rho": 0.89
+    },
+    "within_state": {
+      "median_rho": 0.64,
+      "min_years": 6,
+      "n_states": 24,
+      "pct_positive": 92,
+      "pct_sig_positive": 67
+    }
+  },
   "exceedance_pct": {
     "10": [
       5.6,
-      16.6
+      16.5
     ],
     "100": [
       0.3,

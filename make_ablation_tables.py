@@ -179,6 +179,13 @@ def _load(name: str, root: str = ".") -> tuple[pd.DataFrame | None, dict, str | 
     return df, meta, None
 
 
+def _signed_list(per_origin: dict, d: int = 3) -> str:
+    """LaTeX list of signed per-origin values: ``$-0.064$, $+0.074$ and $+0.126$``."""
+    vals = [per_origin[k] for k in sorted(per_origin)]
+    body = ", ".join(f"${v:+.{d}f}$" for v in vals[:-1])
+    return f"{body} and ${vals[-1]:+.{d}f}$"
+
+
 def _contrast_summary(df: pd.DataFrame, task: str, tau: float | None = None) -> dict:
     """Per-contrast medians and counts over origins, for one task.
 
@@ -206,6 +213,10 @@ def _contrast_summary(df: pd.DataFrame, task: str, tau: float | None = None) -> 
             "n_diff_positive": int((d["value"] > 0).sum()),
             "n_same_direction_ci": int(d["improves"].sum()),
             "n_ci_excludes_zero": int(d["ci_excludes_zero"].sum()),
+            # Per-origin values, so the sentence that lists them can be
+            # audited instead of retyped. Sorted by origin, not by row order.
+            "per_origin": {int(o): float(v) for o, v in
+                           d.sort_values("origin").set_index("origin")["value"].items()},
         }
         if "rel_improvement" in d:
             out[c]["n_rel_positive"] = int((d["rel_improvement"] > 0).sum())
@@ -646,17 +657,60 @@ def claims(f: dict) -> list[dict]:
                  "want": f"best of the three in {city['n_origins_scaling_best']} of 5",
                  "stale": ["best of the three in 4 of 5"], "needs": src})
 
-    # Numbers the manuscript quotes about state-level exceedance. They are
-    # unverifiable while ablation_state_exceedance.csv is missing, and that is
-    # the point of listing them.
-    out += [
-        {"name": "state exceedance supported in 3 of 5",
-         "want": "3 of the 5 origins", "stale": [],
-         "needs": "state_exceedance"},
-        {"name": "state exceedance per-origin differentials",
-         "want": "$-0.047$, $+0.074$, $+0.134$, $+0.175$ and $+0.159$",
-         "stale": [], "needs": "state_exceedance"},
-    ]
+    # State-level exceedance. These used to be two hand-typed literals, one of
+    # which asserted a `supported` verdict that the refreshed run no longer
+    # produces: the lagged block now clears the rule at municipal level and
+    # fails at state level, on 23--25 units per origin. Both directions are
+    # derived here so the sentence cannot outlive the artefact again.
+    st = f.get("exceed", {}).get("state") or {}
+    sm1 = (st.get("contrasts") or {}).get("M1-M0") or {}
+    sm32 = (st.get("contrasts") or {}).get("M3-M2") or {}
+    if sm1:
+        out += [
+            {"name": "state lagged block, sign count",
+             "want": f"positive in {sm1['n_diff_positive']} of "
+                     f"{sm1['n_origins']} origins",
+             "stale": [],
+             "needs": "state_exceedance"},
+            {"name": "state lagged block, decision count",
+             "want": f"exclude zero in only {sm1['n_same_direction_ci']} of the "
+                     f"{sm1['n_origins']} origins",
+             "stale": ["excluding zero in 3 of the 5 origins"],
+             "needs": "state_exceedance"},
+            {"name": "state lagged block, per-origin differentials",
+             "want": _signed_list(sm1["per_origin"]),
+             "stale": ["$-0.047$, $+0.074$, $+0.134$, $+0.175$ and $+0.159$"],
+             "needs": "state_exceedance"},
+            {"name": "state lagged block, verdict",
+             "want": ("fails the rule at state level"
+                      if sm1.get("verdict") != "supported"
+                      else "clears the rule at state level"),
+             "stale": [], "needs": "state_exceedance"},
+        ]
+    if sm32:
+        out.append(
+            {"name": "state scaling Brier at the municipal comparison",
+             "want": f"median of ${sm32['median_diff']:+.3f}$",
+             "stale": [], "needs": "state_exceedance"})
+
+    # The municipal lagged block is now the paper's only `supported` verdict.
+    cm1 = ((f.get("exceed", {}).get("city") or {}).get("contrasts") or {}).get("M1-M0") or {}
+    if cm1:
+        out.append(
+            {"name": "municipal lagged block, verdict",
+             "want": ("the only contrast in this paper to satisfy the "
+                      "pre-registered rule"
+                      if cm1.get("verdict") == "supported"
+                      else "no rung can be credited at this level"),
+             "stale": [("no rung can be credited at this level"
+                        if cm1.get("verdict") == "supported"
+                        else "the only contrast in this paper to satisfy")],
+             "needs": "city_exceedance"})
+        out.append(
+            {"name": "municipal lagged block, decision count",
+             "want": f"excluding zero in {cm1['n_same_direction_ci']} of "
+                     f"{cm1['n_origins']} origins",
+             "stale": [], "needs": "city_exceedance"})
     # The record-year paragraph: its numbers come from the classifier artefact,
     # and its base rate needs a column that only a re-run of run_classifier.py
     # writes.
