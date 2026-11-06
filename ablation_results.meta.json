@@ -2,7 +2,8 @@
   "argv": [
     "--level",
     "state",
-    "--attach-climate"
+    "--tasks",
+    "exceedance"
   ],
   "level": "state",
   "region": "BR",
@@ -147,7 +148,7 @@
   ],
   "panel_notes": [],
   "tasks": [
-    "size"
+    "exceedance"
   ],
   "classifier_threshold_scope": "pooled",
   "classifier_threshold_scope_requested": null,
@@ -161,6 +162,6 @@
     "numpy": "2.5.4",
     "sklearn": "1.9.1"
   },
-  "elapsed_seconds": 107.9,
+  "elapsed_seconds": 100.6,
   "output": "/mnt/Datos/MEGAsync/Papers/2026-PowerLaw/dengue-Powerlaw/ablation_results.csv"
 }
