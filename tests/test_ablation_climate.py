@@ -87,7 +87,8 @@ def test_require_climate_false_still_refuses_to_build_an_empty_rung():
 
 def test_hand_built_empty_rung_is_caught_by_the_nesting_assertion():
     df = _panel(climate="none")
-    m1 = ra.LAGGED_SIZE + ra.LAGGED_DUR + ra.LAGGED_PEAK + ra.EPI + ra.DEMO
+    m1 = (ra.LAGGED_SIZE + ra.COVARIATE_DUR + ra.COVARIATE_PEAK
+          + ra.EPI + ra.DEMO)
     hand = {"M1": m1, "M2": list(m1), "M3": m1 + ra.SCALING_SIZE}
     with pytest.raises(AssertionError, match="adds no column"):
         ra.assert_ladder_is_nested(hand)
@@ -213,7 +214,8 @@ def test_identical_rungs_produce_a_null_contrast_not_a_zero(monkeypatch):
         lambda Xtr, ytr, tau, model=None, seed=42, max_iter=300: _Constant().fit(Xtr, ytr),
     )
     df = _panel(climate="none", y0=2015, y1=2019)
-    m1 = ra.LAGGED_SIZE + ra.LAGGED_DUR + ra.LAGGED_PEAK + ra.EPI + ra.DEMO
+    m1 = (ra.LAGGED_SIZE + ra.COVARIATE_DUR + ra.COVARIATE_PEAK
+          + ra.EPI + ra.DEMO)
     hand_built = {"M1": m1, "M2": list(m1), "M3": m1 + ra.SCALING_SIZE}
 
     rows, _ = ra.run_regression_ablation(

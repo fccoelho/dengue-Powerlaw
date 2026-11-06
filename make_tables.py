@@ -27,18 +27,28 @@ DB_DEFAULT = "powerlaw_results.db"
 GEN_DIR = os.path.join("Manuscript", "generated")
 
 #: ``year = 0`` rows are pooled all-years fits, not a calendar year. Including
-#: them inflates every per-year level by one row per unit (27 states). The
-#: authors' own reported counts (330 state-years, 15 national years) only
+#: them inflates every per-year level by one row per unit (26 states). The
+#: year counts the manuscript reports (353 state-years, 16 national years) only
 #: reproduce with them excluded, so that is the convention used here.
+#: Every level fits the *same* variable class -- epidemic size, at five
+#: different constructions. The duration constructions (the former L5 and L7)
+#: were removed: a season is bounded above by the length of the year, so a
+#: scale-free law cannot apply to duration a priori, and the fits confirmed it
+#: by running into the estimator's ceiling. Keeping them in the table invited
+#: the reader to compare an exponent that means something with one that does
+#: not. Duration and peak timing survive in the paper as covariates of size.
 LEVELS = [
     ("L1", "L1 weekly, city",             "SELECT * FROM powerlaw_fits"),
     ("L2", "L2 weekly, city-year",        "SELECT * FROM powerlaw_fits_yearly WHERE year <> 0"),
     ("L3", "L3 annual total, city",       "SELECT * FROM powerlaw_fits_total_cases"),
     ("L4", "L4 size, state-year",         "SELECT * FROM episcanner_state_fits WHERE metric='total_cases' AND year <> 0"),
-    ("L5", "L5 duration, state-year",     "SELECT * FROM episcanner_state_fits WHERE metric='ep_dur' AND year <> 0"),
     ("L6", "L6 size, national-year",      "SELECT * FROM episcanner_fits WHERE metric='total_cases' AND year <> 0"),
-    ("L7", "L7 duration, national-year",  "SELECT * FROM episcanner_fits WHERE metric='ep_dur' AND year <> 0"),
 ]
+
+#: Levels are addressed by key, never by position. The old code indexed
+#: ``LEVELS[5]`` and ``LEVELS[3]``; dropping L5 shifted every index silently
+#: and the national summary would have been computed from the state table.
+SQL_BY_KEY = {key: sql for key, _label, sql in LEVELS}
 
 
 def _fmt(n: int) -> str:
@@ -48,6 +58,102 @@ def _fmt(n: int) -> str:
 
 def _f(x: float, d: int = 2) -> str:
     return f"{x:.{d}f}"
+
+
+def _sci(value: float) -> str:
+    """LaTeX for a round 'about N x 10^k', e.g. 40738 -> ``$4\\times10^{4}$``."""
+    import math
+
+    k = int(math.floor(math.log10(float(value))))
+    mantissa = int(round(float(value) / 10 ** k))
+    return f"${mantissa}\\times10^{{{k}}}$"
+
+
+def _exceedance_pct(nat) -> dict:
+    """Exceedance percentages implied by each national fit, via Equation (2)."""
+    from scipy.special import zeta as hurwitz
+
+    out = {}
+    for k in (10, 100, 1000):
+        vals = [
+            100.0 * float(hurwitz(a, k * x) / hurwitz(a, x))
+            for a, x in zip(nat["alpha"].astype(float), nat["xmin"].astype(float))
+        ]
+        out[str(k)] = [round(min(vals), 1), round(max(vals), 1)]
+    return out
+
+
+def _coupling(con) -> dict:
+    """Rank association between the two fitted parameters (Table 4).
+
+    Computed rather than typed: these are the numbers that moved when the
+    extraction was refreshed, and Table 4 had no artefact tying it to the
+    database at all.
+    """
+    import numpy as np
+    import pandas as pd
+    from scipy.stats import spearmanr
+
+    def _rho(a, b) -> float:
+        return float(spearmanr(np.asarray(a, float), np.asarray(b, float)).statistic)
+
+    nat = pd.read_sql(SQL_BY_KEY["L6"], con).dropna(subset=["alpha", "xmin"])
+    st = pd.read_sql(SQL_BY_KEY["L4"], con).dropna(subset=["alpha", "xmin"])
+
+    per_rho, per_p = [], []
+    for _state, g in st.groupby("state"):
+        # A rank correlation needs a handful of points; states with fewer than
+        # six seasons are dropped rather than reported as if they were stable.
+        if len(g) < 6:
+            continue
+        r = spearmanr(g["alpha"].astype(float),
+                      np.log10(g["xmin"].astype(float)))
+        per_rho.append(float(r.statistic))
+        per_p.append(float(r.pvalue))
+    per_rho = np.asarray(per_rho, float)
+    per_p = np.asarray(per_p, float)
+
+    means = pd.DataFrame({
+        "alpha": st.groupby("state")["alpha"].mean(),
+        "lx": np.log10(st.groupby("state")["xmin"].mean()),
+    })
+
+    return {
+        "national": {
+            "rho": round(_rho(nat["alpha"], np.log10(nat["xmin"])), 2),
+            "n": int(len(nat)),
+        },
+        "within_state": {
+            "median_rho": round(float(np.median(per_rho)), 2),
+            "n_states": int(len(per_rho)),
+            "min_years": 6,
+            "pct_positive": int(round(100 * float((per_rho > 0).mean()))),
+            "pct_sig_positive": int(
+                round(100 * float(((per_rho > 0) & (per_p < 0.05)).mean()))),
+        },
+        "between_state": {
+            "rho": round(_rho(means["alpha"], means["lx"]), 2),
+            "n": int(len(means)),
+        },
+    }
+
+
+def _size_correlation(con, column: str) -> dict:
+    """Pearson/Spearman of alpha against a municipal covariate (Section 5.3)."""
+    import numpy as np
+    import pandas as pd
+
+    d = pd.read_sql(
+        "SELECT f.alpha AS alpha, c." + column + " AS x "
+        "FROM powerlaw_fits f JOIN city_stats c USING (geocode) "
+        "WHERE c.population > 0", con).dropna()
+    d["x"] = np.log10(d["x"].astype(float)) if column == "population" \
+        else d["x"].astype(float)
+    return {
+        "pearson": round(float(d["x"].corr(d["alpha"])), 3),
+        "spearman": round(float(d["x"].corr(d["alpha"], method="spearman")), 3),
+        "n": int(len(d)),
+    }
 
 
 def compute_facts(db_path: str = DB_DEFAULT) -> dict:
@@ -76,15 +182,18 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
             "exp_sig": int(round(100 * float(((R < 0) & (p < 0.05)).mean()))),
         }
 
-    nat = pd.read_sql(LEVELS[5][2], con).dropna(subset=["alpha", "xmin"])
-    st = pd.read_sql(LEVELS[3][2], con).dropna(subset=["alpha", "xmin"])
+    nat = pd.read_sql(SQL_BY_KEY["L6"], con).dropna(subset=["alpha", "xmin"])
+    st = pd.read_sql(SQL_BY_KEY["L4"], con).dropna(subset=["alpha", "xmin"])
     a_lo, a_hi = float(nat["alpha"].min()), float(nat["alpha"].max())
 
-    # Exceedance above k*x_min for a Pareto tail: P(X > k x_min) = k^-(alpha-1).
-    # Evaluated at the two extremes of the national exponent, which is the
-    # range the manuscript quotes.
-    exceed = {str(k): [round(100 * k ** -(a_hi - 1), 1), round(100 * k ** -(a_lo - 1), 1)]
-              for k in (10, 100, 1000)}
+    # Exceedance above k*x_min, from Equation (2) of the manuscript:
+    #     P(S >= s) = zeta(alpha, s) / zeta(alpha, x_min),  s = k * x_min
+    # with zeta the Hurwitz (generalised) zeta function -- the same expression
+    # fig09 plots. The continuous Pareto limit k^-(alpha-1) was used here
+    # before and disagrees in the first decimal for the small national lower
+    # bounds (16.6\% against 16.5\% at ten times x_min), which put the
+    # generated facts at odds with the paper's own equation.
+    exceed = _exceedance_pct(nat)
 
     alphas = [d["alpha"] for d in levels.values()]
     xmins = [d["xmin"] for d in levels.values()]
@@ -107,14 +216,30 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
             "xmin": int(round(float(st["xmin"].median()))),
             "pl_pref": int(round(100 * float((st["R"] > 0).mean()))),
         },
-        "duration_ceiling": {
-            "n": levels["L5"]["n"],
-            "at_ceiling": int((pd.read_sql(LEVELS[4][2], con)["alpha"].dropna().round(6) == 3.0).sum()),
-            "pct": round(100 * float((pd.read_sql(LEVELS[4][2], con)["alpha"].dropna().round(6) == 3.0).mean()), 1),
+        #: Proportion of fits whose x_min collapsed into the bulk -- the
+        #: diagnostic that decides whether the tail language is vacuous.
+        "xmin_le5_pct": {
+            key: round(100 * float((pd.read_sql(sql, con)["xmin"]
+                                    .dropna() <= 5).mean()), 0)
+            for key, _label, sql in LEVELS
+        },
+        #: Largest selected lower bound anywhere, and where the smallest sits.
+        "xmin_extremes": {
+            "min": int(round(min(
+                float(pd.read_sql(sql, con)["xmin"].dropna().min())
+                for _k, _l, sql in LEVELS))),
+            "max": int(round(max(
+                float(pd.read_sql(sql, con)["xmin"].dropna().max())
+                for _k, _l, sql in LEVELS))),
         },
         "alpha_span_levels": [min(alphas), max(alphas)],
         "xmin_span_levels": [min(xmins), max(xmins)],
         "exceedance_pct": exceed,
+        "coupling": _coupling(con),
+        "correlations": {
+            "population": _size_correlation(con, "population"),
+            "incidence": _size_correlation(con, "incidence"),
+        },
         "warnings": warnings,
     }
 
@@ -132,13 +257,15 @@ def render_table(f: dict) -> str:
         "% Regenerate with: python make_tables.py\n"
         "\\begin{table}[htbp]\n\\centering\n\\small\n"
         "\\setlength{\\tabcolsep}{3.5pt}\n"
-        "\\caption{Power-law fits by aggregation level. $\\alpha$ median with\n"
-        "interquartile range; $x_{\\min}$ median; PL$_{\\text{pref}}$ = proportion with\n"
-        "$R>0$; PL$_{\\text{sig}}$ = proportion with $R>0$ and $p<0.05$;\n"
+        "\\caption{Power-law fits of epidemic \\emph{size} under five nested\n"
+        "constructions. $\\alpha$ median with interquartile range; $x_{\\min}$\n"
+        "median; PL$_{\\text{pref}}$ = proportion with $R>0$;\n"
+        "PL$_{\\text{sig}}$ = proportion with $R>0$ and $p<0.05$;\n"
         "Exp$_{\\text{sig}}$ = proportion with $R<0$ and $p<0.05$. Shares are\n"
-        "percentages. The levels that survive the $x_{\\min}$ diagnostic \\emph{and} the\n"
-        "model comparison are the cross-sectional size constructions L4 and L6, which are\n"
-        "the object of the rest of the paper.}\n"
+        "percentages. The weekly levels produce apparent support that the\n"
+        "$x_{\\min}$ diagnostic removes; the cross-sectional constructions L4 and\n"
+        "L6 are the ones where the support survives both tests, and they are the\n"
+        "object of the rest of the paper.}\n"
         "\\label{tab:main}\n"
         "\\begin{tabular}{@{}lrrrrrrr@{}}\n\\toprule\n"
         "Level & $n$ & $\\alpha$ & IQR & $x_{\\min}$ & PL$_{\\text{pref}}$ & "
@@ -153,11 +280,22 @@ def claims(f: dict) -> list[dict]:
     Each claim pairs the string that *should* appear with the stale literal
     that must *not*. ``--check`` reports both directions, so a value that
     quietly disappears is as visible as one that is wrong.
+
+    The stale literals are not decoration: each one is a number that was
+    actually published in an earlier draft of this manuscript, so a regression
+    to it is caught by name.
     """
-    L, N, S, E = f["levels"], f["national"], f["state"], f["exceedance_pct"]
+    L, N, S, E, X = (
+        f["levels"], f["national"], f["state"], f["exceedance_pct"],
+        f["xmin_extremes"],
+    )
+    C, R = f["coupling"], f["correlations"]
     return [
         {"name": "total fits", "want": _fmt(f["total_fits"]),
-         "stale": ["47{,}494", "47,494"], "count": 2},
+         "stale": ["47{,}494", "47,494", "48{,}681", "48,681"], "count": 2},
+        {"name": "number of constructions", "want": "five aggregation levels",
+         "stale": ["seven aggregation levels", "seven nested constructions",
+                   "the seven aggregation levels"]},
         {"name": "national cross-sections", "want": f"{N['n']} of {N['n']}",
          "stale": ["in 15 of 15 national cross-sections"]},
         {"name": "state-years", "want": _fmt(S["n"]),
@@ -173,12 +311,10 @@ def claims(f: dict) -> list[dict]:
          "stale": ["and 159 cases"]},
         {"name": "span of median exponents",
          "want": f"{_f(f['alpha_span_levels'][0])}$ to ${_f(f['alpha_span_levels'][1])}",
-         "stale": ["$1.95$ to $2.95$"]},
-        {"name": "L7 exponent", "want": _f(L["L7"]["alpha"]),
-         "stale": ["piling up at $2.95$"]},
+         "stale": ["$1.95$ to $2.95$", "$1.95$ to $2.93$"]},
         {"name": "exceedance 10x",
          "want": f"{E['10'][0]}--{E['10'][1]}\\%",
-         "stale": ["5.4--16.5\\%"]},
+         "stale": ["5.4--16.5\\%", "5.6--16.6\\%"]},
         {"name": "exceedance 100x",
          "want": f"{E['100'][0]}--{E['100'][1]}\\%",
          "stale": ["0.3--2.6\\%"]},
@@ -196,11 +332,50 @@ def claims(f: dict) -> list[dict]:
          "want": f"SD ${N['alpha_sd']:.3f}$",
          "stale": ["SD $0.154$"]},
         {"name": "national alpha max",
-         "want": f"exceeds ${_f(N['alpha_max'])}",
+         # stated twice: in the Results as the top of the observed range and in
+         # the Limitations as the evidence that the estimator ceiling never
+         # binds for size.
+         "want": f"and ${_f(N['alpha_max'])}$ nationally",
          "stale": ["exceeds $2.27$"]},
-        {"name": "duration ceiling count",
-         "want": f"{f['duration_ceiling']['at_ceiling']} of them",
-         "stale": ["11 of them"]},
+        {"name": "xmin extremes",
+         # 40{,}738 cases is "about 4 x 10^4"; derive it rather than typing it
+         # so the phrase cannot drift from the database.
+         "want": _sci(X["max"]), "stale": ["$1.5\\times10^{5}$"]},
+        {"name": "share of weekly fits at xmin<=5 (L1)",
+         "want": f"{f['xmin_le5_pct']['L1']:.0f}\\% of L1",
+         "stale": ["76\\% of L1"]},
+        {"name": "share of weekly fits at xmin<=5 (L2)",
+         "want": f"{f['xmin_le5_pct']['L2']:.0f}\\% of L2",
+         "stale": ["82\\% of L2"]},
+        # Table 4 and the coupling paragraph. Every entry here is a number a
+        # reader could check, and none of them existed as an artefact before.
+        {"name": "coupling rho, national",
+         "want": f"at ${C['national']['rho']:.2f}$ nationally",
+         "stale": ["at $0.87$ nationally"]},
+        {"name": "coupling rho, within state",
+         "want": f"${C['within_state']['median_rho']:.2f}$ "
+                 f"(median over {C['within_state']['n_states']} states)",
+         "stale": ["$0.65$ (median over"]},
+        {"name": "coupling rho, between states",
+         "want": f"& ${C['between_state']['rho']:.2f}$ & "
+                 f"{C['between_state']['n']}",
+         "stale": ["& $0.22$ & 26"]},
+        {"name": "share of states with a positive within-state rho",
+         "want": f"positive in {C['within_state']['pct_positive']}\\% of the "
+                 f"{C['within_state']['n_states']} states",
+         "stale": ["positive in 88\\% of the 24 states"]},
+        {"name": "alpha vs city size",
+         "want": f"Pearson $r={R['population']['pearson']:.3f}$, "
+                 f"Spearman ${R['population']['spearman']:.3f}$",
+         "stale": ["Pearson $r=-0.065$"]},
+        {"name": "alpha vs city size, n",
+         "want": f"$n={_fmt(R['population']['n'])}$",
+         "stale": ["$n=5{,}244$"]},
+        {"name": "alpha vs incidence",
+         "want": f"Pearson ${R['incidence']['pearson']:.3f}$, "
+                 f"Spearman ${R['incidence']['spearman']:.3f}$; "
+                 f"$n={_fmt(R['incidence']['n'])}$",
+         "stale": ["Pearson $-0.136$"]},
     ]
 
 

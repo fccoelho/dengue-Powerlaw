@@ -67,21 +67,32 @@ def report_stale_city_cache():
 
 
 def stale_geocodes():
-    """Geocodes whose Infodengue cache predates today (resume support).
+    """Geocodes whose Infodengue cache predates the refresh reference.
 
-    Cities already refreshed today were downloaded AND fitted by the
-    interrupted run (run_scan upserts fits as it goes), so they are skipped
-    entirely; everything else is re-downloaded with force_download=True.
+    Reference: the ``STALE_SINCE_EPOCH`` environment variable when set
+    (e.g. the completion time of a previous, mostly-successful run, so only
+    true stragglers are re-downloaded); otherwise midnight today, which
+    matches the original "one full update per day" semantics.
+
+    Cities already refreshed after the reference were downloaded AND fitted
+    by the interrupted run (run_scan upserts fits as it goes), so they are
+    skipped entirely; everything else is re-downloaded with force_download.
     """
     import os
 
     from fitpl import NAME_BY_GEOCODE
 
-    today = datetime.now().replace(hour=0, minute=0, second=0, microsecond=0).timestamp()
+    ref = os.environ.get("STALE_SINCE_EPOCH")
+    if ref:
+        ref = float(ref)
+    else:
+        ref = datetime.now().replace(
+            hour=0, minute=0, second=0, microsecond=0
+        ).timestamp()
     stale = {}
     for geocode, name in NAME_BY_GEOCODE.items():
         path = os.path.join("data", f"{geocode}.parquet")
-        if not os.path.exists(path) or os.path.getmtime(path) < today:
+        if not os.path.exists(path) or os.path.getmtime(path) < ref:
             stale[geocode] = name
     print(f"[resume] {len(stale)} of {len(NAME_BY_GEOCODE)} municipalities "
           "have a stale (or missing) cache and will be re-downloaded", flush=True)

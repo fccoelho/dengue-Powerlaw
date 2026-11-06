@@ -1,9 +1,9 @@
 {
   "manifest_version": 1,
-  "written_utc": "2026-11-04T12:27:01+00:00",
+  "written_utc": "2026-11-06T18:20:48+00:00",
   "database": {
     "path": "powerlaw_results.db",
-    "sha256": "2115c0f689f6c1f85c869217fee553f0fd70fc12aa8c8293eeb9702d2974f5f6",
+    "sha256": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
     "inventory": {
       "city_stats": {
         "rows": 5571,
@@ -16,7 +16,7 @@
         ]
       },
       "episcanner_fits": {
-        "rows": 33,
+        "rows": 17,
         "schema": "9138888c1cf4f63b",
         "columns": [
           "metric",
@@ -29,7 +29,7 @@
         ]
       },
       "episcanner_state_fits": {
-        "rows": 737,
+        "rows": 380,
         "schema": "15ce0ccc6d02236f",
         "columns": [
           "state",
@@ -43,7 +43,7 @@
         ]
       },
       "powerlaw_fits": {
-        "rows": 5247,
+        "rows": 5264,
         "schema": "79a82f03c45d1165",
         "columns": [
           "geocode",
@@ -71,7 +71,7 @@
         ]
       },
       "powerlaw_fits_yearly": {
-        "rows": 41635,
+        "rows": 43673,
         "schema": "c114855b3bd86308",
         "columns": [
           "geocode",
@@ -87,17 +87,22 @@
     }
   },
   "artifacts": {
-    "powerlaw_results.db": "2115c0f689f6c1f85c869217fee553f0fd70fc12aa8c8293eeb9702d2974f5f6",
-    "Manuscript/main.tex": "0fe341aab2ffcb51add8350c96dc4c90b6468e7fc34f0facf29497b11e070818",
-    "Manuscript/generated/facts.json": "e825eec95f6ae9980f1b1997d73944c1af6ea6dbdef2119eeadbd27d7d8a8888",
-    "Manuscript/generated/tab_main.tex": "33197cfb854989d5af1218503b2e546115e05008b7ccc79dbc63cdaa7155ef35",
-    "ablation_results.csv": "865fd8f3b7369d4b070529aed2570b0bb4aad16784f6c6a528432db480fd824c",
-    "ablation_results.meta.json": "0ddd15f6007d5897bbf5b353afb747e9438625813bfacc12ed3143c6c5fa5cb0",
-    "ablation_city.csv": "d1324bb793fd53095a1bce8b7542de3c90d86df65a99ed22642ba43c43a4ec96",
-    "ablation_city.meta.json": "94e8c6a6a26575d641cff951733b32a5b27686d409ddc5a1c149c4aff93c6d0f",
-    "classifier_results.parquet": "c05d22a681ef832e8032baf700289d40859cdaf7da51c752ef9ce4c3dd56b42d",
-    "classifier_results_metrics.csv": "3d7b8cb62a833a35322a0e434759826da2c81926d2546212cceae46f59fe01f7",
-    "classifier_results_importance.csv": "1d77e29f34ae1703e6891e9629c5a7bcc103bac4fbbc8244f8c82bc935fdbd57",
-    "classifier_results.meta.json": "a2f1d9c1cd3ec4c80b92c168d2f69be858611af93c4e3ddeadeee5e0e0956b5f"
+    "powerlaw_results.db": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
+    "Manuscript/main.tex": "82b617481ff90ac3f1367d018e07832ba12ca057228a1029b9ae436e74c4ccd9",
+    "Manuscript/generated/facts.json": "4d6423577dd455cc5971d9a020f5c05dd259f274b91a796c9911cbdfc94fdd7b",
+    "Manuscript/generated/tab_main.tex": "35f0085ee7e72e792c28da58fffd90ec7b30a503f872b2ca8b730d6db6517325",
+    "Manuscript/generated/tab_ablation.tex": "7c097d99a734210bfedc85bf8d0ce98831edd2955a43cfa2c04828da25a8e52c",
+    "Manuscript/generated/tab_exceed.tex": "a45c528190a77e49ee1ea944a6ec5d410f34b7c226f6b0099683c55852e82738",
+    "Manuscript/generated/ablation_facts.json": "558509ce5b5fd6869dcfd852c0a15d674d75fbf3dc3cf06454570bb6d0bf45b2",
+    "ablation_results.csv": "c3a78574e5cba0ab1c8c6a358032865421616cf8259075cb4d5db34f9ae0bbbc",
+    "ablation_results.meta.json": "bac62addf7f21795a39566ff5286c5ab73b2867f74245e80f485e499d5e5cf09",
+    "ablation_city.csv": "55578e2ecdc789bcbe03feb21724aacba52cff9763f93e43710e045a565632ea",
+    "ablation_city.meta.json": "bb279d25e3d057107d740e96247a084c90accdcec54b3887960bb0c63cc9c87e",
+    "ablation_state_exceedance.csv": "33013109c9685c81a90b606585d54c9d28999f6171f0ce7413e398ed7a8babdb",
+    "ablation_state_exceedance.meta.json": "b37fe39648c9c89cc151b8d39bfcefec00adafd6cac4d0ba407667125248ea69",
+    "classifier_results.parquet": "899dd983efd45d0978f9d4354dce6422957215004cf651039a516e95b5ba44e6",
+    "classifier_results_metrics.csv": "ce8b915593b7b071e72127e54b24498399d161b743062dfaa23f730c97f0b92a",
+    "classifier_results_importance.csv": "efae74c323f33eb91b3022853fd635003f56aa01726266358fed9a833f25fe2a",
+    "classifier_results.meta.json": "d4593e798cc7d6ff5d6249f9f6a181b153607eccf2c2b7b5fd53871e545067ff"
   }
 }

@@ -10,6 +10,11 @@
 
 -- ---------------------------------------------------------------
 -- 1. The main table (Table 1 of the manuscript)
+--
+-- Five constructions, all of epidemic size. The duration levels were removed
+-- from the paper: a season is bounded above by the length of the year, so a
+-- scale-free law cannot apply to duration a priori, and
+-- fit_episcanner_pl.py no longer writes metric='ep_dur' rows.
 -- ---------------------------------------------------------------
 -- L1: weekly cases, city, full series
 SELECT 'L1' AS level, COUNT(*) AS n,
@@ -44,26 +49,13 @@ SELECT 'L4', COUNT(*), ROUND(AVG(alpha),3), NULL, ROUND(AVG(xmin),1),
        ROUND(100.0*AVG(CASE WHEN R < 0 AND p < 0.05 THEN 1 ELSE 0 END),1)
 FROM episcanner_state_fits WHERE metric='total_cases' AND year > 0
 UNION ALL
-SELECT 'L5', COUNT(*), ROUND(AVG(alpha),3), NULL, ROUND(AVG(xmin),1),
-       ROUND(100.0*AVG(CASE WHEN xmin <= 5 THEN 1 ELSE 0 END),1),
-       ROUND(100.0*AVG(CASE WHEN R > 0 THEN 1 ELSE 0 END),1),
-       ROUND(100.0*AVG(CASE WHEN R > 0 AND p < 0.05 THEN 1 ELSE 0 END),1),
-       ROUND(100.0*AVG(CASE WHEN R < 0 AND p < 0.05 THEN 1 ELSE 0 END),1)
-FROM episcanner_state_fits WHERE metric='ep_dur' AND year > 0
-UNION ALL
 SELECT 'L6', COUNT(*), ROUND(AVG(alpha),3), NULL, ROUND(AVG(xmin),1),
        ROUND(100.0*AVG(CASE WHEN xmin <= 5 THEN 1 ELSE 0 END),1),
        ROUND(100.0*AVG(CASE WHEN R > 0 THEN 1 ELSE 0 END),1),
        ROUND(100.0*AVG(CASE WHEN R > 0 AND p < 0.05 THEN 1 ELSE 0 END),1),
        ROUND(100.0*AVG(CASE WHEN R < 0 AND p < 0.05 THEN 1 ELSE 0 END),1)
 FROM episcanner_fits WHERE metric='total_cases' AND year > 0
-UNION ALL
-SELECT 'L7', COUNT(*), ROUND(AVG(alpha),3), NULL, ROUND(AVG(xmin),1),
-       ROUND(100.0*AVG(CASE WHEN xmin <= 5 THEN 1 ELSE 0 END),1),
-       ROUND(100.0*AVG(CASE WHEN R > 0 THEN 1 ELSE 0 END),1),
-       ROUND(100.0*AVG(CASE WHEN R > 0 AND p < 0.05 THEN 1 ELSE 0 END),1),
-       ROUND(100.0*AVG(CASE WHEN R < 0 AND p < 0.05 THEN 1 ELSE 0 END),1)
-FROM episcanner_fits WHERE metric='ep_dur' AND year > 0;
+
 
 -- ---------------------------------------------------------------
 -- 2. Stability of the exponent across states (L4)
@@ -76,13 +68,13 @@ WHERE metric='total_cases' AND year > 0
 GROUP BY state ORDER BY alpha_state;
 
 -- ---------------------------------------------------------------
--- 3. Year-by-year national fits (L6 vs L7) -- the headline contrast
+-- 3. Year-by-year national fits (L6) -- the headline series
 -- ---------------------------------------------------------------
 SELECT year, metric, ROUND(alpha,3) AS alpha, ROUND(xmin,1) AS xmin,
        ROUND(R,3) AS R, ROUND(p,4) AS p
 FROM episcanner_fits
-WHERE year > 0
-ORDER BY metric, year;
+WHERE metric = 'total_cases' AND year > 0
+ORDER BY year;
 
 -- ---------------------------------------------------------------
 -- 4. Correlation of alpha with size (L1)

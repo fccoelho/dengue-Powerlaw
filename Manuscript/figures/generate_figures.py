@@ -84,17 +84,19 @@ mpl.rcParams.update({
     "legend.frameon": False,
 })
 
+#: Five constructions of the same variable -- epidemic size. The two duration
+#: constructions (former L5 and L7) are gone: a season is bounded above by the
+#: length of the year, so a scale-free law cannot apply to duration a priori,
+#: and the fits said so by running into the estimator's ceiling. Duration and
+#: peak timing survive as covariates of size.
 LEVELS = {
     "L1": ("powerlaw_fits", "", "weekly, city"),
     "L2": ("powerlaw_fits_yearly", "", "weekly, city-year"),
     "L3": ("powerlaw_fits_total_cases", "", "size, city"),
     "L4": ("episcanner_state_fits", "metric='total_cases' AND year>0", "size, state-year"),
-    "L5": ("episcanner_state_fits", "metric='ep_dur' AND year>0", "duration, state-year"),
     "L6": ("episcanner_fits", "metric='total_cases' AND year>0", "size, natl-year"),
-    "L7": ("episcanner_fits", "metric='ep_dur' AND year>0", "duration, natl-year"),
 }
-SIZE_LEVELS = ["L1", "L2", "L3", "L4", "L6"]
-DUR_LEVELS = ["L5", "L7"]
+SIZE_LEVELS = list(LEVELS)
 COLORS = plt.cm.tab10.colors
 
 
@@ -142,11 +144,10 @@ def _city_panel():
 ABL_REQUIRED = ("record_type", "task", "target", "origin", "rung", "contrast",
                 "loss", "tau", "value", "ci_low", "ci_high")
 
-TASK_LABEL = {
-    "total_cases": "size $S_t$",
-    "ep_dur": "duration $D_t$",
-    "peak_week": "peak week $P_t$",
-}
+#: Epidemic size is the only forecasting target. Duration and peak timing are
+#: covariates in the model, not outcomes.
+TASK_LABEL = {"total_cases": "size $S_t$"}
+TARGETS_ALLOWED = set(TASK_LABEL)
 RUNG_COLORS = {"M1": "#9ecae1", "M2": "#4292c6", "M3": "#08519c"}
 
 
@@ -209,6 +210,25 @@ def _load_ablation(csv_path=None):
         raise RuntimeError(
             "every M2-M1 contrast is exactly 0.0 with a [0, 0] interval: this "
             "is the 'climate never entered' signature, not a result.")
+
+    # -- guard 4: no stale duration/peak target may survive -----------------
+    stale = sorted(set(raw.loc[raw.record_type == "loss", "target"].dropna())
+                   - TARGETS_ALLOWED)
+    if stale:
+        raise RuntimeError(
+            f"the ablation artefact still reports the target(s) {stale}. "
+            "Duration and peak timing are covariates now, not targets, and "
+            "their duration scaling level no longer exists. Re-run "
+            "`python run_ablation.py` -- a view of a superseded design is "
+            "worse than no figure."
+        )
+    stale_cols = [c for rung in meta.get("ladder", {}).values() for c in rung
+                  if c.startswith(("prev_alpha_dur", "prev_xmin_dur"))]
+    if stale_cols:
+        raise RuntimeError(
+            f"the ablation ladder still carries duration scaling descriptors "
+            f"{sorted(set(stale_cols))}; they no longer exist in the database."
+        )
 
     return {"raw": raw, "meta": meta, "path": csv_path}
 
@@ -299,7 +319,8 @@ def _load_classifier():
 
 
 def fig01():
-    fig, ax = plt.subplots(figsize=(8.4, 3.4))
+    """Schematic of the five constructions, on one dataset."""
+    fig, ax = plt.subplots(figsize=(8.4, 3.2))
     ax.axis("off")
 
     def box(x, y, w, h, text, fc):
@@ -313,7 +334,7 @@ def fig01():
                 arrowprops=dict(arrowstyle="->", lw=0.8))
     ax.text(0.18, 0.62, "temporal window:\nfull series / season / year",
             fontsize=7, va="center")
-    box(0.02, 0.34, 0.30, 0.16, "random variable $X$:\ncounts, sizes or durations", "#d9e8f4")
+    box(0.02, 0.34, 0.30, 0.16, "random variable $X$:\nepidemic size", "#d9e8f4")
 
     ax.annotate("", xy=(0.45, 0.42), xytext=(0.33, 0.42),
                 arrowprops=dict(arrowstyle="->", lw=0.8))
@@ -322,18 +343,18 @@ def fig01():
 
     labels = [
         ("L1 weekly, city\n(full series)", 0.46, 0.80),
-        ("L2 weekly, city\n(single years)", 0.46, 0.56),
-        ("L3 size, city\n(annual totals)", 0.46, 0.32),
-        ("L4 size, state-year\ncross-section", 0.74, 0.80),
-        ("L5 duration, state-year", 0.74, 0.56),
-        ("L6 size, national-year", 0.74, 0.32),
-        ("L7 duration, national-year", 0.74, 0.08),
+        ("L2 weekly, city\n(single years)", 0.46, 0.50),
+        ("L3 size, city\n(annual totals)", 0.46, 0.20),
+        ("L4 size, state-year\ncross-section", 0.74, 0.65),
+        ("L6 size, national-year", 0.74, 0.30),
     ]
-    for i, (t, x, y) in enumerate(labels):
-        fc = "#f6d6d0" if "duration" in t else "#d8ecd8"
-        box(x, y, 0.24, 0.14, t, fc)
-    ax.text(0.50, 0.02, "green: constructions whose verdict is 'power law'   "
-            "red: constructions whose verdict is 'exponential'",
+    for t_text, x, y in labels:
+        # shaded by the x_min diagnostic, which is what decides whether the
+        # tail language is vacuous: L1 and L2 collapse into the bulk.
+        fc = "#f6d6d0" if t_text[:2] in ("L1", "L2") else "#d8ecd8"
+        box(x, y, 0.24, 0.16, t_text, fc)
+    ax.text(0.50, 0.00, "green: $x_{\\min}$ above the bulk (the fit describes a tail)   "
+            "red: $x_{\\min}\\leq5$ (the fit describes the data)",
             fontsize=7, color="0.3")
     fig.savefig(OUT / "fig01_aggregation_levels.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig01_aggregation_levels.png", bbox_inches="tight")
@@ -344,23 +365,22 @@ def fig01():
 # Fig 02 -- alpha by level (boxes), size above, duration below
 # ---------------------------------------------------------------------------
 def fig02():
+    """Distribution of the estimated exponent at each construction."""
     data = _level_alpha()
-    fig, (ax1, ax2) = plt.subplots(
-        2, 1, figsize=(7.0, 4.2),
-        gridspec_kw={"height_ratios": [5, 2]})
-    for ax, levels in ((ax1, SIZE_LEVELS), (ax2, DUR_LEVELS)):
-        vals = [data[l]["alpha"].values for l in levels]
-        bp = ax.boxplot(vals, tick_labels=levels, whis=1.5, showfliers=False,
-                        patch_artist=True, widths=0.55)
-        for patch in bp["boxes"]:
-            patch.set_facecolor("#aec7e8")
-        ax.axhline(2.0, ls="--", lw=0.9, color="0.4")
-        ax.set_ylabel(r"$\alpha$")
-    ax2.set_xlabel("aggregation level")
-    ax1.text(0.02, 0.92, "size constructions", transform=ax1.transAxes, fontsize=9)
-    ax2.text(0.02, 0.8, "duration constructions", transform=ax2.transAxes, fontsize=9)
-    fig.suptitle(r"estimated exponent by aggregation level (dashed: $\alpha=2$)", y=0.98)
-    fig.tight_layout(rect=[0, 0, 1, 0.96])
+    fig, ax = plt.subplots(figsize=(7.0, 3.4))
+    vals = [data[lvl]["alpha"].values for lvl in SIZE_LEVELS]
+    bp = ax.boxplot(vals, tick_labels=SIZE_LEVELS, whis=1.5, showfliers=False,
+                    patch_artist=True, widths=0.55)
+    for patch in bp["boxes"]:
+        patch.set_facecolor("#aec7e8")
+    ax.axhline(2.0, ls="--", lw=0.9, color="0.4")
+    ax.text(0.02, 0.92, r"$\alpha=2$", transform=ax.transAxes, fontsize=9,
+            color="0.35")
+    ax.set_xlabel("aggregation level")
+    ax.set_ylabel(r"$\alpha$")
+    ax.set_title("estimated exponent by construction (dashed: $\\alpha=2$)",
+                 fontsize=10)
+    fig.tight_layout()
     fig.savefig(OUT / "fig02_alpha_by_level.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig02_alpha_by_level.png", bbox_inches="tight")
     plt.close(fig)
@@ -402,46 +422,52 @@ def fig03():
 # Fig 04 -- CCDFs at the national cross-section, pooled 15 years
 # ---------------------------------------------------------------------------
 def fig04():
+    """CCDF of epidemic size at the national cross-section, with both models.
+
+    The figure used to carry a second panel: the same CCDF for epidemic
+    duration, drawn to show that it bends downwards while size does not. That
+    contrast is gone with the duration aggregation levels -- duration is
+    bounded by the length of the season, so the comparison was between a
+    question the model can answer and one it cannot. What remains is the
+    claim the paper actually uses, with the exponential alternative overlaid
+    on the same axes.
+    """
     from powerlaw import Fit
+    from scipy.special import zeta
 
     df = _episcanner_all()
     nat = _read(
         "SELECT metric, alpha, xmin FROM episcanner_fits WHERE year=0"
     ).set_index("metric")
-    fig, axes = plt.subplots(1, 2, figsize=(8.6, 3.4))
 
-    for ax, col, metric, lab in (
-        (axes[0], "total_cases", "total_cases", "epidemic size (cases)"),
-        (axes[1], "ep_dur", "ep_dur", "epidemic duration (weeks)"),
-    ):
-        v = df[col].values
-        v = v[v > 0]
-        fit = Fit(v, discrete=True, xmin=float(nat.loc[metric, "xmin"]))
-        fit.plot_ccdf(ax=ax, color="0.55", label="empirical (pooled 2011–2025)")
-        xmin = float(nat.loc[metric, "xmin"])
-        alpha = float(nat.loc[metric, "alpha"])
-        s = np.logspace(np.log10(xmin), np.log10(v.max()), 100)
-        if metric == "total_cases":
-            # discrete PL tail: Pr(X>=s) = zeta(alpha, s)/zeta(alpha, xmin)
-            from scipy.special import zeta
+    v = df["total_cases"].values
+    v = v[v > 0]
+    xmin = float(nat.loc["total_cases", "xmin"])
+    alpha = float(nat.loc["total_cases", "alpha"])
 
-            ccdf = zeta(alpha, s) / zeta(alpha, xmin)
-            ax.plot(s, ccdf, "k-", lw=1.4,
-                    label=rf"power law ($\alpha={alpha:.2f}$, $x_\min={xmin:.0f}$)")
-            ax.set_xscale("log")
-            ax.set_yscale("log")
-        else:
-            # exponential alternative: Pr(X>=s) = exp(-lambda (s - xmin))
-            lam = 1.0 / v[v >= xmin].mean()
-            ax.plot(s, np.exp(-lam * (s - xmin)), "k--", lw=1.4,
-                    label=f"exponential (mean {1/lam:.1f} wk)")
-            ax.set_xscale("log")
-        ax.set_xlabel(lab)
-        ax.set_ylabel(r"$\Pr(X \geq x)$")
-        ax.legend(fontsize=7, loc="lower left")
+    fig, ax = plt.subplots(figsize=(6.4, 4.0))
+    fit = Fit(v, discrete=True, xmin=xmin)
+    fit.plot_ccdf(ax=ax, color="0.55", label="empirical (pooled 2011–2026)")
+
+    s = np.logspace(np.log10(xmin), np.log10(v.max()), 200)
+    # discrete power law tail: Pr(X >= s) = zeta(alpha, s) / zeta(alpha, xmin)
+    ax.plot(s, zeta(alpha, s) / zeta(alpha, xmin), "k-", lw=1.5,
+            label=rf"power law ($\alpha={alpha:.2f}$, $x_\min={xmin:.0f}$)")
+
+    # exponential alternative fitted on the same tail
+    lam = 1.0 / v[v >= xmin].mean()
+    ax.plot(s, np.exp(-lam * (s - xmin)), "k--", lw=1.4,
+            label=f"exponential (mean {1 / lam:.0f} cases)")
+
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlabel("epidemic size $s$ (cases)")
+    ax.set_ylabel(r"$\Pr(X \geq x)$")
+    ax.legend(fontsize=8, loc="lower left")
+    ax.set_title("epidemic size over two decades above $x_\\min$", fontsize=10)
     fig.tight_layout()
-    fig.savefig(OUT / "fig04_size_vs_duration.pdf", bbox_inches="tight")
-    fig.savefig(OUT / "fig04_size_vs_duration.png", bbox_inches="tight")
+    fig.savefig(OUT / "fig04_size_ccdf.pdf", bbox_inches="tight")
+    fig.savefig(OUT / "fig04_size_ccdf.png", bbox_inches="tight")
     plt.close(fig)
 
 
@@ -472,18 +498,29 @@ def fig05():
 # Fig 06 -- four individual fits with both alternatives
 # ---------------------------------------------------------------------------
 def fig06():
+    """Three individual fits, with the power-law and exponential alternatives.
+
+    The former panel (d) showed the same cross-section for epidemic duration,
+    to make the point that the curve bends downwards there. With the duration
+    constructions removed there is no duration fit to contrast, and the point
+    survives without it: what panels (a), (b) and (c) share is that the same
+    estimator is being applied to three different objects, and only the third
+    one describes a tail.
+    """
     from powerlaw import Fit
 
     small = pd.read_parquet("data/3117836.parquet")["casos_est"]
     large = pd.read_parquet("data/3550308.parquet")["casos_est"]
     epi = pd.read_parquet("data/episcanner_SP_2024.parquet")
 
-    fig, axes = plt.subplots(2, 2, figsize=(8.6, 6.2))
+    fig, axes = plt.subplots(1, 3, figsize=(10.5, 3.5))
     panels = [
-        (axes[0][0], small.dropna().values, "Cônego Marinho (3117836), weekly cases, 2010–2025"),
-        (axes[0][1], large.dropna().values, "São Paulo (3550308), weekly cases, 2010–2025"),
-        (axes[1][0], epi["total_cases"].dropna().values, "SP state-year cross-section 2024, epidemic size"),
-        (axes[1][1], epi["ep_dur"].dropna().values, "SP state-year cross-section 2024, epidemic duration"),
+        (axes[0], small.dropna().values,
+         "C\u00f4nego Marinho (3117836)\nweekly cases, 2010\u20132026"),
+        (axes[1], large.dropna().values,
+         "S\u00e3o Paulo (3550308)\nweekly cases, 2010\u20132026"),
+        (axes[2], epi["total_cases"].dropna().values,
+         "SP state-year cross-section 2024\nepidemic size"),
     ]
     for ax, v, title in panels:
         v = v[v > 0]
@@ -710,51 +747,68 @@ def _regression_oof(origins=(2023, 2024, 2025)):
 
 
 def fig10(oof):
-    fig, axes = plt.subplots(1, 2, figsize=(9.0, 4.0), sharey=True)
-    # RF panel
-    d = oof[oof["model"] == "M3"]
-    ax = axes[0]
-    ax.scatter(d["y_true"], d["y_pred"], s=4, alpha=0.25, color="0.4")
-    lims = [1e1, 10 ** np.ceil(np.log10(max(d["y_true"].max(), d["y_pred"].max())))]
-    ax.plot(lims, lims, "k--", lw=1, label="identity")
-    ax.fill_between(lims, [l / 10 for l in lims], [l * 10 for l in lims],
-                    alpha=0.10, color="0.3", label="10:1 / 1:10 band")
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_xlim(lims)
-    ax.set_ylim(lims)
-    ax.set_xlabel("observed annual cases")
-    ax.set_ylabel("predicted")
-    ax.set_title(f"random forest (origins 2023–2025, n={len(d):,})", fontsize=9)
-    ax.legend(fontsize=7, loc="upper left")
-    # quantile ensemble: retrain tau=0.5 pooled for the right panel
-    from predictive_model import train_predictive_models
+    """Predicted against observed epidemic size, two estimator classes.
+
+    The two panels differ only in the estimator: a random forest, which cannot
+    produce a forecast above the largest response it was trained on, and the
+    spline-basis quantile regression that the ablation now uses, which
+    continues the boundary trend outside the observed range.
+
+    The dotted red line marks the largest annual total in the training window.
+    A tree forecast cannot cross it, and in a heavy-tailed setting the season
+    that matters is precisely the one on the far side of it, so the line is
+    the graphical form of the limitation the manuscript states.
+    """
+    from run_ablation import (
+        CLIMATE_BLOCK, COVARIATE_DUR, COVARIATE_PEAK, DEMO, EPI,
+        LAGGED_SIZE, SCALING_SIZE, fit_quantile_model,
+    )
 
     df = _city_panel()
-    use = [c for c in df.columns if c.startswith("prev_") and not df[c].isnull().all()]
-    use = [c for c in use if not c.startswith(("prev_alpha_dur", "prev_xmin_dur"))]
-    train = df[df["year"] < 2023].dropna(subset=use + ["total_cases"])
-    import lightgbm as lgb
+    train_max = float(df[df["year"] < 2023]["total_cases"].max())
 
-    qm = lgb.LGBMRegressor(objective="quantile", alpha=0.5, n_estimators=300,
-                           learning_rate=0.05, num_leaves=16, random_state=42,
-                           verbose=-1, n_jobs=-1)
-    qm.fit(train[use], np.log1p(train["total_cases"]))
-    test = df[df["year"].isin([2023, 2024, 2025])].dropna(subset=use)
-    p = np.expm1(qm.predict(test[use]))
-    ax = axes[1]
-    ax.scatter(test["total_cases"], p, s=4, alpha=0.25, color="0.4")
-    lims = [1e1, 10 ** np.ceil(np.log10(max(test["total_cases"].max(), p.max())))]
-    ax.plot(lims, lims, "k--", lw=1, label="identity")
-    ax.fill_between(lims, [l / 10 for l in lims], [l * 10 for l in lims],
-                    alpha=0.10, color="0.3", label="10:1 / 1:10 band")
-    ax.set_xscale("log")
-    ax.set_yscale("log")
-    ax.set_xlim(lims)
-    ax.set_ylim(lims)
-    ax.set_xlabel("observed annual cases")
-    ax.set_title(f"LightGBM median quantile (origin 2022, n={len(test):,})", fontsize=9)
-    ax.legend(fontsize=7, loc="upper left")
+    def _panel(ax, y_true, y_pred, title):
+        y_true = np.asarray(y_true, dtype=float)
+        y_pred = np.asarray(y_pred, dtype=float)
+        ok = np.isfinite(y_true) & np.isfinite(y_pred) & (y_true > 0) & (y_pred > 0)
+        ax.scatter(y_true[ok], y_pred[ok], s=4, alpha=0.25, color="0.4")
+        lims = [max(1e1, min(y_true[ok].min(), y_pred[ok].min())),
+                10 ** np.ceil(np.log10(max(y_true[ok].max(), y_pred[ok].max())))]
+        ax.plot(lims, lims, "k--", lw=1, label="identity")
+        ax.fill_between(lims, [l / 10 for l in lims], [l * 10 for l in lims],
+                        alpha=0.10, color="0.3", label="10:1 / 1:10 band")
+        ax.axhline(train_max, color="#c62828", ls=":", lw=1.2,
+                   label="largest training response")
+        ax.set_xscale("log")
+        ax.set_yscale("log")
+        ax.set_xlim(lims)
+        ax.set_ylim(lims)
+        ax.set_xlabel("observed annual cases")
+        ax.set_title(title, fontsize=8.5)
+        ax.legend(fontsize=6.5, loc="upper left")
+
+    fig, axes = plt.subplots(1, 2, figsize=(9.4, 4.2), sharey=True)
+
+    # (a) random forest, from the shared out-of-sample pass
+    d = oof[oof["model"] == "M3"]
+    _panel(axes[0], d["y_true"], d["y_pred"],
+           f"random forest (origins 2023\u20132025, n={len(d):,})")
+    axes[0].set_ylabel("predicted")
+
+    # (b) the estimator the ablation uses
+    feats = (LAGGED_SIZE + COVARIATE_DUR + COVARIATE_PEAK + EPI + DEMO
+             + list(CLIMATE_BLOCK) + SCALING_SIZE)
+    use = [c for c in feats if c in df.columns and not df[c].isnull().all()]
+    tr = df[df["year"] < 2023].dropna(subset=use + ["total_cases"])
+    te = df[df["year"].isin([2023, 2024, 2025])].dropna(
+        subset=use + ["total_cases"])
+    est = fit_quantile_model(tr[use], np.log1p(tr["total_cases"]), 0.5)
+    pred = np.expm1(est.predict(te[use]))
+    beyond = 100.0 * float((te["total_cases"] > train_max).mean())
+    _panel(axes[1], te["total_cases"], pred,
+           "quantile regression, spline basis (can extrapolate)\n"
+           f"{beyond:.1f}% of test units lie above the training maximum")
+
     fig.tight_layout()
     fig.savefig(OUT / "fig10_pred_vs_obs.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig10_pred_vs_obs.png", bbox_inches="tight")
@@ -764,8 +818,8 @@ def fig10(oof):
 def fig11(abl):
     """The ablation ladder, read from ablation_results.csv (not recomputed).
 
-    (a) skill against the calibrated-persistence benchmark M0 for the three
-        regression targets, bar = median over the five forecast origins,
+    (a) skill against the calibrated-persistence benchmark M0 for epidemic
+        size, bar = median over the five forecast origins,
         dot = one origin, at the primary loss (pinball, tau = 0.5);
     (b) the quantity the decision rule turns on: the relative change in
         pinball loss from M2 to M3 against tau. A scaling block that carries
@@ -775,8 +829,7 @@ def fig11(abl):
     """
     sk = _ablation_skill(abl)
     rel = _ablation_relative(abl)
-    targets = [t for t in ("total_cases", "ep_dur", "peak_week")
-               if t in set(sk["target"])]
+    targets = [t for t in TASK_LABEL if t in set(sk["target"])]
     rungs = ["M1", "M2", "M3"]
     origins = sorted(sk["origin"].unique())
 
@@ -809,8 +862,7 @@ def fig11(abl):
              ha="right", va="bottom")
 
     # ---------------- (b) M3 - M2 vs tau ----------------------------------
-    colors = {"total_cases": "#08519c", "ep_dur": "#c62828",
-              "peak_week": "#2e7d32"}
+    colors = {"total_cases": "#08519c"}
     for tgt in targets:
         d = rel[rel.target == tgt]
         med = d.groupby("tau")["rel"].median().sort_index()
@@ -824,12 +876,17 @@ def fig11(abl):
                              color=colors[tgt], alpha=0.12, lw=0,
                              label="range over origins")
     ax2.axhline(0, color="k", lw=0.9)
+    # a tiny L_M2 in one origin makes the relative change explode (to
+    # several hundred percent), squashing a linear axis; symlog keeps the
+    # region around zero linear and compresses the tails instead of
+    # hiding them
+    ax2.set_yscale("symlog", linthresh=50)
     ax2.axhspan(ax2.get_ylim()[0], 0, color="0.9", zorder=0)
     ax2.set_xlabel(r"quantile level $\tau$")
     ax2.set_ylabel(r"$100\,(L_{M2}-L_{M3})/L_{M2}$  (%)")
     ax2.set_title("(b) scaling block vs $\\tau$: negative = M3 worse",
                   fontsize=9)
-    ax2.legend(fontsize=7, loc="lower left")
+    ax2.legend(fontsize=7, loc="upper right")
 
     # the headline number, stated on the panel
     d95 = rel[(rel.target == "total_cases") & np.isclose(rel.tau, 0.95)]["rel"]
@@ -841,8 +898,8 @@ def fig11(abl):
             textcoords="axes fraction", fontsize=6.5,
             arrowprops=dict(arrowstyle="->", lw=0.7, color="0.3"),
             bbox=dict(boxstyle="round,pad=0.25", fc="white", ec="0.7", lw=0.5))
-    ax2.text(0.02, 0.03, "no $\\tau$ meets the 3/5 criterion",
-             transform=ax2.transAxes, fontsize=6.5, color="0.35")
+    ax2.text(0.02, 0.97, "no $\\tau$ meets the 3/5 criterion",
+             transform=ax2.transAxes, fontsize=6.5, color="0.35", va="top")
 
     fig.tight_layout()
     fig.savefig(OUT / "fig11_ablation_skill.pdf", bbox_inches="tight")
@@ -1096,7 +1153,9 @@ def fig14(oof):
     ax1.set_title("(a) APE vs population", fontsize=9)
 
     df = _city_panel()
-    targets = ["total_cases", "ep_dur", "peak_week"]
+    # Epidemic size only: duration and peak timing are bounded by the length
+    # of the season and are covariates now, not targets.
+    targets = ["total_cases"]
     for i, tgt in enumerate(targets):
         prev = f"prev_{tgt}"
         sub = df.dropna(subset=[prev, tgt])
@@ -1122,26 +1181,30 @@ def fig14(oof):
 # Fig 15 -- predicted-probability map for one forecast origin
 # ---------------------------------------------------------------------------
 def fig15():
-    import xgboost as xgb
-    from sklearn.impute import SimpleImputer
+    """Map of the predicted probability of a large season, one origin.
+
+    The classifier is the one the ablation reports (``run_ablation.make_classifier``
+    with its default), on the M3 feature set. It used to be a separate XGBoost
+    fit with its own feature list, which is the same defect the ablation
+    figures had: a second, undeclared experiment drawn as if it were a view of
+    the first.
+    """
+    from run_ablation import (
+        CLIMATE_BLOCK, COVARIATE_DUR, COVARIATE_PEAK, DEMO, EPI,
+        LAGGED_SIZE, SCALING_SIZE, make_classifier,
+    )
 
     df = _city_panel()
-    m3 = [c for c in df.columns if c.startswith("prev_")
-          and not df[c].isnull().all()] + ["log_pop"]
-    m3 = [c for c in m3 if not c.startswith(("prev_alpha_dur", "prev_xmin_dur"))]
+    feats = (LAGGED_SIZE + COVARIATE_DUR + COVARIATE_PEAK + EPI + DEMO
+             + list(CLIMATE_BLOCK) + SCALING_SIZE + ["log_pop"])
+    m3 = [c for c in feats if c in df.columns and not df[c].isnull().all()]
     train = df[df["year"] < 2024].dropna(subset=m3 + ["total_cases"])
     y = (train["total_cases"] > train["total_cases"].quantile(0.75)).astype(int)
-    imp = SimpleImputer(strategy="median")
-    X = imp.fit_transform(train[m3])
-    pos_w = float(np.sum(y == 0) / max(np.sum(y == 1), 1))
-    clf = xgb.XGBClassifier(
-        n_estimators=300, max_depth=5, learning_rate=0.05,
-        scale_pos_weight=pos_w, eval_metric="logloss",
-        random_state=42, tree_method="hist", n_jobs=-1)
-    clf.fit(X, y)
+    clf = make_classifier()
+    clf.fit(train[m3], y)
     test = df[df["year"] == 2024].copy()
     test_ok = test.dropna(subset=m3)
-    prob = clf.predict_proba(imp.transform(test_ok[m3]))[:, 1]
+    prob = clf.predict_proba(test_ok[m3])[:, 1]
     test_ok["prob"] = prob
 
     gdf = gpd.read_file("muni_br.gpkg")

@@ -200,33 +200,21 @@ def create_dashboard():
                             epi_details_table_size = gr.Dataframe(
                                 label="Fit Details (Size)", interactive=False
                             )
-                            epi_details_table_dur = gr.Dataframe(
-                                label="Fit Details (Duration)", interactive=False
-                            )
 
                     with gr.Column(scale=4):
                         with gr.Row():
                             epi_combined_plot_size = gr.Plot(
                                 label="Size: Combined Fit (Total Cases)"
                             )
-                            epi_combined_plot_dur = gr.Plot(
-                                label="Duration: Combined Fit (Total Cases)"
-                            )
 
                         with gr.Row():
                             epi_dispersion_plot_size = gr.Plot(
                                 label="Size: Dispersion vs Alpha (Total Cases)"
                             )
-                            epi_dispersion_plot_dur = gr.Plot(
-                                label="Duration: Dispersion vs Alpha (Total Cases)"
-                            )
 
                         with gr.Row():
                             epi_state_map_size = gr.Plot(
                                 label="Epidemic Size Alpha Map (Total Cases)"
-                            )
-                            epi_state_map_dur = gr.Plot(
-                                label="Epidemic Duration Alpha Map (Total Cases)"
                             )
 
                         with gr.Row():
@@ -938,6 +926,11 @@ def create_dashboard():
                 if not df_target_year.empty:
                     X_target_all = df_target_year[feature_cols]
 
+                    # Epidemic size is the only trained target: duration and
+                    # peak timing are bounded by the length of the season and
+                    # are not modelled as outcomes. They are still listed so
+                    # the panel wiring stays fixed; anything untrained is
+                    # simply reported as not modelled instead of as a zero.
                     targets = ["total_cases", "ep_dur", "peak_week"]
                     preds_all = {t: np.zeros(len(df_target_year)) for t in targets}
 
@@ -950,6 +943,8 @@ def create_dashboard():
                                 if bias_correction and t in bias_correction:
                                     preds = preds * bias_correction[t]
                             preds_all[t] = preds
+
+                    trained = [t for t in targets if models.get(t)]
 
                     if region != "BR":
                         pred_cases_total = np.sum(preds_all["total_cases"])
@@ -987,8 +982,11 @@ def create_dashboard():
 
                         target_pred_text += f"#### State Aggregate ({region})\n"
                         target_pred_text += f"- **Total Cases**: {pred_cases_total:.0f} (Observed: {obs_cases_total:.0f}, Error: {err_cases:+.0f})\n"
-                        target_pred_text += f"- **Duration (Weighted)**: {pred_dur_agg:.1f} weeks (Observed: {obs_dur_agg:.1f}, Error: {err_dur:+.1f})\n"
-                        target_pred_text += f"- **Peak Week (Weighted)**: {pred_peak_agg:.1f} (Observed: {obs_peak_agg:.1f}, Error: {err_peak:+.1f})\n\n"
+                        if "ep_dur" in trained:
+                            target_pred_text += f"- **Duration (Weighted)**: {pred_dur_agg:.1f} weeks (Observed: {obs_dur_agg:.1f}, Error: {err_dur:+.1f})\n"
+                        if "peak_week" in trained:
+                            target_pred_text += f"- **Peak Week (Weighted)**: {pred_peak_agg:.1f} (Observed: {obs_peak_agg:.1f}, Error: {err_peak:+.1f})\n"
+                        target_pred_text += "\n"
 
                     if city_str:
                         geocode = extract_geocode(city_str)
@@ -1002,6 +1000,8 @@ def create_dashboard():
                                     f"#### Individual City: {city_str}\n"
                                 )
                                 for t in ["total_cases", "ep_dur", "peak_week"]:
+                                    if t not in trained:
+                                        continue
                                     val = preds_all[t][pos]
                                     obs = df_target_year.loc[city_row_idx[0], t]
                                     err = val - obs
@@ -1431,26 +1431,22 @@ def create_dashboard():
             )
 
         def load_episcanner_tab(region):
+            # Only epidemic size is fitted as a power law. Duration was
+            # removed as a scaling object -- a season is bounded by the length
+            # of the year, so a scale-free law cannot apply to it a priori --
+            # and the database no longer stores metric='ep_dur' fits.
             combined_size = plot_combined_episcanner_fit(region, "total_cases")
-            combined_dur = plot_combined_episcanner_fit(region, "ep_dur")
             disp_size = plot_episcanner_dispersion_alpha(region, "total_cases")
-            disp_dur = plot_episcanner_dispersion_alpha(region, "ep_dur")
             state_map_size = plot_episcanner_state_map("total_cases")
-            state_map_dur = plot_episcanner_state_map("ep_dur")
             details_size = get_episcanner_fit_results(region, "total_cases")
-            details_dur = get_episcanner_fit_results(region, "ep_dur")
             timeseries = plot_episcanner_region_timeseries(region)
             residuals = plot_state_residuals_vs_alpha(region)
 
             return (
                 combined_size,
-                combined_dur,
                 disp_size,
-                disp_dur,
                 state_map_size,
-                state_map_dur,
                 details_size if details_size is not None else pd.DataFrame(),
-                details_dur if details_dur is not None else pd.DataFrame(),
                 timeseries,
                 residuals,
             )
@@ -1527,13 +1523,9 @@ def create_dashboard():
             inputs=[epi_region_dropdown],
             outputs=[
                 epi_combined_plot_size,
-                epi_combined_plot_dur,
                 epi_dispersion_plot_size,
-                epi_dispersion_plot_dur,
                 epi_state_map_size,
-                epi_state_map_dur,
                 epi_details_table_size,
-                epi_details_table_dur,
                 epi_timeseries_plot,
                 epi_residuals_plot,
             ],

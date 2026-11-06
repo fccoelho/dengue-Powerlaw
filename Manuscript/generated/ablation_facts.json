@@ -1,0 +1,343 @@
+{
+  "classifier": {
+    "auc_gain_scaling_median": 0.013260067590227798,
+    "auc_gap_vs_ablation_city": 0.0,
+    "auc_median": {
+      "M0": 0.5,
+      "M1": 0.5825275932227804,
+      "M2": 0.6345937248592116,
+      "M3": 0.6492836480032865,
+      "POP": 0.4714289399685267
+    },
+    "brier_by_origin": {
+      "2021": {
+        "M0": 0.1677119029553565,
+        "M1": 0.2441180468656555,
+        "M2": 0.2173756690399998,
+        "M3": 0.2149399478914824,
+        "POP": 0.249679662694943
+      },
+      "2022": {
+        "M0": 0.2836811772978154,
+        "M1": 0.2531241970489169,
+        "M2": 0.2619391650247533,
+        "M3": 0.2582403087267419,
+        "POP": 0.2505791065995841
+      },
+      "2023": {
+        "M0": 0.2937833074430662,
+        "M1": 0.244688321031777,
+        "M2": 0.2427812781381159,
+        "M3": 0.2400071880617745,
+        "POP": 0.2500630489346209
+      },
+      "2024": {
+        "M0": 0.398032056379203,
+        "M1": 0.257168984986847,
+        "M2": 0.2522057529714452,
+        "M3": 0.2500237247809679,
+        "POP": 0.2500960962945544
+      },
+      "2025": {
+        "M0": 0.2783660638149614,
+        "M1": 0.2282788558998208,
+        "M2": 0.2253351725964943,
+        "M3": 0.2238186023665311,
+        "POP": 0.250320260226239
+      }
+    },
+    "brier_median": {
+      "M0": 0.2836811772978154,
+      "M1": 0.244688321031777,
+      "M2": 0.2427812781381159,
+      "M3": 0.2400071880617745,
+      "POP": 0.2500960962945544
+    },
+    "n_origins_scaling_best": 3,
+    "n_repeats": 5,
+    "prevalence_max": 0.6954177897574124,
+    "prevalence_min": 0.2086206896551724,
+    "threshold_scope": "per_unit",
+    "train_prevalence": {
+      "2021": 0.2597460791635549,
+      "2022": 0.2623179227359088,
+      "2023": 0.2674018615944961,
+      "2024": 0.2638854399470242,
+      "2025": 0.2626955074875208
+    }
+  },
+  "exceed": {
+    "city": {
+      "auc_gain_scaling_median": 0.013260067590227798,
+      "auc_median": {
+        "M0": 0.5,
+        "M1": 0.5825275932227804,
+        "M2": 0.6345937248592116,
+        "M3": 0.6492836480032865
+      },
+      "contrasts": {
+        "M1-M0": {
+          "decision_origins": 4,
+          "median_diff": 0.0490949864112891,
+          "median_rel": 0.1671129201947714,
+          "n_ci_excludes_zero": 5,
+          "n_diff_positive": 4,
+          "n_origins": 5,
+          "n_rel_positive": 4,
+          "n_same_direction_ci": 4,
+          "per_origin": {
+            "2021": -0.0764061439102989,
+            "2022": 0.0305569802488985,
+            "2023": 0.0490949864112891,
+            "2024": 0.1408630713923558,
+            "2025": 0.0500872079151406
+          },
+          "verdict": "supported"
+        },
+        "M2-M1": {
+          "decision_origins": 2,
+          "median_diff": 0.0029436833033264,
+          "median_rel": 0.0128951202761341,
+          "n_ci_excludes_zero": 3,
+          "n_diff_positive": 4,
+          "n_origins": 5,
+          "n_rel_positive": 4,
+          "n_same_direction_ci": 2,
+          "per_origin": {
+            "2021": 0.0267423778256556,
+            "2022": -0.0088149679758364,
+            "2023": 0.001907042893661,
+            "2024": 0.0049632320154017,
+            "2025": 0.0029436833033264
+          },
+          "verdict": "not_supported"
+        },
+        "M3-M2": {
+          "decision_origins": 1,
+          "median_diff": 0.0024357211485173,
+          "median_rel": 0.0112051231827109,
+          "n_ci_excludes_zero": 1,
+          "n_diff_positive": 5,
+          "n_origins": 5,
+          "n_rel_positive": 5,
+          "n_same_direction_ci": 1,
+          "per_origin": {
+            "2021": 0.0024357211485173,
+            "2022": 0.0036988562980114,
+            "2023": 0.0027740900763414,
+            "2024": 0.0021820281904773,
+            "2025": 0.0015165702299632
+          },
+          "verdict": "not_supported"
+        }
+      },
+      "n_origins_scaling_best": 3,
+      "n_units": 3976,
+      "population_only_auc_median": 0.4714289399685267,
+      "population_only_auc_range": [
+        0.4542805018179323,
+        0.5215884333531393
+      ],
+      "threshold_scope": "per_unit"
+    },
+    "state": {
+      "contrasts": {
+        "M1-M0": {
+          "decision_origins": 2,
+          "median_diff": 0.125657350622214,
+          "median_rel": 0.4633517452873529,
+          "n_ci_excludes_zero": 2,
+          "n_diff_positive": 4,
+          "n_origins": 5,
+          "n_rel_positive": 4,
+          "n_same_direction_ci": 2,
+          "per_origin": {
+            "2021": -0.0642825887426468,
+            "2022": 0.0741227465058044,
+            "2023": 0.125657350622214,
+            "2024": 0.2122852247669693,
+            "2025": 0.1486426528083119
+          },
+          "verdict": "not_supported"
+        },
+        "M2-M1": {
+          "decision_origins": 2,
+          "median_diff": 0.0267867160726124,
+          "median_rel": 0.2848018541761026,
+          "n_ci_excludes_zero": 3,
+          "n_diff_positive": 3,
+          "n_origins": 5,
+          "n_rel_positive": 3,
+          "n_same_direction_ci": 2,
+          "per_origin": {
+            "2021": 0.0623931021222609,
+            "2022": -0.0208291984837143,
+            "2023": 0.0674695124544826,
+            "2024": -0.1142870621906153,
+            "2025": 0.0267867160726124
+          },
+          "verdict": "not_supported"
+        },
+        "M3-M2": {
+          "decision_origins": 0,
+          "median_diff": 0.0001820105319944,
+          "median_rel": 0.0011296074945905,
+          "n_ci_excludes_zero": 2,
+          "n_diff_positive": 3,
+          "n_origins": 5,
+          "n_rel_positive": 3,
+          "n_same_direction_ci": 0,
+          "per_origin": {
+            "2021": -0.0275378825934101,
+            "2022": 0.0001820105319944,
+            "2023": 0.0081323160753135,
+            "2024": -0.0230181544954088,
+            "2025": 0.0172586154735274
+          },
+          "verdict": "not_supported"
+        }
+      }
+    }
+  },
+  "extreme_tau": 0.95,
+  "primary_tau": 0.5,
+  "size": {
+    "contrasts": {
+      "M1-M0": {
+        "decision_origins": 2,
+        "median_diff": 4253.932116167312,
+        "median_rel": 0.3046090709853287,
+        "n_ci_excludes_zero": 2,
+        "n_diff_positive": 3,
+        "n_origins": 5,
+        "n_rel_positive": 3,
+        "n_same_direction_ci": 2,
+        "per_origin": {
+          "2021": 4253.932116167312,
+          "2022": 9627.353885077564,
+          "2023": -1496.3222715786378,
+          "2024": -8401.568391603234,
+          "2025": 133771.7861542805
+        },
+        "verdict": "not_supported"
+      },
+      "M2-M1": {
+        "decision_origins": 2,
+        "median_diff": 1877.8968008545987,
+        "median_rel": 0.0119042915479719,
+        "n_ci_excludes_zero": 3,
+        "n_diff_positive": 4,
+        "n_origins": 5,
+        "n_rel_positive": 4,
+        "n_same_direction_ci": 2,
+        "per_origin": {
+          "2021": -8824.645049088549,
+          "2022": 5613.86247703241,
+          "2023": 5429.203015995501,
+          "2024": 1877.8968008545987,
+          "2025": 219.34780809498537
+        },
+        "verdict": "not_supported"
+      },
+      "M3-M2": {
+        "decision_origins": 0,
+        "median_diff": -4554.745770460323,
+        "median_rel": -0.0524037926882326,
+        "n_ci_excludes_zero": 2,
+        "n_diff_positive": 1,
+        "n_origins": 5,
+        "n_rel_positive": 1,
+        "n_same_direction_ci": 0,
+        "per_origin": {
+          "2021": -4554.745770460323,
+          "2022": -41.7565631658842,
+          "2023": 990.5669654057616,
+          "2024": -8168.266531377837,
+          "2025": -7502.169955582041
+        },
+        "verdict": "not_supported"
+      }
+    },
+    "decision_rule": "improvement on the primary loss with a 95% bootstrap interval excluding zero, same direction, in at least 3/5 origins",
+    "estimator_extrapolates": true,
+    "model": "spline_quantile",
+    "scaling_vs_tau": {
+      "at_extreme": {
+        "median_rel": 0.0492117292967626,
+        "n_ci_excludes_zero": 2,
+        "n_negative": 1,
+        "n_positive": 4,
+        "n_same_direction_ci": 1,
+        "per_origin": {
+          "2021": 0.3270472556038382,
+          "2022": 0.0492117292967626,
+          "2023": 0.0267903442852038,
+          "2024": -0.1536063547035757,
+          "2025": 0.1475118074420004
+        }
+      },
+      "grid_median_max": 0.0723318632286208,
+      "grid_median_min": -0.1360693642877258,
+      "n_taus": 19,
+      "taus_with_three_same_direction": []
+    },
+    "skill": {
+      "M1": {
+        "max": 0.8574702908883896,
+        "median": 0.3046090709853289,
+        "min": -0.0562549792520257,
+        "n_origins": 5,
+        "n_positive": 3
+      },
+      "M2": {
+        "max": 0.8588762990925113,
+        "median": 0.1227314077372133,
+        "min": -0.3853614260494247,
+        "n_origins": 5,
+        "n_positive": 3
+      },
+      "M3": {
+        "max": 0.8107877743068143,
+        "median": 0.15364352687401,
+        "min": -0.7693766444970584,
+        "n_origins": 5,
+        "n_positive": 3
+      }
+    }
+  },
+  "sources": {
+    "city_classifier": {
+      "how": null,
+      "path": "classifier_results_metrics.csv",
+      "present": true,
+      "problem": null,
+      "restore": null,
+      "what": "municipal-level out-of-fold classifier metrics"
+    },
+    "city_exceedance": {
+      "how": "python run_ablation.py --level city --tasks exceedance --output ablation_city.csv",
+      "path": "ablation_city.csv",
+      "present": true,
+      "problem": null,
+      "restore": null,
+      "what": "municipal-level exceedance ablation"
+    },
+    "state_exceedance": {
+      "how": "python run_ablation.py --level state --tasks exceedance --output ablation_state_exceedance.csv",
+      "path": "ablation_state_exceedance.csv",
+      "present": true,
+      "problem": null,
+      "restore": null,
+      "what": "state-level exceedance classifier"
+    },
+    "state_size": {
+      "how": "python run_ablation.py --level state --attach-climate --force  (refit; new hashes, so re-freeze and recompile)",
+      "path": "ablation_results.csv",
+      "present": true,
+      "problem": null,
+      "restore": "git checkout -- ablation_results.csv ablation_results.meta.json",
+      "what": "state-level size ablation"
+    }
+  },
+  "warnings": []
+}

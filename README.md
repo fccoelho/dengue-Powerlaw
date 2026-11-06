@@ -33,12 +33,22 @@ table it illustrates, and once did.
 | --- | --- | --- |
 | `powerlaw_results.db` | `update_data.py` | everything below |
 | `city_stats` table | `aggregate_city_stats.py` | `generate_figures.py`, dashboard |
-| `Manuscript/generated/tab_main.tex`, `facts.json` | `make_tables.py` | `main.tex` (Table 1) |
-| `ablation_results.csv` + `.meta.json` | `run_ablation.py --level state` | Table 4, Figure 11 |
-| `ablation_city.csv` + `.meta.json` | `run_ablation.py --level city` | Table 5, Figure 11 |
-| `classifier_results.{parquet,metrics.csv,importance.csv,meta.json}` | `run_classifier.py` | Figures 12, 13 |
+| `Manuscript/generated/tab_main.tex`, `facts.json` | `make_tables.py` | `main.tex` (Table 1, Table 4, §5.3 correlations) |
+| `Manuscript/generated/tab_ablation.tex`, `tab_exceed.tex`, `ablation_facts.json` | `make_ablation_tables.py` | `main.tex` (ablation + classifier tables) |
+| `ablation_results.csv` + `.meta.json` | `run_ablation.py --level state` | `tab_ablation.tex`, Figure 11 |
+| `ablation_state_exceedance.csv` + `.meta.json` | `run_ablation.py --level state --tasks exceedance` | `tab_exceed.tex` (state block) |
+| `ablation_city.csv` + `.meta.json` | `run_ablation.py --level city --tasks exceedance --output ablation_city.csv` | `tab_exceed.tex` (municipal block) |
+| `classifier_results.{parquet,metrics.csv,importance.csv,meta.json}` | `run_classifier.py` | Figures 12, 13, `tab_exceed.tex` fallback |
 | `Manuscript/figures/fig*.png` / `.pdf` | `Manuscript/figures/generate_figures.py` | `main.tex` |
 | `snapshot_manifest.json` | `provenance.py --write` | `verify_snapshot.py` |
+
+`--output` defaults to a name derived from `--level` and `--tasks`, and
+`run_ablation.py` refuses to overwrite a file holding a different experiment.
+This is not tidiness: the default used to be `ablation_results.csv` for every
+run, so `--level city --tasks exceedance` replaced the state size ladder in
+place. The columns still matched, every check stayed green, and the only
+symptom was `make_ablation_tables.py` reporting that the repository contained
+no size ladder -- which it did, right up until the wrong run overwrote it.
 
 ### Full refresh after a new data extraction
 
@@ -54,37 +64,49 @@ python update_data.py
 # 2. rebuild the population/case join table used by figures and dashboard
 python aggregate_city_stats.py
 
-# 3. ablation ladder - state level (Table 4, Figure 11 right-hand context)
+# 3. ablation ladder - state level, size (Table 3, Figure 11)
 python run_ablation.py                     # --dry-run first to see the plan
 
-# 4. ablation ladder - municipality level (Table 5, Figure 11)
-python run_ablation.py --level city --tasks exceedance
+# 4. ablation ladder - state level, exceedance classifier (Table 4, state block)
+python run_ablation.py --level state --tasks exceedance \
+    --output ablation_state_exceedance.csv
 
-# 5. out-of-fold rarity classifier (Figures 12 and 13)
+# 5. ablation ladder - municipality level, exceedance (Table 4, municipal block)
+python run_ablation.py --level city --tasks exceedance --output ablation_city.csv
+
+# 6. out-of-fold rarity classifier (Figures 12 and 13)
 python run_classifier.py --level city
 
-# 6. regenerate Table 1 and the derived facts from the database
+# 7. regenerate Table 1 and the derived facts from the database
 python make_tables.py
 
-# 7. regenerate every figure (or a subset: ... 2 4 6)
+# 8. regenerate the ablation and classifier tables from the artefacts
+python make_ablation_tables.py
+
+# 9. regenerate every figure (or a subset: ... 2 4 6)
 python Manuscript/figures/generate_figures.py
 
-# 8. freeze the new state as THE snapshot
+# 10. freeze the new state as THE snapshot
 python provenance.py --write
 
-# 9. prove the repository is internally consistent
+# 11. prove the repository is internally consistent
 python verify_snapshot.py
 ```
 
-Step 9 must exit `0` before the PDF is rebuilt:
+Step 11 must exit `0` before the PDF is rebuilt:
 
 ```bash
 cd Manuscript && pdflatex main && bibtex main && pdflatex main && pdflatex main
 ```
 
-A partial refresh is fine as long as it is followed by steps 6--9: the
+A partial refresh is fine as long as it is followed by steps 7--11: the
 artefacts are hashed, so a stale table is a hard error rather than a subtle
 one.
+
+`verify_snapshot.py` failing is normal right after a partial run and is the
+point of steps 8 and 11: it names the artefact that is behind. If it reports
+a number as *unverifiable*, the artefact that should back it does not exist --
+run the command in the message rather than editing the prose.
 
 ### Snapshot invariants
 
@@ -116,21 +138,62 @@ already reached the manuscript once.
    discrimination-free model an AUC near 0.60. Figures 12 and 13 plot
    per-origin curves and the permutation importance is computed on the
    held-out fold.
-6. **`parquet_cache/` must not come back.** It held Parquet exports of tables
+6. **The forecasting estimator must be the one the manuscript describes.**
+   The default is `--model spline_quantile` (linear in the covariates beyond
+   the boundary knot, so it can forecast outside its training range) and
+   `--classifier-model logistic`. An artefact produced before the estimator
+   change is byte-valid but experimentally different, so
+   `verify_snapshot.py` refuses meta files without `extrapolating_regressor`
+   and `classifier_model`.
+7. **Epidemic size is the only target and the only fitted variable.**
+   `TARGETS` in `run_ablation.py` has one entry, `FIT_METRICS` in
+   `fit_episcanner_pl.py` has one entry, and duration/peak timing appear only
+   as `COVARIATE_DUR`/`COVARIATE_PEAK` on the right-hand side. Reintroducing
+   them as outcomes means re-introducing a scaling claim about a bounded
+   variable.
+8. **No ablation number is typed, and no number is drawn from a superseded
+   run.** `make_ablation_tables.py` renders both predictive tables from
+   `ablation_results.csv`, `ablation_city.csv` and
+   `classifier_results_metrics.csv`, and `--check` compares every ablation
+   figure in the prose against them. An artefact whose `.meta.json` lacks
+   `extrapolating_regressor` / `classifier_model` predates the current design
+   and is refused even though it is byte-valid: `ablation_city.csv` carried a
+   tree classifier into the published table for exactly that reason. A figure
+   and its own caption once reported opposite signs for the same contrast on
+   the same page.
+
+9. **`parquet_cache/` must not come back.** It held Parquet exports of tables
    that no script read; its row counts silently disagreed with the database.
    Dead copies of the source of truth are how this class of bug survives.
    `verify_snapshot.py` reports them.
 
+10. **Exceedance comes from Equation (2), not from the Pareto limit.**
+    `P(S >= s) = zeta(alpha, s) / zeta(alpha, x_min)`, evaluated at
+    `s = k * x_min` with the Hurwitz zeta function -- the expression Figure 9
+    plots. `make_tables.py` used the continuous approximation
+    `k^-(alpha-1)` and reported 16.6\% where the equation gives 16.5\%, a
+    0.1pp disagreement between the prose and the figure it cites. The
+    generated facts now come from the same formula as the plot.
+11. **Table 4 and the coupling paragraph are derived too.** The rank
+    correlations ($\rho$ national, within-state median, between-state) and the
+    alpha-vs-population/incidence correlations are computed by `make_tables.py`
+    from `powerlaw_results.db` and audited by `--check`. They were the last
+    numbers in the manuscript typed by hand, and when the extraction was
+    refreshed they all moved at once: $0.87 \to 0.89$ nationally, $0.65 \to
+    0.64$ within states, $0.22 \to 0.34$ between states.
+
 ### Before every commit that touches data or numbers
 
 ```bash
-pytest -q                     # 16 test modules, including the ablation guards
-python make_tables.py --check # prose literals still match the database
-python provenance.py --check  # no artefact came from a different run
-python verify_snapshot.py     # all three checks; exit 1 on any drift
+pytest -q                          # test modules, including the ablation guards
+python make_tables.py --check      # fit literals still match the database
+python make_ablation_tables.py --check  # ablation literals still match the artefacts
+python make_ablation_tables.py --sources # every source artefact present and of the right kind
+python provenance.py --check       # no artefact came from a different run
+python verify_snapshot.py          # all five checks; exit 1 on any drift
 ```
 
-The same three checks belong in CI. They are cheap (seconds) and they are the
+The same checks belong in CI. They are cheap (seconds) and they are the
 difference between a manuscript that describes its database and one that
 merely agrees with it today.
 
@@ -139,10 +202,15 @@ merely agrees with it today.
 | symptom | cause | fix |
 | --- | --- | --- |
 | `DRIFT: ... changed since the snapshot was frozen` | `powerlaw_results.db` was re-fitted but the tables were not regenerated | run steps 6--8 above, or `python make_tables.py` then `python provenance.py --write` if the new database is the intended one |
-| `[2/3] prose STALE` lists a value with the wrong occurrence count | a number appears twice in `main.tex` and only one site was updated | grep for the stale literal; both sites must change together |
+| `[2/5] prose STALE` lists a value with the wrong occurrence count | a number appears twice in `main.tex` and only one site was updated | grep for the stale literal; both sites must change together |
+| `[5/5] ablation INCOMPLETE` names a source as absent | the artefact that should back a quoted number does not exist (e.g. the state-level exceedance run was never committed) | run the command in the message; do not edit the prose to match the gap |
+| `[5/5] ablation STALE` names a contrast | the artefact was regenerated and the prose still carries the old median, or the reverse | re-run `make_ablation_tables.py` first: the tables fix themselves. Then update the prose the message names |
+| `[3/5] design STALE` names `ablation_city.meta.json` | the municipal exceedance run predates the estimator change | `python run_ablation.py --level city --tasks exceedance --output ablation_city.csv` |
 | `0/8 block columns available` | the climate block is missing from the panel, so `M2` would equal `M1` | `python run_ablation.py --attach-climate` (rebuilds from `data/[0-9]*.parquet`) or `--climate-parquet <file>` |
 | every `M2-M1` contrast is exactly `0.0` with CI `[0, 0]` | a pre-fix artefact; the rungs were identical | regenerate the ablation; the current script aborts instead of writing zeros |
 | `RuntimeError: ... refuses to plot` from `generate_figures.py` | a figure was pointed at a defective artefact | fix the artefact, do not relax the check |
+| `cannot write tab_ablation.tex: no size ladder in the artefacts` | `ablation_results.csv` is missing, or holds a *different* experiment because a run with another `--level`/`--tasks` wrote over it | `python make_ablation_tables.py --sources` names the file and the reason; rebuild with `python run_ablation.py --level state --attach-climate` |
+| `refusing to overwrite ablation_results.csv` | the run you launched writes a different `level`/`tasks` combination than the file already holds | keep the derived filename (drop `--output`), or pass `--force` if the replacement is intended |
 
 ## Technical Analysis Overview
 
@@ -172,17 +240,30 @@ The project bridges statistical scaling with mechanistic epidemiological indicat
 - **Model Residuals**: Relationship between alpha values and sum of residuals from epidemic models.
 
 ### 5. Epidemic Metrics Power Laws (Episcanner Integration)
-Extended power law analysis applied to epidemic-level metrics:
+Power law analysis applied to epidemic-level metrics. **Only epidemic size is
+fitted.** Duration and peak timing are bounded above by the length of the
+season, so a scale-free law cannot apply to them a priori; they are carried
+through the analysis as *covariates* of size instead. `fit_episcanner_pl.py`
+fits `FIT_METRICS = ["total_cases"]` and offers `--purge-ep-dur` to remove any
+`metric='ep_dur'` rows left over from earlier runs.
 - **Epidemic Size**: Power law fitting of total case counts per epidemic event.
-- **Epidemic Duration**: Power law analysis of outbreak duration in weeks.
 - **Combined CCDF Analysis**: Multi-year cumulative distribution analysis with year-stratified visualization.
 - **Dispersion-Alpha Relationships**: Boxplot analysis of metric distributions overlaid with yearly alpha trends.
 - **State-Level Aggregation**: Comparative analysis of power law parameters across all Brazilian states.
 
 ### 6. Predictive Modeling
 A machine learning framework for forecasting epidemic characteristics using historical power law patterns:
-- **Model Architecture**: Random Forest Regressor ($f_{RF}$) trained on lagged features from year $t-1$ to predict year $t$ metrics.
-- **Target Variables**: Epidemic Size ($S_t$), Duration ($D_t$), and Peak Week ($P_t$).
+- **Model Architecture**: a quantile regression on a cubic-spline basis with
+  linear boundary extrapolation (`run_ablation.py --model spline_quantile`), the
+  default. A tree ensemble predicts a weighted average of its training
+  responses and therefore cannot produce a value outside their range, which
+  under a heavy tail is exactly where the interesting season sits; the spline
+  basis continues the boundary trend instead. Boosted alternatives
+  (`lightgbm`, `lightgbm_linear_tree`, `hist_gradient_boosting`) are kept as a
+  comparison arm, and a Random Forest is retained for the illustrative scatter
+  of figure 10.
+- **Target Variable**: Epidemic Size ($S_t$) only. Duration ($D_t$) and peak
+  week ($P_t$) are *predictors*, not outcomes.
 - **Feature Engineering**:
   - Lagged epidemic metrics from previous season ($S_{t-1}, D_{t-1}, P_{t-1}$)
   - Power law scaling factors ($\alpha_{S, t-1}, x_{\text{min}, S, t-1}$)
@@ -213,12 +294,12 @@ The Gradio-based dashboard provides four main analysis tabs:
 - **Data Tables**: General city statistics and yearly fit parameters
 
 ### Epidemic Metrics Power Laws
-- **Combined Fits**: Multi-year CCDF plots for epidemic size and duration
+- **Combined Fits**: Multi-year CCDF plots for epidemic size
 - **Dispersion Analysis**: Boxplots overlaid with yearly alpha trends
-- **State Alpha Maps**: Choropleth maps for epidemic size and duration parameters
+- **State Alpha Map**: Choropleth map of the epidemic-size exponent
 - **Regional Timeseries**: Weekly case trends at state or national level
 - **Residuals Analysis**: Alpha vs residuals scatter plots
-- **Fit Details Tables**: Comprehensive parameter tables for size and duration
+- **Fit Details Table**: Parameter table for the epidemic-size fits
 
 ### Predictive Modeling
 - **Forecast Configuration**: Select prediction level (State/City), region, and target year (2012-2025)

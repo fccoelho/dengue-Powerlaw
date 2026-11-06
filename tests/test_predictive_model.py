@@ -138,8 +138,11 @@ def test_train_models():
     )
 
     assert 'total_cases' in models
-    assert 'ep_dur' in models
-    assert 'peak_week' in models
+    # Epidemic size is the only target: duration and peak timing are bounded by
+    # the length of the season and enter as covariates (prev_ep_dur,
+    # prev_peak_week), which the fixture above still supplies.
+    assert 'ep_dur' not in models
+    assert 'peak_week' not in models
     assert 'MAE' in metrics['total_cases']
     assert 'MAPE' in metrics['total_cases']
 

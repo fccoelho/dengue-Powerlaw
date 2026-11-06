@@ -84,6 +84,11 @@ def parse_args(argv=None):
                          "--level state")
     ap.add_argument("--min-unit-years", type=int, default=5)
     ap.add_argument("--max-iter", type=int, default=300)
+    ap.add_argument("--classifier-model", default=None,
+                    choices=["logistic", "hist_gradient_boosting"],
+                    help="classifier passed to run_ablation.make_classifier; "
+                         "default is run_ablation.DEFAULT_CLASSIFIER (logistic, "
+                         "which extrapolates in log-odds)")
     ap.add_argument("--seed", type=int, default=SEED)
     ap.add_argument("--panel", default=None, help="reuse a cached panel parquet")
     ap.add_argument("--save-panel", default=None)
@@ -236,7 +241,8 @@ def main(argv=None):
         fold = classifier_fold(
             df, ladder, unit_col, origin, percentile=args.percentile,
             threshold_scope=scope, min_unit_years=args.min_unit_years,
-            seed=args.seed, max_iter=args.max_iter, verbose=verbose,
+            seed=args.seed, max_iter=args.max_iter,
+            model=args.classifier_model, verbose=verbose,
         )
         if fold is None:
             if verbose:
@@ -266,6 +272,11 @@ def main(argv=None):
                 "auc": _auc(y_val, p),
                 "log_loss": _log_loss(y_val, p),
                 "prevalence": float(np.mean(y_val)),
+                # The base rate the model actually learned. Without it the
+                # manuscript cannot justify comparing a season's prevalence to
+                # the training frequency, which is the whole content of the 2024
+                # paragraph.
+                "train_prevalence": float(base),
                 "n_val": int(len(y_val)),
                 "n_units": int(val_ok[unit_col].nunique()),
                 "n_train": int(len(fold["train_ok"])),
@@ -334,7 +345,10 @@ def main(argv=None):
     pop_gap = (float((pair["auc_m3"] - pair["auc_pop"]).mean())
                if len(pair) else None)
 
+    from run_ablation import DEFAULT_CLASSIFIER
+
     meta = {
+        "classifier_model": args.classifier_model or DEFAULT_CLASSIFIER,
         "level": args.level, "region": args.region,
         "panel_rows": int(len(df)), "panel_units": int(df[unit_col].nunique()),
         "origins": origins, "percentile": args.percentile,
