@@ -84,7 +84,14 @@ SOURCES = {
         # to pass every check here while Table 3 quietly lost its source.
         "values": {"task": ("size",), "level": ("state",)},
         "what": "state-level size ablation",
-        "how": "python run_ablation.py --level state --attach-climate",
+        # The committed copy of this file is usually the run the text quotes, so
+        # restoring it is the fix nine times out of ten -- and it is the only fix
+        # that keeps the frozen hashes. Refitting is the fallback, and it needs
+        # --force precisely because the clobbered file now belongs to another
+        # experiment (run_ablation.guard_output refuses it otherwise).
+        "restore": "git checkout -- ablation_results.csv ablation_results.meta.json",
+        "how": ("python run_ablation.py --level state --attach-climate --force  "
+                "(refit; new hashes, so re-freeze and recompile)"),
         # Keys written by the current run_ablation.py. Their absence means the
         # file was produced before the estimator change, so its numbers describe
         # an experiment the manuscript no longer reports.
@@ -234,10 +241,16 @@ def compute_facts(root: str = ".") -> dict:
                            f"{missing}): its numbers describe a superseded experiment")
         facts["sources"][name] = {"path": spec["path"], "what": spec["what"],
                                   "present": fresh, "problem": problem,
+                                  "restore": spec.get("restore"),
                                   "how": spec.get("how")}
         if problem:
-            facts["warnings"].append(
-                problem + (f" -- regenerate with: {spec['how']}" if spec.get("how") else ""))
+            if spec.get("restore"):
+                hint = f" -- restore with: {spec['restore']}"
+            elif spec.get("how"):
+                hint = f" -- regenerate with: {spec['how']}"
+            else:
+                hint = ""
+            facts["warnings"].append(problem + hint)
 
     # ---- Table 3: the size ladder at state level -------------------------
     df, meta, problem = _load("state_size", root)
@@ -422,8 +435,11 @@ def render_ablation_table(f: dict) -> str:
         raise ValueError(
             "no size ladder in the artefacts; cannot render Table 3\n"
             f"    ablation_results.csv: {prob or 'absent'}\n"
-            "    rebuild it with: python run_ablation.py --level state "
-            "--attach-climate")
+            "    if the committed copy is the run the text quotes, restore it:\n"
+            "        git checkout -- ablation_results.csv "
+            "ablation_results.meta.json\n"
+            "    otherwise refit it (new hashes: re-freeze, then recompile):\n"
+            "        python run_ablation.py --level state --attach-climate --force")
     s, c = f["size"]["skill"], f["size"]["contrasts"]
     cells = []
     for r in ("M1", "M2", "M3"):
@@ -716,6 +732,8 @@ def format_sources(f: dict) -> str:
                     f"{s['path']:32s}  {s['what']}{hard}")
         if not s.get("present"):
             rows.append(f"         -> {s.get('problem')}")
+            if s.get("restore"):
+                rows.append(f"         -> restore: {s['restore']}")
             if s.get("how"):
                 rows.append(f"         -> rebuild: {s['how']}")
     return "\n".join(rows)

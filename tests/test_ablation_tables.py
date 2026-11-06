@@ -147,3 +147,19 @@ def test_render_error_names_the_file_and_the_fix():
     msg = str(ei.value)
     assert "ablation_results.csv" in msg
     assert "run_ablation.py --level state" in msg
+
+
+def test_render_error_offers_the_restore_before_the_refit():
+    """A refit is the expensive fix and it moves every hash; restore first.
+
+    The refit command alone is also a dead end now: ``guard_output`` refuses to
+    write over the artefact that caused the problem, so following that advice
+    verbatim fails with a second, unrelated-looking error.
+    """
+    with pytest.raises(ValueError) as ei:
+        mat.render_ablation_table(
+            {"size": {}, "sources": {"state_size": {"problem": "gone"}}})
+    msg = str(ei.value)
+    assert "git checkout -- ablation_results.csv" in msg
+    assert msg.index("git checkout") < msg.index("run_ablation.py")
+    assert "--force" in msg

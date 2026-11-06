@@ -313,6 +313,27 @@ def test_guard_refuses_to_overwrite_a_different_experiment(tmp_path):
         ra.guard_output(args, ["exceedance"])
 
 
+def test_guard_refusal_offers_the_cheap_way_back():
+    """The refusal has to name the restore, not only --force.
+
+    Overwriting is what created the problem. The committed copy is byte
+    identical to the frozen manifest, so restoring it costs nothing and keeps
+    the snapshot valid; a --force refit invalidates every hash downstream.
+    """
+    import types as _t
+    import pandas as _pd
+    import tempfile, os as _os
+    d = tempfile.mkdtemp()
+    target = _os.path.join(d, "ablation_results.csv")
+    _pd.DataFrame({"level": ["state"], "task": ["exceedance"]}).to_csv(target, index=False)
+    with pytest.raises(SystemExit) as ei:
+        ra.guard_output(_t.SimpleNamespace(level="state", output=target, force=False),
+                        ["size"])
+    msg = str(ei.value)
+    assert "git checkout -- " + target in msg
+    assert "--force" in msg
+
+
 def test_guard_allows_a_rerun_and_honours_force(tmp_path):
     target = tmp_path / "ablation_results.csv"
     pd.DataFrame({"level": ["state"], "task": ["size"]}).to_csv(target, index=False)
