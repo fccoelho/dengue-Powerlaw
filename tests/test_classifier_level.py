@@ -64,7 +64,7 @@ def _ladder():
 
 def _args(**kw):
     base = dict(level="city", threshold_scope=None, min_effect_rel=None,
-                tasks="size,duration,peak_week", include_classifier=False)
+                tasks="size", include_classifier=False)
     base.update(kw)
     return type("A", (), base)()
 
@@ -123,7 +123,7 @@ def test_default_effect_floor_follows_the_aggregation_level():
 def test_tasks_are_selectable_and_include_classifier_is_a_shorthand():
     assert ra.resolve_tasks(_args(tasks="exceedance")) == ["exceedance"]
     assert ra.resolve_tasks(_args(include_classifier=True)) == [
-        "size", "duration", "peak_week", "exceedance"]
+        "size", "exceedance"]
     assert ra.resolve_tasks(
         _args(tasks="size,exceedance", include_classifier=True)) == ["size", "exceedance"]
 

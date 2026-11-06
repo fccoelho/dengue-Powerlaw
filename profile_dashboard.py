@@ -22,14 +22,12 @@ def profile_update_episcanner(region="BR"):
     start = time.time()
     
     # Simulate update_episcanner
+    # Only the size cross-section is a scaling object. Duration fits were
+    # removed from the database, so there is nothing to plot for them.
     r1 = plot_combined_episcanner_fit(region, "total_cases")
-    r2 = plot_combined_episcanner_fit(region, "ep_dur")
     r3 = plot_episcanner_dispersion_alpha(region, "total_cases")
-    r4 = plot_episcanner_dispersion_alpha(region, "ep_dur")
     r5 = plot_episcanner_state_map("total_cases")
-    r6 = plot_episcanner_state_map("ep_dur")
     r7 = get_episcanner_fit_results(region, "total_cases")
-    r8 = get_episcanner_fit_results(region, "ep_dur")
     r9 = plot_episcanner_region_timeseries(region)
     
     end = time.time()

@@ -51,3 +51,7 @@ slides/output/
 *.nav
 *.snm
 *.vrb
+
+# chain run logs
+logs/
+powerlaw_results.db.bak*

@@ -6,6 +6,8 @@ added". That sentence is only true if M2 and M3 differ *only* in the scaling
 columns, so the assertion that enforces it is pinned here rather than left to
 review.
 """
+import types
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -38,8 +40,6 @@ def _panel(n_units=8, y0=2012, y1=2020, seed=0):
                 "prev_avg_umid_Q1": float(rng.normal(70, 5)),
                 "prev_alpha_size": float(rng.normal(2.0, 0.2)),
                 "prev_xmin_size": float(rng.uniform(50, 500)),
-                "prev_alpha_dur": float(rng.normal(2.9, 0.05)),
-                "prev_xmin_dur": float(rng.uniform(10, 30)),
                 "prev_alpha_trend": float(rng.normal(0, 0.05)),
             })
     return pd.DataFrame(rows)
@@ -111,12 +111,36 @@ def test_all_null_column_is_dropped_and_reported():
     assert "prev_R0" in dropped["M1"]
 
 
-def test_duration_rung_is_optional_and_adds_only_duration_scaling():
+def test_there_is_no_duration_rung_and_no_duration_target():
+    """Duration and peak timing are covariates, never outcomes.
+
+    The duration scaling rung was removed together with the two duration
+    aggregation levels, so ``build_ladder`` must not accept a flag for it and
+    the target map must carry epidemic size only. This is a design guarantee,
+    not a default: a ladder that can quietly grow a duration rung invites a
+    table that reports a scaling claim about a bounded variable.
+    """
     df = _panel()
-    assert "M3dur" not in ra.build_ladder(df)[0]
-    ladder, _, _ = ra.build_ladder(df, include_dur_scaling=True)
-    added = set(ladder["M3dur"]) - set(ladder["M3"])
-    assert added == set(ra.SCALING_DUR)
+    ladder = ra.build_ladder(df)[0]
+    assert {"M1", "M2", "M3"} <= set(ladder)
+    assert "M3dur" not in ladder
+    with pytest.raises(TypeError):
+        ra.build_ladder(df, include_dur_scaling=True)  # noqa: F841
+
+    assert ra.TARGETS == {"size": "total_cases"}
+    assert set(ra.PRIMARY_LOSS) == {"size", "exceedance"}
+
+    # ... and they are still predictors of size, which is where they carry
+    # information.
+    assert "prev_ep_dur" in ladder["M1"]
+    assert "prev_peak_week" in ladder["M1"]
+
+
+def test_no_duration_scaling_columns_anywhere_in_the_ladder():
+    ladder = ra.build_ladder(_panel())[0]
+    offenders = [c for cols in ladder.values() for c in cols
+                 if c.startswith(("prev_alpha_dur", "prev_xmin_dur"))]
+    assert offenders == []
 
 
 # ---------------------------------------------------------------------------
@@ -261,3 +285,75 @@ def test_decision_is_supported_at_three_of_five_origins():
     dec = ra.decision_rows(rows, diffs, list(origins), "state")
     assert dec[0]["verdict"] == "supported"
     assert dec[0]["value"] == 3
+
+
+# ---------------------------------------------------------------------------
+# Output routing
+#
+# ``--output`` used to default to ``ablation_results.csv`` for every run, so a
+# city exceedance run silently replaced the state size ladder Table 3 is built
+# from. The symptom was a table generator reporting that no size ladder existed
+# anywhere in the repository.
+# ---------------------------------------------------------------------------
+def test_default_output_names_follow_the_experiment():
+    assert ra.default_output_name("state", ["size"]) == "ablation_results.csv"
+    assert (ra.default_output_name("state", ["exceedance"])
+            == "ablation_state_exceedance.csv")
+    assert ra.default_output_name("city", ["exceedance"]) == "ablation_city.csv"
+    assert ra.default_output_name("city", ["size"]) == "ablation_city_size.csv"
+    assert (ra.default_output_name("city", ["size", "exceedance"])
+            == "ablation_city_size_exceedance.csv")
+
+
+def test_guard_refuses_to_overwrite_a_different_experiment(tmp_path):
+    target = tmp_path / "ablation_results.csv"
+    pd.DataFrame({"level": ["state"], "task": ["size"]}).to_csv(target, index=False)
+    args = types.SimpleNamespace(level="city", output=str(target), force=False)
+    with pytest.raises(SystemExit, match="refusing to overwrite"):
+        ra.guard_output(args, ["exceedance"])
+
+
+def test_guard_refusal_offers_the_cheap_way_back():
+    """The refusal has to name the restore, not only --force.
+
+    Overwriting is what created the problem. The committed copy is byte
+    identical to the frozen manifest, so restoring it costs nothing and keeps
+    the snapshot valid; a --force refit invalidates every hash downstream.
+    """
+    import types as _t
+    import pandas as _pd
+    import tempfile, os as _os
+    d = tempfile.mkdtemp()
+    target = _os.path.join(d, "ablation_results.csv")
+    _pd.DataFrame({"level": ["state"], "task": ["exceedance"]}).to_csv(target, index=False)
+    with pytest.raises(SystemExit) as ei:
+        ra.guard_output(_t.SimpleNamespace(level="state", output=target, force=False),
+                        ["size"])
+    msg = str(ei.value)
+    assert "git checkout -- " + target in msg
+    assert "--force" in msg
+
+
+def test_guard_allows_a_rerun_and_honours_force(tmp_path):
+    target = tmp_path / "ablation_results.csv"
+    pd.DataFrame({"level": ["state"], "task": ["size"]}).to_csv(target, index=False)
+    ra.guard_output(
+        types.SimpleNamespace(level="state", output=str(target), force=False), ["size"])
+    ra.guard_output(
+        types.SimpleNamespace(level="city", output=str(target), force=True), ["exceedance"])
+
+
+def test_guard_derives_the_name_when_output_is_omitted(tmp_path):
+    args = types.SimpleNamespace(level="state", output=None, force=False)
+    assert ra.guard_output(args, ["exceedance"]) == "ablation_state_exceedance.csv"
+    assert args.output == "ablation_state_exceedance.csv"
+
+
+def test_guard_treats_a_new_or_unreadable_target_as_new(tmp_path):
+    args = types.SimpleNamespace(level="state", output=str(tmp_path / "nope.csv"),
+                                force=False)
+    assert ra.guard_output(args, ["size"]) == str(tmp_path / "nope.csv")
+    junk = tmp_path / "junk.csv"
+    junk.write_text("not,a,real,ablation\n")
+    ra.guard_output(types.SimpleNamespace(level="state", output=str(junk),
+                                          force=False), ["size"])

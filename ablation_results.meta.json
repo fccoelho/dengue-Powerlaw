@@ -1,7 +1,11 @@
 {
   "argv": [
+    "--level",
+    "state",
+    "--tasks",
+    "size",
     "--attach-climate",
-    "--include-classifier"
+    "--force"
   ],
   "level": "state",
   "region": "BR",
@@ -59,7 +63,10 @@
     0.9,
     0.95
   ],
-  "model": "hist_gradient_boosting",
+  "model": "spline_quantile",
+  "classifier_model": "logistic",
+  "extrapolating_regressor": true,
+  "extrapolating_classifier": true,
   "max_iter": 300,
   "seed": 42,
   "bootstrap_replicates": 2000,
@@ -142,14 +149,21 @@
     "prev_avg_umid_Q4"
   ],
   "panel_notes": [],
+  "tasks": [
+    "size"
+  ],
   "classifier_threshold_scope": "pooled",
+  "classifier_threshold_scope_requested": null,
   "classifier_percentile": 0.75,
+  "classifier_min_unit_years": 5,
+  "min_effect_rel": 0.0,
+  "min_effect_rel_requested": null,
   "versions": {
     "python": "3.12.11",
     "pandas": "2.3.3",
     "numpy": "2.5.4",
     "sklearn": "1.9.1"
   },
-  "elapsed_seconds": 335.2,
+  "elapsed_seconds": 110.4,
   "output": "/mnt/Datos/MEGAsync/Papers/2026-PowerLaw/dengue-Powerlaw/ablation_results.csv"
 }

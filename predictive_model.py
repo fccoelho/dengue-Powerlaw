@@ -227,11 +227,13 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
             df_fits, "powerlaw_results.db:episcanner_state_fits"
         )
 
+        # Only the *size* cross-section is fitted as a power law. Duration was
+        # dropped as a scaling object (a season is bounded by the length of the
+        # year, so a scale-free law cannot apply to it), so alpha_dur/xmin_dur
+        # no longer exist in the database and must not be merged in.
         df_fits_size = df_fits[df_fits['metric'] == 'total_cases'][['state', 'year', 'alpha', 'xmin']].rename(columns={'alpha': 'alpha_size', 'xmin': 'xmin_size'})
-        df_fits_dur = df_fits[df_fits['metric'] == 'ep_dur'][['state', 'year', 'alpha', 'xmin']].rename(columns={'alpha': 'alpha_dur', 'xmin': 'xmin_dur'})
         
         df_features = state_agg.merge(df_fits_size, on=['state', 'year'], how='left')
-        df_features = df_features.merge(df_fits_dur, on=['state', 'year'], how='left')
         
         group_col = 'state'
         
@@ -285,12 +287,6 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
         # Merge
         # Data types: geocode in fit might be int, in metrics int.
         df_features = df_metrics.merge(df_fits, on=['geocode', 'year'], how='left')
-        
-        # We might miss 'alpha_dur' at city level if not calculated. 
-        # Fill with NaN or 0? XGBoost/RF handle NaNs, but sklearn Random Forest doesn't nativey support NaNs well without Imputer.
-        # Let's add dummy alpha_dur if not present
-        df_features['alpha_dur'] = np.nan
-        df_features['xmin_dur'] = np.nan
         
         group_col = 'geocode'
         # Add city_name for reference if available?
@@ -349,7 +345,9 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
     # Create Lagged Features
     # Basic metrics can be assumed 0 if missing (meaning no epidemic detected)
     basic_metrics = ['total_cases', 'ep_dur', 'peak_week', 'R0']
-    fit_metrics = ['alpha_size', 'xmin_size', 'alpha_dur', 'xmin_dur', 'alpha_trend']
+    # alpha_dur / xmin_dur are gone with the duration scaling level. Duration
+    # and peak week themselves stay: they are covariates of size.
+    fit_metrics = ['alpha_size', 'xmin_size', 'alpha_trend']
     static_features = ['log_pop'] if 'log_pop' in df_features.columns else []
     climate_features = [c for c in df_features.columns if 'avg_temp' in c or 'avg_umid' in c]
     feature_cols = basic_metrics + fit_metrics + static_features + climate_features
@@ -401,7 +399,7 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
 
 def train_predictive_models(train_df, test_year=None, model_type="random_forest", quantile=0.5):
     """
-    Trains models for Size, Duration, and Peak Week.
+    Trains the model for epidemic size (the only target).
     
     model_type: "random_forest", "lightgbm_quantile", "hist_gradient_boosting_quantile"
     quantile: quantile level for quantile loss models (default 0.5 = median)
@@ -414,7 +412,10 @@ def train_predictive_models(train_df, test_year=None, model_type="random_forest"
     all_prev_cols = [c for c in train_df.columns if c.startswith('prev_')]
     feature_cols = [c for c in all_prev_cols if not train_df[c].isnull().all()]
 
-    targets = ['total_cases', 'ep_dur', 'peak_week']
+    # Epidemic size is the only target. Duration and peak timings are
+    # predictors (prev_ep_dur, prev_peak_week), never outcomes: they are
+    # bounded and they are not what a health secretariat orders beds against.
+    targets = ['total_cases']
 
     models = {}
     metrics = {}

@@ -21,13 +21,14 @@ LEVELS = [
     ("L3", "annual total, city (across years)", "powerlaw_fits_total_cases", ""),
     ("L4", "epidemic size, state-year",
      "episcanner_state_fits", "metric='total_cases' AND year > 0"),
-    ("L5", "epidemic duration, state-year",
-     "episcanner_state_fits", "metric='ep_dur' AND year > 0"),
     ("L6", "epidemic size, national-year",
      "episcanner_fits", "metric='total_cases' AND year > 0"),
-    ("L7", "epidemic duration, national-year",
-     "episcanner_fits", "metric='ep_dur' AND year > 0"),
 ]
+
+#: The duration constructions (former L5 and L7) are not verified here
+#: because the manuscript no longer reports them: a season is bounded above
+#: by the length of the year, so a scale-free law cannot apply to duration a
+#: priori. ``fit_episcanner_pl.py`` no longer fits ``metric='ep_dur'``.
 
 
 def summarise(con, table, where=""):
@@ -74,7 +75,7 @@ def main(db_path=DEFAULT_DB):
     print("=" * 100)
     nat = pd.read_sql(
         "SELECT year, metric, alpha, xmin, R, p FROM episcanner_fits "
-        "WHERE year > 0 ORDER BY metric, year", con)
+        "WHERE metric='total_cases' AND year > 0 ORDER BY year", con)
     print(nat.round(3).to_string(index=False))
 
     print()
