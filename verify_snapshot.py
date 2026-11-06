@@ -1,6 +1,6 @@
-"""One command that answers: does the manuscript match the database?
+"""One command that answers: does the manuscript match its artefacts?
 
-Three independent checks, because the repository drifted in three ways at once:
+Five independent checks, because the repository has drifted in five ways:
 
 1. **Manifest** -- ``snapshot_manifest.json`` records the SHA-256 of the fits
    database and of every derived artifact. A mismatch means something was
@@ -20,8 +20,15 @@ Three independent checks, because the repository drifted in three ways at once:
    database (5,244 vs 5,247; 40,616 vs 41,635). Dead copies of the source of
    truth are how this class of bug survives. Any row-count disagreement is
    reported, and the directory is flagged for removal.
+5. **Ablation** -- the predictive results need the same treatment as the fits.
+   Check 2 only covers the database; nothing watched ``ablation_results.csv``,
+   and the result was a figure and its own caption reporting opposite signs for
+   the same contrast on the same page. This check re-derives every ablation
+   number the manuscript states, and it also fails when a *source artefact* is
+   missing or predates the current design, because a number nobody can
+   reproduce should not ship quietly.
 
-Exit code 0 only when all four pass. Suitable for a pre-commit hook or CI.
+Exit code 0 only when all five pass. Suitable for a pre-commit hook or CI.
 """
 
 from __future__ import annotations
@@ -31,6 +38,7 @@ import os
 import sqlite3
 import sys
 
+import make_ablation_tables
 import make_tables
 import provenance
 
@@ -149,6 +157,9 @@ def main(argv=None) -> int:
     ap.add_argument("--db", default="powerlaw_results.db")
     ap.add_argument("--tex", default=os.path.join("Manuscript", "main.tex"))
     ap.add_argument("--skip-manifest", action="store_true")
+    ap.add_argument("--allow-unverified", action="store_true",
+                    help="do not fail on ablation numbers whose source "
+                         "artefact is absent")
     a = ap.parse_args(argv)
 
     failed = False
@@ -156,42 +167,67 @@ def main(argv=None) -> int:
     if not a.skip_manifest:
         try:
             rep = provenance.assert_snapshot(a.db, a.root)
-            print(f"[1/4] manifest      OK ({len(rep['ok'])} artifacts)")
+            print(f"[1/5] manifest      OK ({len(rep['ok'])} artifacts)")
         except provenance.SnapshotDrift as e:
-            print(f"[1/4] manifest      DRIFT: {e}", file=sys.stderr)
+            print(f"[1/5] manifest      DRIFT: {e}", file=sys.stderr)
             failed = True
     else:
-        print("[1/4] manifest      skipped")
+        print("[1/5] manifest      skipped")
 
     facts = make_tables.compute_facts(os.path.join(a.root, a.db))
     audit = make_tables.audit_prose(os.path.join(a.root, a.tex), facts)
     if audit["stale"] or audit["missing"]:
         failed = True
-        print(f"[2/4] prose         STALE ({facts['total_fits']:,} fits in db)", file=sys.stderr)
+        print(f"[2/5] prose         STALE ({facts['total_fits']:,} fits in db)", file=sys.stderr)
         for s in audit["stale"]:
             print(f"        {s['name']:<26} has {s['found']} want {s['want']!r}", file=sys.stderr)
         for m in audit["missing"]:
             print(f"        {m['name']:<26} missing {m['want']!r}", file=sys.stderr)
     else:
-        print(f"[2/4] prose         OK ({len(audit['ok'])} claims verified)")
+        print(f"[2/5] prose         OK ({len(audit['ok'])} claims verified)")
 
     design = check_design(a.root)
     if design:
         failed = True
-        print("[3/4] design        STALE", file=sys.stderr)
+        print("[3/5] design        STALE", file=sys.stderr)
         for d in design:
             print(f"        {d}", file=sys.stderr)
     else:
-        print("[3/4] design        OK (current estimator, size-only targets)")
+        print("[3/5] design        OK (current estimator, size-only targets)")
 
     orphans = check_orphans(a.root, a.db)
     if orphans:
         failed = True
-        print("[4/4] orphan exports  STALE", file=sys.stderr)
+        print("[4/5] orphan exports  STALE", file=sys.stderr)
         for o in orphans:
             print(f"        {o}", file=sys.stderr)
     else:
-        print("[4/4] orphan exports  OK (none)")
+        print("[4/5] orphan exports  OK (none)")
+
+    abl = make_ablation_tables.audit_prose(
+        os.path.join(a.root, a.tex),
+        make_ablation_tables.compute_facts(a.root))
+    bad = bool(abl["stale"] or abl["missing"]
+               or (abl["unverified"] and not a.allow_unverified))
+    if bad:
+        failed = True
+        label = "STALE" if (abl["stale"] or abl["missing"]) else "INCOMPLETE"
+        print(f"[5/5] ablation      {label}", file=sys.stderr)
+        for s in abl["stale"]:
+            print(f"        {s['name']:<40} has {s['found']} want {s['want']!r}",
+                  file=sys.stderr)
+        for m in abl["missing"]:
+            print(f"        {m['name']:<40} missing {m['want']!r}", file=sys.stderr)
+        for u in abl["unverified"]:
+            print(f"        {u['name']:<40} unverifiable: {u['source']} absent",
+                  file=sys.stderr)
+        print("        rerun: make_ablation_tables.py --check for the full list",
+              file=sys.stderr)
+    elif abl["unverified"]:
+        print(f"[5/5] ablation      OK ({len(abl['ok'])} claims, "
+              f"{len(abl['unverified'])} unverifiable, allowed)")
+    else:
+        print(f"[5/5] ablation      OK ({len(abl['ok'])} claims verified)")
 
     return 1 if failed else 0
 

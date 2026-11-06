@@ -1,0 +1,221 @@
+{
+  "classifier": {
+    "auc_gain_scaling_median": 0.013260067590227798,
+    "auc_median": {
+      "M0": 0.5,
+      "M1": 0.5825275932227804,
+      "M2": 0.6345937248592116,
+      "M3": 0.6492836480032865,
+      "POP": 0.4714289399685267
+    },
+    "brier_by_origin": {
+      "2021": {
+        "M0": 0.1677119029553565,
+        "M1": 0.2441180468656555,
+        "M2": 0.2173756690399998,
+        "M3": 0.2149399478914824,
+        "POP": 0.249679662694943
+      },
+      "2022": {
+        "M0": 0.2836811772978154,
+        "M1": 0.2531241970489169,
+        "M2": 0.2619391650247533,
+        "M3": 0.2582403087267419,
+        "POP": 0.2505791065995841
+      },
+      "2023": {
+        "M0": 0.2937833074430662,
+        "M1": 0.244688321031777,
+        "M2": 0.2427812781381159,
+        "M3": 0.2400071880617745,
+        "POP": 0.2500630489346209
+      },
+      "2024": {
+        "M0": 0.398032056379203,
+        "M1": 0.257168984986847,
+        "M2": 0.2522057529714452,
+        "M3": 0.2500237247809679,
+        "POP": 0.2500960962945544
+      },
+      "2025": {
+        "M0": 0.2783660638149614,
+        "M1": 0.2282788558998208,
+        "M2": 0.2253351725964943,
+        "M3": 0.2238186023665311,
+        "POP": 0.250320260226239
+      }
+    },
+    "brier_median": {
+      "M0": 0.2836811772978154,
+      "M1": 0.244688321031777,
+      "M2": 0.2427812781381159,
+      "M3": 0.2400071880617745,
+      "POP": 0.2500960962945544
+    },
+    "n_origins_scaling_best": 3,
+    "n_repeats": 5,
+    "prevalence_max": 0.6954177897574124,
+    "prevalence_min": 0.2086206896551724,
+    "threshold_scope": "per_unit"
+  },
+  "exceed": {
+    "city": {
+      "auc_gain_scaling_median": 0.013260067590227798,
+      "auc_median": {
+        "M0": 0.5,
+        "M1": 0.5825275932227804,
+        "M2": 0.6345937248592116,
+        "M3": 0.6492836480032865
+      },
+      "contrasts": {
+        "M1-M0": {
+          "median_diff": 0.049094986411289177,
+          "n_ci_excludes_zero": null,
+          "n_diff_positive": 4,
+          "n_origins": 5,
+          "n_same_direction_ci": null,
+          "verdict": null
+        },
+        "M2-M1": {
+          "median_diff": 0.0029436833033265053,
+          "n_ci_excludes_zero": null,
+          "n_diff_positive": 4,
+          "n_origins": 5,
+          "n_same_direction_ci": null,
+          "verdict": null
+        },
+        "M3-M2": {
+          "median_diff": 0.0024357211485173946,
+          "n_ci_excludes_zero": null,
+          "n_diff_positive": 5,
+          "n_origins": 5,
+          "n_same_direction_ci": null,
+          "verdict": null
+        }
+      },
+      "n_origins_scaling_best": 3,
+      "n_units": 3976,
+      "no_intervals": true,
+      "population_only_auc_median": 0.4714289399685267,
+      "source": "classifier_results_metrics.csv",
+      "threshold_scope": "per_unit"
+    },
+    "state": null
+  },
+  "extreme_tau": 0.95,
+  "primary_tau": 0.5,
+  "size": {
+    "contrasts": {
+      "M1-M0": {
+        "decision_origins": 2,
+        "median_diff": 4253.932116167312,
+        "median_rel": 0.3046090709853287,
+        "n_ci_excludes_zero": 2,
+        "n_diff_positive": 3,
+        "n_origins": 5,
+        "n_rel_positive": 3,
+        "n_same_direction_ci": 2,
+        "verdict": "not_supported"
+      },
+      "M2-M1": {
+        "decision_origins": 2,
+        "median_diff": 1877.8968008545987,
+        "median_rel": 0.0119042915479719,
+        "n_ci_excludes_zero": 3,
+        "n_diff_positive": 4,
+        "n_origins": 5,
+        "n_rel_positive": 4,
+        "n_same_direction_ci": 2,
+        "verdict": "not_supported"
+      },
+      "M3-M2": {
+        "decision_origins": 0,
+        "median_diff": -4554.745770460323,
+        "median_rel": -0.0524037926882326,
+        "n_ci_excludes_zero": 2,
+        "n_diff_positive": 1,
+        "n_origins": 5,
+        "n_rel_positive": 1,
+        "n_same_direction_ci": 0,
+        "verdict": "not_supported"
+      }
+    },
+    "decision_rule": "improvement on the primary loss with a 95% bootstrap interval excluding zero, same direction, in at least 3/5 origins",
+    "estimator_extrapolates": true,
+    "model": "spline_quantile",
+    "scaling_vs_tau": {
+      "at_extreme": {
+        "median_rel": 0.0492117292967626,
+        "n_ci_excludes_zero": 2,
+        "n_negative": 1,
+        "n_positive": 4,
+        "n_same_direction_ci": 1,
+        "per_origin": {
+          "2021": 0.3270472556038382,
+          "2022": 0.0492117292967626,
+          "2023": 0.0267903442852038,
+          "2024": -0.1536063547035757,
+          "2025": 0.1475118074420004
+        }
+      },
+      "grid_median_max": 0.0723318632286208,
+      "grid_median_min": -0.1360693642877258,
+      "n_taus": 19,
+      "taus_with_three_same_direction": []
+    },
+    "skill": {
+      "M1": {
+        "max": 0.8574702908883896,
+        "median": 0.3046090709853289,
+        "min": -0.0562549792520257,
+        "n_origins": 5,
+        "n_positive": 3
+      },
+      "M2": {
+        "max": 0.8588762990925113,
+        "median": 0.1227314077372133,
+        "min": -0.3853614260494247,
+        "n_origins": 5,
+        "n_positive": 3
+      },
+      "M3": {
+        "max": 0.8107877743068143,
+        "median": 0.15364352687401,
+        "min": -0.7693766444970584,
+        "n_origins": 5,
+        "n_positive": 3
+      }
+    }
+  },
+  "sources": {
+    "city_classifier": {
+      "path": "classifier_results_metrics.csv",
+      "present": true,
+      "problem": null,
+      "what": "municipal-level out-of-fold classifier metrics"
+    },
+    "city_exceedance": {
+      "path": "ablation_city.csv",
+      "present": false,
+      "problem": "ablation_city.csv predates the current design (meta has no ['extrapolating_classifier', 'classifier_model']): its numbers describe a superseded experiment",
+      "what": "municipal-level exceedance ablation"
+    },
+    "state_exceedance": {
+      "path": "ablation_state_exceedance.csv",
+      "present": false,
+      "problem": "ablation_state_exceedance.csv absent (state-level exceedance classifier)",
+      "what": "state-level exceedance classifier"
+    },
+    "state_size": {
+      "path": "ablation_results.csv",
+      "present": true,
+      "problem": null,
+      "what": "state-level size ablation"
+    }
+  },
+  "warnings": [
+    "ablation_state_exceedance.csv absent (state-level exceedance classifier) -- regenerate with: python run_ablation.py --level state --tasks exceedance --output ablation_state_exceedance.csv",
+    "ablation_city.csv predates the current design (meta has no ['extrapolating_classifier', 'classifier_model']): its numbers describe a superseded experiment -- regenerate with: python run_ablation.py --level city --tasks exceedance --output ablation_city.csv",
+    "the municipal block is drawn from the classifier artefact because ablation_city.csv is stale; the CI column and the pre-registered verdicts need the re-run"
+  ]
+}
