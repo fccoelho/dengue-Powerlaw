@@ -1787,8 +1787,10 @@ def guard_output(args, tasks):
         f"  this run wants  level={want[0]} tasks={want[1]}\n"
         "That file is a source artefact for the manuscript, so writing a "
         "different experiment over it deletes results the text quotes. "
-        f"Use --output {default_output_name(args.level, tasks)}, or --force to "
-        "replace it deliberately."
+        "If the experiment you wanted is the one in the last commit, restore it "
+        f"with: git checkout -- {args.output}\n"
+        f"Otherwise write to --output {default_output_name(args.level, tasks)}, "
+        "or pass --force to replace it deliberately."
     )
 
 
