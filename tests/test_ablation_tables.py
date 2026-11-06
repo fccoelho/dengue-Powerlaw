@@ -109,3 +109,41 @@ def test_exceed_table_marks_a_missing_block_instead_of_dropping_it():
 def test_ablation_table_refuses_to_render_without_a_ladder():
     with pytest.raises(ValueError):
         mat.render_ablation_table({"size": {}})
+
+
+def test_an_artefact_overwritten_by_another_task_is_not_used(tmp_path):
+    """The defect behind "no size ladder in the artefacts".
+
+    ``run_ablation.py`` used to default ``--output`` to ``ablation_results.csv``
+    for every level and task, so a city exceedance run replaced the state size
+    ladder in place. The columns still matched, so a column-only check called the
+    file fresh: Table 3 lost its source while every check stayed green, and the
+    failure surfaced as a bare "no size ladder" from the renderer.
+    """
+    df = _contrast_frame(n_tau=1).assign(task="exceedance", level="city",
+                                         loss="brier", tau=np.nan)
+    df.to_csv(tmp_path / "ablation_results.csv", index=False)
+    (tmp_path / "ablation_results.meta.json").write_text(json.dumps({
+        "extrapolating_regressor": True, "classifier_model": "logistic"}))
+
+    facts = mat.compute_facts(str(tmp_path))
+    src = facts["sources"]["state_size"]
+    assert src["present"] is False
+    assert "another run has written over it" in src["problem"]
+    assert not facts["size"]
+    with pytest.raises(ValueError, match="cannot render Table 3"):
+        mat.render_ablation_table(facts)
+
+
+def test_render_error_names_the_file_and_the_fix():
+    """``no size ladder`` alone sent a reader hunting a bug in the renderer.
+
+    The file was there all along, holding the wrong experiment; the message has
+    to name it and give the command that rebuilds it.
+    """
+    with pytest.raises(ValueError) as ei:
+        mat.render_ablation_table(
+            {"size": {}, "sources": {"state_size": {"problem": "gone"}}})
+    msg = str(ei.value)
+    assert "ablation_results.csv" in msg
+    assert "run_ablation.py --level state" in msg

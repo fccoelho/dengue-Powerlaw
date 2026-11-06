@@ -45,6 +45,12 @@ TRACKED_ARTIFACTS = [
     "ablation_results.meta.json",
     "ablation_city.csv",
     "ablation_city.meta.json",
+    # Quoted by Table 4's state block and, until now, not hashed at all: the
+    # manuscript could cite a run whose output nothing in the repository had to
+    # produce. Tracking it makes its absence a named failure instead of prose
+    # nobody can check.
+    "ablation_state_exceedance.csv",
+    "ablation_state_exceedance.meta.json",
     "classifier_results.parquet",
     "classifier_results_metrics.csv",
     "classifier_results_importance.csv",
@@ -174,6 +180,9 @@ def main(argv=None) -> int:
     ap.add_argument("--root", default=".")
     g = ap.add_mutually_exclusive_group(required=True)
     g.add_argument("--write", action="store_true", help="freeze current state")
+    ap.add_argument("--allow-missing", action="store_true",
+                    help="with --write: freeze even when a tracked artefact is "
+                         "absent. Do not use for a manuscript build")
     g.add_argument("--check", action="store_true", help="verify against manifest")
     g.add_argument("--inventory", action="store_true", help="print table counts")
     a = ap.parse_args(argv)
@@ -186,6 +195,19 @@ def main(argv=None) -> int:
         return 0
 
     if a.write:
+        # Freezing a state that is missing a tracked artefact makes the gap
+        # permanent: every later --check compares against a snapshot in which
+        # the absent file is simply "missing", which is indistinguishable from
+        # a file that was deleted afterwards.
+        gone = [p for p in TRACKED_ARTIFACTS
+                if not os.path.exists(os.path.join(a.root, p))]
+        if gone and not a.allow_missing:
+            print("refusing to freeze an incomplete snapshot:", file=sys.stderr)
+            for p in gone:
+                print(f"  absent: {p}", file=sys.stderr)
+            print("Rebuild it (make_ablation_tables.py --sources names the "
+                  "command), or pass --allow-missing.", file=sys.stderr)
+            return 1
         man = write_manifest(a.db, a.root)
         print(f"frozen {MANIFEST_NAME}")
         print(f"  db sha256 {man['database']['sha256'][:16]}...")

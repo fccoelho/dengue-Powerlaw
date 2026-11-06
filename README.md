@@ -42,6 +42,14 @@ table it illustrates, and once did.
 | `Manuscript/figures/fig*.png` / `.pdf` | `Manuscript/figures/generate_figures.py` | `main.tex` |
 | `snapshot_manifest.json` | `provenance.py --write` | `verify_snapshot.py` |
 
+`--output` defaults to a name derived from `--level` and `--tasks`, and
+`run_ablation.py` refuses to overwrite a file holding a different experiment.
+This is not tidiness: the default used to be `ablation_results.csv` for every
+run, so `--level city --tasks exceedance` replaced the state size ladder in
+place. The columns still matched, every check stayed green, and the only
+symptom was `make_ablation_tables.py` reporting that the repository contained
+no size ladder -- which it did, right up until the wrong run overwrote it.
+
 ### Full refresh after a new data extraction
 
 Run in this order. Steps 1 and 2 are network-bound; the rest are local.
@@ -165,6 +173,7 @@ already reached the manuscript once.
 pytest -q                          # test modules, including the ablation guards
 python make_tables.py --check      # fit literals still match the database
 python make_ablation_tables.py --check  # ablation literals still match the artefacts
+python make_ablation_tables.py --sources # every source artefact present and of the right kind
 python provenance.py --check       # no artefact came from a different run
 python verify_snapshot.py          # all five checks; exit 1 on any drift
 ```
@@ -185,6 +194,8 @@ merely agrees with it today.
 | `0/8 block columns available` | the climate block is missing from the panel, so `M2` would equal `M1` | `python run_ablation.py --attach-climate` (rebuilds from `data/[0-9]*.parquet`) or `--climate-parquet <file>` |
 | every `M2-M1` contrast is exactly `0.0` with CI `[0, 0]` | a pre-fix artefact; the rungs were identical | regenerate the ablation; the current script aborts instead of writing zeros |
 | `RuntimeError: ... refuses to plot` from `generate_figures.py` | a figure was pointed at a defective artefact | fix the artefact, do not relax the check |
+| `cannot write tab_ablation.tex: no size ladder in the artefacts` | `ablation_results.csv` is missing, or holds a *different* experiment because a run with another `--level`/`--tasks` wrote over it | `python make_ablation_tables.py --sources` names the file and the reason; rebuild with `python run_ablation.py --level state --attach-climate` |
+| `refusing to overwrite ablation_results.csv` | the run you launched writes a different `level`/`tasks` combination than the file already holds | keep the derived filename (drop `--output`), or pass `--force` if the replacement is intended |
 
 ## Technical Analysis Overview
 

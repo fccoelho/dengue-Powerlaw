@@ -18,6 +18,12 @@ emitted from an artefact, never typed.
     python make_ablation_tables.py            # write generated/{tab_ablation,tab_exceed}.tex
     python make_ablation_tables.py --check    # audit only, exit 1 on staleness
     python make_ablation_tables.py --print    # dump the facts
+    python make_ablation_tables.py --sources  # which artefacts exist, and why not
+
+"Table 3 cannot be rendered: no size ladder" is therefore not a rendering bug --
+it means ``ablation_results.csv`` is missing or holds something else, usually
+because a run with a different ``--level``/``--tasks`` wrote over it. Run
+``--sources`` first; it names the file and the reason.
 
 Three verdicts, because a missing artefact is neither fresh nor stale:
 
@@ -73,7 +79,12 @@ SOURCES = {
         "path": "ablation_results.csv",
         "meta": "ablation_results.meta.json",
         "columns": ("record_type", "task", "loss", "tau", "contrast", "rung"),
+        # Content, not just shape. A file with the right columns but the wrong
+        # ``task`` is the signature of one run overwriting another, and it used
+        # to pass every check here while Table 3 quietly lost its source.
+        "values": {"task": ("size",), "level": ("state",)},
         "what": "state-level size ablation",
+        "how": "python run_ablation.py --level state --attach-climate",
         # Keys written by the current run_ablation.py. Their absence means the
         # file was produced before the estimator change, so its numbers describe
         # an experiment the manuscript no longer reports.
@@ -83,6 +94,7 @@ SOURCES = {
         "path": "ablation_state_exceedance.csv",
         "meta": "ablation_state_exceedance.meta.json",
         "columns": ("record_type", "task", "loss", "contrast", "rung"),
+        "values": {"task": ("exceedance",), "level": ("state",)},
         "what": "state-level exceedance classifier",
         "design": ("extrapolating_classifier", "classifier_model"),
         # Not produced by any script in this repository as committed: the
@@ -95,6 +107,7 @@ SOURCES = {
         "path": "ablation_city.csv",
         "meta": "ablation_city.meta.json",
         "columns": ("record_type", "task", "loss", "contrast", "rung"),
+        "values": {"task": ("exceedance",), "level": ("city",)},
         "what": "municipal-level exceedance ablation",
         "design": ("extrapolating_classifier", "classifier_model"),
         "how": ("python run_ablation.py --level city --tasks exceedance "
@@ -104,6 +117,7 @@ SOURCES = {
         "path": "classifier_results_metrics.csv",
         "meta": "classifier_results.meta.json",
         "columns": ("origin", "rung", "brier", "auc"),
+        "values": {"level": ("city",)},
         "what": "municipal-level out-of-fold classifier metrics",
         "design": ("classifier_model",),
     },
@@ -138,6 +152,16 @@ def _load(name: str, root: str = ".") -> tuple[pd.DataFrame | None, dict, str | 
     if miss:
         return None, {}, (f"{spec['path']} lacks the columns {miss}: it is not a "
                           f"{spec['what']} artefact")
+    for col, allowed in spec.get("values", {}).items():
+        if col not in df.columns:
+            continue
+        got = sorted(str(v) for v in df[col].dropna().unique())
+        absent = [v for v in allowed if v not in got]
+        if absent:
+            return None, {}, (
+                f"{spec['path']} holds {col}={got or ['nothing']} but a "
+                f"{spec['what']} artefact needs {col} in {list(allowed)}: "
+                f"another run has written over it")
     meta = {}
     mpath = os.path.join(root, spec["meta"])
     if os.path.exists(mpath):
@@ -209,7 +233,8 @@ def compute_facts(root: str = ".") -> dict:
                 problem = (f"{spec['path']} predates the current design (meta has no "
                            f"{missing}): its numbers describe a superseded experiment")
         facts["sources"][name] = {"path": spec["path"], "what": spec["what"],
-                                  "present": fresh, "problem": problem}
+                                  "present": fresh, "problem": problem,
+                                  "how": spec.get("how")}
         if problem:
             facts["warnings"].append(
                 problem + (f" -- regenerate with: {spec['how']}" if spec.get("how") else ""))
@@ -393,7 +418,12 @@ def compute_facts(root: str = ".") -> dict:
 def render_ablation_table(f: dict) -> str:
     """LaTeX float for Table 3, built from the size ladder."""
     if not f.get("size", {}).get("skill"):
-        raise ValueError("no size ladder in the artefacts; cannot render Table 3")
+        prob = (f.get("sources", {}).get("state_size") or {}).get("problem")
+        raise ValueError(
+            "no size ladder in the artefacts; cannot render Table 3\n"
+            f"    ablation_results.csv: {prob or 'absent'}\n"
+            "    rebuild it with: python run_ablation.py --level state "
+            "--attach-climate")
     s, c = f["size"]["skill"], f["size"]["contrasts"]
     cells = []
     for r in ("M1", "M2", "M3"):
@@ -670,12 +700,36 @@ def audit_prose(tex_path: str, f: dict) -> dict:
     return res
 
 
+#: Sources whose absence blocks a table outright, as opposed to one that only
+#: withdraws a column. ``state_size`` is Table 3; ``state_exceedance`` is the
+#: paper's only ``supported`` verdict, and it is currently reproducible by no
+#: committed script -- so it must fail loudly rather than read as an omission.
+HARD_SOURCES = ("state_size", "state_exceedance")
+
+
+def format_sources(f: dict) -> str:
+    """One line per source artefact, with the reason when it cannot be used."""
+    rows = []
+    for name, s in f.get("sources", {}).items():
+        hard = " (required)" if name in HARD_SOURCES else ""
+        rows.append(f"{'ok     ' if s.get('present') else 'MISSING'}  "
+                    f"{s['path']:32s}  {s['what']}{hard}")
+        if not s.get("present"):
+            rows.append(f"         -> {s.get('problem')}")
+            if s.get("how"):
+                rows.append(f"         -> rebuild: {s['how']}")
+    return "\n".join(rows)
+
+
 def main(argv=None) -> int:
     ap = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     ap.add_argument("--root", default=".")
     ap.add_argument("--tex", default=os.path.join("Manuscript", "main.tex"))
     ap.add_argument("--check", action="store_true", help="audit, do not write")
     ap.add_argument("--print", dest="dump", action="store_true")
+    ap.add_argument("--sources", action="store_true",
+                    help="report the state of the ablation artefacts and exit; "
+                         "exit 1 when a source a table needs is unusable")
     ap.add_argument("--allow-unverified", action="store_true",
                     help="treat unverifiable claims as warnings, not failures")
     a = ap.parse_args(argv)
@@ -685,6 +739,16 @@ def main(argv=None) -> int:
     if a.dump:
         print(json.dumps(f, indent=2, sort_keys=True, default=float))
         return 0
+
+    if a.sources:
+        print(format_sources(f))
+        for w in f["warnings"]:
+            print(f"note: {w}")
+        bad = [n for n in HARD_SOURCES
+               if not f["sources"].get(n, {}).get("present")]
+        if bad:
+            print(f"unusable required source(s): {', '.join(bad)}", file=sys.stderr)
+        return 1 if bad else 0
 
     audit = audit_prose(os.path.join(a.root, a.tex), f)
 
@@ -707,14 +771,23 @@ def main(argv=None) -> int:
 
     gen = os.path.join(a.root, GEN_DIR)
     os.makedirs(gen, exist_ok=True)
+    # Render both before writing either. Writing them in a loop meant a failure
+    # on the second left a fresh Table 3 beside a stale Table 4, which is worse
+    # than writing neither: the manuscript would be internally inconsistent and
+    # nothing would say so.
+    rendered = {}
     for name, fn in (("tab_ablation.tex", render_ablation_table),
                      ("tab_exceed.tex", render_exceed_table)):
         try:
-            open(os.path.join(gen, name), "w", encoding="utf-8").write(fn(f))
-            print(f"wrote {GEN_DIR}/{name}")
+            rendered[name] = fn(f)
         except ValueError as e:
             print(f"cannot write {name}: {e}", file=sys.stderr)
+            print("no table was written, so Manuscript/generated/ is unchanged",
+                  file=sys.stderr)
             return 2
+    for name, tex in rendered.items():
+        open(os.path.join(gen, name), "w", encoding="utf-8").write(tex)
+        print(f"wrote {GEN_DIR}/{name}")
     with open(os.path.join(gen, "ablation_facts.json"), "w", encoding="utf-8") as fh:
         json.dump(f, fh, indent=2, sort_keys=True, default=float)
         fh.write("\n")

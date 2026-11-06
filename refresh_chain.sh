@@ -67,6 +67,20 @@ say "stage 3: ablation ladder (state level, size task)"
     > logs/ablation.log 2>&1
 say "stage 3: done"
 
+# ---- stage 3b: exceedance artefacts (both blocks of Table 4) --------
+# Not produced by any other stage, which is how the state block came to be
+# quoted in the manuscript with no committed artefact behind it. Each run
+# writes its own file now (run_ablation.py derives the name from --level and
+# --tasks), so neither can overwrite the size ladder from stage 3.
+say "stage 3b: exceedance artifacts (state + city)"
+"$PY" run_ablation.py --level state --tasks exceedance --attach-climate \
+    --output ablation_state_exceedance.csv \
+    > logs/ablation_state_exceedance.log 2>&1
+"$PY" run_ablation.py --level city --tasks exceedance \
+    --output ablation_city.csv \
+    > logs/ablation_city.log 2>&1
+say "stage 3b: done"
+
 # ---- stage 4: rarity classifier -------------------------------------
 say "stage 4: rarity classifier (city level, defaults)"
 "$PY" run_classifier.py > logs/classifier.log 2>&1
