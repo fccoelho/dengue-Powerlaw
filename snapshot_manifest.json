@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "written_utc": "2026-11-06T12:23:10+00:00",
+  "written_utc": "2026-11-06T17:45:29+00:00",
   "database": {
     "path": "powerlaw_results.db",
     "sha256": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
@@ -92,15 +92,17 @@
     "Manuscript/generated/facts.json": "8b863f367414b77e49af2eff84813c645180880ab7b60816cd81840c977aff25",
     "Manuscript/generated/tab_main.tex": "35f0085ee7e72e792c28da58fffd90ec7b30a503f872b2ca8b730d6db6517325",
     "Manuscript/generated/tab_ablation.tex": "7c097d99a734210bfedc85bf8d0ce98831edd2955a43cfa2c04828da25a8e52c",
-    "Manuscript/generated/tab_exceed.tex": "ad1028aa6380b29498bbc81e83d9e93a2bbcd015c0c375c9ca3949bd879382f9",
-    "Manuscript/generated/ablation_facts.json": "c6796680fb5d29c46d4f51bbfe80dd4786068b4bf3b99bf235166bc3eb04e80e",
+    "Manuscript/generated/tab_exceed.tex": "a45c528190a77e49ee1ea944a6ec5d410f34b7c226f6b0099683c55852e82738",
+    "Manuscript/generated/ablation_facts.json": "62b95b81c70bbc53c1dae761b8e62f7860acaf0023852430378ae2ad61a79f51",
     "ablation_results.csv": "c3a78574e5cba0ab1c8c6a358032865421616cf8259075cb4d5db34f9ae0bbbc",
-    "ablation_results.meta.json": "48fcaf07baae6c223cc5d12c0c758256703ee061404ebfe832c22680b04628c6",
-    "ablation_city.csv": "d1324bb793fd53095a1bce8b7542de3c90d86df65a99ed22642ba43c43a4ec96",
-    "ablation_city.meta.json": "94e8c6a6a26575d641cff951733b32a5b27686d409ddc5a1c149c4aff93c6d0f",
+    "ablation_results.meta.json": "bac62addf7f21795a39566ff5286c5ab73b2867f74245e80f485e499d5e5cf09",
+    "ablation_city.csv": "55578e2ecdc789bcbe03feb21724aacba52cff9763f93e43710e045a565632ea",
+    "ablation_city.meta.json": "bb279d25e3d057107d740e96247a084c90accdcec54b3887960bb0c63cc9c87e",
+    "ablation_state_exceedance.csv": "33013109c9685c81a90b606585d54c9d28999f6171f0ce7413e398ed7a8babdb",
+    "ablation_state_exceedance.meta.json": "b37fe39648c9c89cc151b8d39bfcefec00adafd6cac4d0ba407667125248ea69",
     "classifier_results.parquet": "899dd983efd45d0978f9d4354dce6422957215004cf651039a516e95b5ba44e6",
-    "classifier_results_metrics.csv": "6ce519e3a77c663d03acae134b603e8a5d3984d1f36db01febc4c420f309cc46",
+    "classifier_results_metrics.csv": "ce8b915593b7b071e72127e54b24498399d161b743062dfaa23f730c97f0b92a",
     "classifier_results_importance.csv": "efae74c323f33eb91b3022853fd635003f56aa01726266358fed9a833f25fe2a",
-    "classifier_results.meta.json": "ca1fe7dec0b24092ad069f889c35e39157f454f4b69ec37a769dba0040c6e2d9"
+    "classifier_results.meta.json": "d4593e798cc7d6ff5d6249f9f6a181b153607eccf2c2b7b5fd53871e545067ff"
   }
 }

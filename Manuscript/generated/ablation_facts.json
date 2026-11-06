@@ -1,6 +1,7 @@
 {
   "classifier": {
     "auc_gain_scaling_median": 0.013260067590227798,
+    "auc_gap_vs_ablation_city": 0.0,
     "auc_median": {
       "M0": 0.5,
       "M1": 0.5825275932227804,
@@ -56,7 +57,14 @@
     "n_repeats": 5,
     "prevalence_max": 0.6954177897574124,
     "prevalence_min": 0.2086206896551724,
-    "threshold_scope": "per_unit"
+    "threshold_scope": "per_unit",
+    "train_prevalence": {
+      "2021": 0.2597460791635549,
+      "2022": 0.2623179227359088,
+      "2023": 0.2674018615944961,
+      "2024": 0.2638854399470242,
+      "2025": 0.2626955074875208
+    }
   },
   "exceed": {
     "city": {
@@ -69,38 +77,85 @@
       },
       "contrasts": {
         "M1-M0": {
-          "median_diff": 0.049094986411289177,
-          "n_ci_excludes_zero": null,
+          "decision_origins": 4,
+          "median_diff": 0.0490949864112891,
+          "median_rel": 0.1671129201947714,
+          "n_ci_excludes_zero": 5,
           "n_diff_positive": 4,
           "n_origins": 5,
-          "n_same_direction_ci": null,
-          "verdict": null
+          "n_rel_positive": 4,
+          "n_same_direction_ci": 4,
+          "verdict": "supported"
         },
         "M2-M1": {
-          "median_diff": 0.0029436833033265053,
-          "n_ci_excludes_zero": null,
+          "decision_origins": 2,
+          "median_diff": 0.0029436833033264,
+          "median_rel": 0.0128951202761341,
+          "n_ci_excludes_zero": 3,
           "n_diff_positive": 4,
           "n_origins": 5,
-          "n_same_direction_ci": null,
-          "verdict": null
+          "n_rel_positive": 4,
+          "n_same_direction_ci": 2,
+          "verdict": "not_supported"
         },
         "M3-M2": {
-          "median_diff": 0.0024357211485173946,
-          "n_ci_excludes_zero": null,
+          "decision_origins": 1,
+          "median_diff": 0.0024357211485173,
+          "median_rel": 0.0112051231827109,
+          "n_ci_excludes_zero": 1,
           "n_diff_positive": 5,
           "n_origins": 5,
-          "n_same_direction_ci": null,
-          "verdict": null
+          "n_rel_positive": 5,
+          "n_same_direction_ci": 1,
+          "verdict": "not_supported"
         }
       },
       "n_origins_scaling_best": 3,
       "n_units": 3976,
-      "no_intervals": true,
       "population_only_auc_median": 0.4714289399685267,
-      "source": "classifier_results_metrics.csv",
+      "population_only_auc_range": [
+        0.4542805018179323,
+        0.5215884333531393
+      ],
       "threshold_scope": "per_unit"
     },
-    "state": null
+    "state": {
+      "contrasts": {
+        "M1-M0": {
+          "decision_origins": 2,
+          "median_diff": 0.125657350622214,
+          "median_rel": 0.4633517452873529,
+          "n_ci_excludes_zero": 2,
+          "n_diff_positive": 4,
+          "n_origins": 5,
+          "n_rel_positive": 4,
+          "n_same_direction_ci": 2,
+          "verdict": "not_supported"
+        },
+        "M2-M1": {
+          "decision_origins": 2,
+          "median_diff": 0.0267867160726124,
+          "median_rel": 0.2848018541761026,
+          "n_ci_excludes_zero": 3,
+          "n_diff_positive": 3,
+          "n_origins": 5,
+          "n_rel_positive": 3,
+          "n_same_direction_ci": 2,
+          "verdict": "not_supported"
+        },
+        "M3-M2": {
+          "decision_origins": 0,
+          "median_diff": 0.0001820105319944,
+          "median_rel": 0.0011296074945905,
+          "n_ci_excludes_zero": 2,
+          "n_diff_positive": 3,
+          "n_origins": 5,
+          "n_rel_positive": 3,
+          "n_same_direction_ci": 0,
+          "verdict": "not_supported"
+        }
+      }
+    }
   },
   "extreme_tau": 0.95,
   "primary_tau": 0.5,
@@ -189,33 +244,37 @@
   },
   "sources": {
     "city_classifier": {
+      "how": null,
       "path": "classifier_results_metrics.csv",
       "present": true,
       "problem": null,
+      "restore": null,
       "what": "municipal-level out-of-fold classifier metrics"
     },
     "city_exceedance": {
+      "how": "python run_ablation.py --level city --tasks exceedance --output ablation_city.csv",
       "path": "ablation_city.csv",
-      "present": false,
-      "problem": "ablation_city.csv predates the current design (meta has no ['extrapolating_classifier', 'classifier_model']): its numbers describe a superseded experiment",
+      "present": true,
+      "problem": null,
+      "restore": null,
       "what": "municipal-level exceedance ablation"
     },
     "state_exceedance": {
+      "how": "python run_ablation.py --level state --tasks exceedance --output ablation_state_exceedance.csv",
       "path": "ablation_state_exceedance.csv",
-      "present": false,
-      "problem": "ablation_state_exceedance.csv absent (state-level exceedance classifier)",
+      "present": true,
+      "problem": null,
+      "restore": null,
       "what": "state-level exceedance classifier"
     },
     "state_size": {
+      "how": "python run_ablation.py --level state --attach-climate --force  (refit; new hashes, so re-freeze and recompile)",
       "path": "ablation_results.csv",
       "present": true,
       "problem": null,
+      "restore": "git checkout -- ablation_results.csv ablation_results.meta.json",
       "what": "state-level size ablation"
     }
   },
-  "warnings": [
-    "ablation_state_exceedance.csv absent (state-level exceedance classifier) -- regenerate with: python run_ablation.py --level state --tasks exceedance --output ablation_state_exceedance.csv",
-    "ablation_city.csv predates the current design (meta has no ['extrapolating_classifier', 'classifier_model']): its numbers describe a superseded experiment -- regenerate with: python run_ablation.py --level city --tasks exceedance --output ablation_city.csv",
-    "the municipal block is drawn from the classifier artefact because ablation_city.csv is stale; the CI column and the pre-registered verdicts need the re-run"
-  ]
+  "warnings": []
 }

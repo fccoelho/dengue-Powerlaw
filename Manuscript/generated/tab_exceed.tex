@@ -19,11 +19,13 @@ population-only reference reaches a median AUC of $0.47$ against $0.58$--$0.65$ 
 \toprule
 Level & Contrast & $\Delta$Brier, median & Origins $\Delta>0$ & Origins CI excl.\ 0 & Verdict\\
 \midrule
-\multicolumn{6}{@{}l}{\emph{State level: no committed artefact; run \texttt{run\_ablation.py --level state --tasks exceedance}}}\\
+State (26 units) & M1$-$M0 (lagged metrics) & $+0.126$ & 4/5 & 2/5 & not supported\\
+ & M2$-$M1 (climate) & $+0.027$ & 3/5 & 2/5 & not supported\\
+ & M3$-$M2 (scaling) & $+0.000$ & 3/5 & 0/5 & not supported\\
 \addlinespace
-Municipal (3{,}976 units) & M1$-$M0 (lagged metrics) & $+0.049$ & 4/5 & -- & \emph{not tested}\\
- & M2$-$M1 (climate) & $+0.003$ & 4/5 & -- & \emph{not tested}\\
- & M3$-$M2 (scaling) & $+0.002$ & 5/5 & -- & \emph{not tested}\\
+Municipal (3{,}976 units) & M1$-$M0 (lagged metrics) & $+0.049$ & 4/5 & 4/5 & \textbf{supported}\\
+ & M2$-$M1 (climate) & $+0.003$ & 4/5 & 2/5 & not supported\\
+ & M3$-$M2 (scaling) & $+0.002$ & 5/5 & 1/5 & not supported\\
 \bottomrule
 \end{tabular}
 \end{table}
