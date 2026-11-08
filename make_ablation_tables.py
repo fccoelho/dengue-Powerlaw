@@ -698,8 +698,8 @@ def claims(f: dict) -> list[dict]:
     if cm1:
         out.append(
             {"name": "municipal lagged block, verdict",
-             "want": ("the only contrast in this paper to satisfy the "
-                      "pre-registered rule"
+             "want": ("the only contrast in this study to satisfy the "
+                      "pre-specified rule"
                       if cm1.get("verdict") == "supported"
                       else "no rung can be credited at this level"),
              "stale": [("no rung can be credited at this level"
