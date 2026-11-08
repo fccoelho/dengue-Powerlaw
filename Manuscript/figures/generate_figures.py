@@ -84,17 +84,20 @@ mpl.rcParams.update({
     "legend.frameon": False,
 })
 
-#: Five constructions of the same variable -- epidemic size. The two duration
-#: constructions (former L5 and L7) are gone: a season is bounded above by the
-#: length of the year, so a scale-free law cannot apply to duration a priori,
+#: Five constructions of the same municipal series: the weekly count at two
+#: temporal windows and the epidemic size at three dimensions of pooling. The
+#: duration and peak-timing constructions are gone: a season is bounded above by
+#: the length of the year, so a scale-free law cannot apply to duration a priori,
 #: and the fits said so by running into the estimator's ceiling. Duration and
 #: peak timing survive as covariates of size.
 LEVELS = {
-    "L1": ("powerlaw_fits", "", "weekly, city"),
-    "L2": ("powerlaw_fits_yearly", "", "weekly, city-year"),
-    "L3": ("powerlaw_fits_total_cases", "", "size, city"),
-    "L4": ("episcanner_state_fits", "metric='total_cases' AND year>0", "size, state-year"),
-    "L6": ("episcanner_fits", "metric='total_cases' AND year>0", "size, natl-year"),
+    "W-mun":   ("powerlaw_fits", "", "weekly, city"),
+    "W-seas":  ("powerlaw_fits_yearly", "", "weekly, city-season"),
+    "S-mun":   ("powerlaw_fits_total_cases", "", "size, city"),
+    "S-state": ("episcanner_state_fits", "metric='total_cases' AND year>0",
+                "size, state-year"),
+    "S-nat":   ("episcanner_fits", "metric='total_cases' AND year>0",
+                "size, national-year"),
 }
 SIZE_LEVELS = list(LEVELS)
 COLORS = plt.cm.tab10.colors
@@ -342,16 +345,17 @@ def fig01():
             fontsize=7, ha="center")
 
     labels = [
-        ("L1 weekly, city\n(full series)", 0.46, 0.80),
-        ("L2 weekly, city\n(single years)", 0.46, 0.50),
-        ("L3 size, city\n(annual totals)", 0.46, 0.20),
-        ("L4 size, state-year\ncross-section", 0.74, 0.65),
-        ("L6 size, national-year", 0.74, 0.30),
+        ("W-mun weekly, city\n(full series)", 0.46, 0.80),
+        ("W-seas weekly, city\n(single seasons)", 0.46, 0.50),
+        ("S-mun size, city\n(across seasons)", 0.46, 0.20),
+        ("S-state size, state-year\ncross-section", 0.74, 0.65),
+        ("S-nat size, national-year\ncross-section", 0.74, 0.30),
     ]
     for t_text, x, y in labels:
         # shaded by the x_min diagnostic, which is what decides whether the
-        # tail language is vacuous: L1 and L2 collapse into the bulk.
-        fc = "#f6d6d0" if t_text[:2] in ("L1", "L2") else "#d8ecd8"
+        # tail language is vacuous: the two weekly constructions collapse into
+        # the bulk.
+        fc = "#f6d6d0" if t_text.startswith("W-") else "#d8ecd8"
         box(x, y, 0.24, 0.16, t_text, fc)
     ax.text(0.50, 0.00, "green: $x_{\\min}$ above the bulk (the fit describes a tail)   "
             "red: $x_{\\min}\\leq5$ (the fit describes the data)",
@@ -376,7 +380,7 @@ def fig02():
     ax.axhline(2.0, ls="--", lw=0.9, color="0.4")
     ax.text(0.02, 0.92, r"$\alpha=2$", transform=ax.transAxes, fontsize=9,
             color="0.35")
-    ax.set_xlabel("aggregation level")
+    ax.set_xlabel("construction")
     ax.set_ylabel(r"$\alpha$")
     ax.set_title("estimated exponent by construction (dashed: $\\alpha=2$)",
                  fontsize=10)
@@ -548,7 +552,7 @@ def fig06():
 
 
 # ---------------------------------------------------------------------------
-# Fig 07 -- the L1/L2 window flip
+# Fig 07 -- the W-mun/W-seas window flip
 # ---------------------------------------------------------------------------
 def fig07():
     l1 = _read("SELECT alpha, geocode FROM powerlaw_fits").dropna(subset=["alpha"])
@@ -564,17 +568,17 @@ def fig07():
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.6, 3.3))
     bins = np.linspace(0.5, 6, 60)
     ax1.hist(l1["alpha"], bins=bins, density=True, alpha=0.65,
-             label=f"L1 full series (n={len(l1):,})", color="#8fbf8f")
+             label=f"W-mun full series (n={len(l1):,})", color="#8fbf8f")
     ax1.hist(l2["alpha"], bins=bins, density=True, alpha=0.65,
-             label=f"L2 single years (n={len(l2):,})", color="#e8a09a")
+             label=f"W-seas single seasons (n={len(l2):,})", color="#e8a09a")
     ax1.axvline(2.0, ls="--", lw=0.9, color="0.4")
     ax1.set_xlabel(r"estimated $\alpha$")
     ax1.set_ylabel("density")
     ax1.legend(fontsize=8)
 
     stats = pd.DataFrame({
-        "L1 full": [100 * (l1R["R"] > 0).mean(), 100 * ((l1R["R"] < 0) & (l1R["p"] < .05)).mean()],
-        "L2 yearly": [100 * (l2R["R"] > 0).mean(), 100 * ((l2R["R"] < 0) & (l2R["p"] < .05)).mean()],
+        "W-mun, full series": [100 * (l1R["R"] > 0).mean(), 100 * ((l1R["R"] < 0) & (l1R["p"] < .05)).mean()],
+        "W-seas, single seasons": [100 * (l2R["R"] > 0).mean(), 100 * ((l2R["R"] < 0) & (l2R["p"] < .05)).mean()],
     }, index=["power law preferred", "exponential, $p<0.05$"])
     stats.T.plot.bar(ax=ax2, rot=0, color=["#2e7d32", "#c62828"], legend=True)
     ax2.set_ylabel("share of fits (%)")

@@ -10,6 +10,10 @@
 \usepackage[margin=2cm]{geometry}
 \usepackage{hyperref}
 
+% Handles for the five constructions defined in Section~\ref{sec:levels}.
+% \mbox keeps a handle from breaking at its hyphen across a line break.
+\newcommand{\lvl}[1]{\mbox{#1}}
+
 \title{From exponent to risk: power-law tails and the probability of\\
 large dengue epidemics in Brazil}
 \author{Fl\'avio Code\c{c}o Coelho}
@@ -127,7 +131,7 @@ decision rule fixed in advance.
 \item \textbf{A robust exponent for epidemic size, reported with the diagnostic
 that makes it interpretable.} Under five constructions of the same surveillance
 series, the two weekly constructions show what the diagnostic is for: $x_{\min}$
-collapses to five cases or fewer in 77\% of L1 and 81\% of L2 fits,
+collapses to five cases or fewer in 77\% of \lvl{W-mun} and 81\% of \lvl{W-seas} fits,
 so that the power law is estimated on counts of one and two. The size
 constructions do not collapse, and they agree: the power law is preferred in 16
 of 16 national cross-sections and in 96\% of 353 state-year cross-sections, with
@@ -275,14 +279,20 @@ estimator. Table~\ref{tab:levels} defines the five aggregation levels used; each
 a construction in the sense of Section~\ref{sec:definitions}, and the two terms are
 used interchangeably.
 Two variables are fitted, both derived from the same municipal series: the weekly
-count $c_{i,w}$ at constructions L1 and L2, and the epidemic size $S_{i,t}$ at
-constructions L3, L4 and L6. Within each group the constructions differ only in
+count $c_{i,w}$ at constructions \lvl{W-mun} and \lvl{W-seas}, and the epidemic size $S_{i,t}$ at
+constructions \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat}. Within each group the constructions differ only in
 the dimension along which the variable is pooled, which is what allows a
 contrast between two of them to be read as the effect of that dimension alone.
 
-The identifiers L1, L2, L3, L4 and L6 are used throughout as fixed handles for
-the five constructions, and they also label the panels of
-Figures~\ref{fig:alpha}, \ref{fig:verdicts} and \ref{fig:xmin}.
+Every handle is read as a variable and a scope. The initial letter names the
+fitted variable --- \emph{W} for the weekly count, \emph{S} for the epidemic size
+--- and the remainder names the scope over which observations are pooled:
+\emph{mun} for a single municipality, \emph{seas} for a single season of a single
+municipality, \emph{state} for the municipalities of one state in one season, and
+\emph{nat} for the municipalities of the country in one season. The handles name
+constructions and are not random variables: only $c_{i,w}$ and $S_{i,t}$ enter the
+likelihood. They are used throughout for the five constructions and also label the
+panels of Figures~\ref{fig:alpha}, \ref{fig:verdicts} and \ref{fig:xmin}.
 
 \begin{table}[htbp]
 \centering
@@ -291,34 +301,34 @@ Figures~\ref{fig:alpha}, \ref{fig:verdicts} and \ref{fig:xmin}.
 \caption{The five aggregation levels. ``Fitted variable'' is the random variable
 entering the estimator; ``sampling unit'' is what each observation of the fitted
 sample represents; ``pooling'' is the dimension along which observations are
-collected. L1 and L2 fit the weekly count over different windows; L3, L4 and L6
+collected. \lvl{W-mun} and \lvl{W-seas} fit the weekly count over different windows; \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat}
 fit the epidemic size over different dimensions.}
 \label{tab:levels}
 \begin{tabular}{@{}llllr@{}}
 \toprule
-ID & Fitted variable & Sampling unit & Pooling & Fits\\
+Handle & Fitted variable & Sampling unit & Pooling & Fits\\
 \midrule
-L1 & weekly count $c$      & municipality            & weeks, full series        & 5{,}264\\
-L2 & weekly count $c$      & municipality-season     & weeks within one season   & 43{,}673\\
-L3 & epidemic size $S$     & municipality            & seasons, ten or more      & 1{,}085\\
-L4 & epidemic size $S$     & municipality in state-year & municipalities of a state & 353\\
-L6 & epidemic size $S$     & municipality in national-year & municipalities nationally & 16\\
+\lvl{W-mun}   & weekly count $c$  & municipality                  & weeks, full series        & 5{,}264\\
+\lvl{W-seas}  & weekly count $c$  & municipality-season           & weeks within one season   & 43{,}673\\
+\lvl{S-mun}   & epidemic size $S$ & municipality                  & seasons, ten or more      & 1{,}085\\
+\lvl{S-state} & epidemic size $S$ & municipality in state-year    & municipalities of a state & 353\\
+\lvl{S-nat}   & epidemic size $S$ & municipality in national-year & municipalities nationally & 16\\
 \bottomrule
 \end{tabular}
 \end{table}
 
-Constructions L1 and L2 differ only in the temporal window over which the weekly
-counts are pooled: L1 uses the complete available series of a municipality
-(January 2010 to January 2026), whereas L2 restricts the sample to a single
+Constructions \lvl{W-mun} and \lvl{W-seas} differ only in the temporal window over which the weekly
+counts are pooled: \lvl{W-mun} uses the complete available series of a municipality
+(January 2010 to January 2026), whereas \lvl{W-seas} restricts the sample to a single
 season, of at most 53 weeks. Their sample sizes differ by roughly an order of
 magnitude, which is why the comparison between them is made on shares rather than
 on counts.
 
-Constructions L3, L4 and L6 fit the same variable, $S_{i,t}$, and differ only in
-the dimension of pooling. L3 pools the seasons of one municipality and is
+Constructions \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat} fit the same variable, $S_{i,t}$, and differ only in
+the dimension of pooling. \lvl{S-mun} pools the seasons of one municipality and is
 therefore a statement about how a single municipality's epidemic sizes vary over
 time; a municipality enters this construction only if at least ten seasons are
-available. L4 and L6 pool municipalities within a period, at state and national
+available. \lvl{S-state} and \lvl{S-nat} pool municipalities within a period, at state and national
 scope respectively, and are therefore statements about how sizes vary across
 space in a given season. This nesting is deliberate: each contrast reported in
 Section~\ref{sec:results} is a single step within one of the two groups, so that a
@@ -334,8 +344,8 @@ Starting from the same municipal weekly series (top), one chooses a temporal
 window --- the full series or a single season --- and a dimension of pooling ---
 the weeks of one municipality, the seasons of one municipality, or the
 municipalities of one period --- and obtains random variables that differ in
-support, variance and tail behaviour. L1 and L2 differ only in the window; L3
-differs from L4 and L6 only in the dimension of pooling; L4 and L6 differ only in
+support, variance and tail behaviour. \lvl{W-mun} and \lvl{W-seas} differ only in the window; \lvl{S-mun}
+differs from \lvl{S-state} and \lvl{S-nat} only in the dimension of pooling; \lvl{S-state} and \lvl{S-nat} differ only in
 the spatial scope of the cross-section. Every contrast reported in
 Section~\ref{sec:results} is a single step in this scheme.}
 \label{fig:levels}
@@ -744,12 +754,12 @@ interpreting from those that are not.
 \label{sec:verdicts}
 
 One estimator, one body of surveillance data, five constructions, and verdicts
-that range from unanimous support for a power law (L6, 16 of 16 seasons) to the
-23\% of fits favouring a power law at L2. Median exponents span $1.95$ to
+that range from unanimous support for a power law (\lvl{S-nat}, 16 of 16 seasons) to the
+23\% of fits favouring a power law at \lvl{W-seas}. Median exponents span $1.95$ to
 $2.08$; individual estimates of the lower bound range from one case to
 $4\times10^{4}$, four orders of magnitude. No two analyses in the table differ
-in data source, period or variable: L1 and L2 are the same variable over
-different windows, and L4 and L6 the same variable at different spatial scopes.
+in data source, period or variable: \lvl{W-mun} and \lvl{W-seas} are the same variable over
+different windows, and \lvl{S-state} and \lvl{S-nat} the same variable at different spatial scopes.
 
 \input{generated/tab_main}
 
@@ -770,7 +780,7 @@ most of their fits describe the bulk rather than a tail.}
 Two features disqualify the weekly constructions as a basis for a scaling claim,
 and both are visible without a further experiment. Where the estimated lower
 bound falls within the bulk, the fitted law describes the whole distribution and
-the language of tails is vacuous: 77\% of L1 and 81\% of L2 fits
+the language of tails is vacuous: 77\% of \lvl{W-mun} and 81\% of \lvl{W-seas} fits
 have $x_{\min} \le 5$, so that the model is estimated on counts of one and two
 cases. Second, the verdict changes with the window: pooling the same weekly
 counts over a decade instead of a single season reduces the proportion of fits
@@ -822,8 +832,8 @@ different objects, and only the third describes a tail.}
 \centering
 \includegraphics[width=\textwidth]{figures/fig07_window_flip}
 \caption{The window reverses the verdict on identical data. Left, density of the
-estimated exponent from the full municipal series (L1) and from the same series
-partitioned into single seasons (L2). Right, the corresponding verdicts: the
+estimated exponent from the full municipal series (\lvl{W-mun}) and from the same series
+partitioned into single seasons (\lvl{W-seas}). Right, the corresponding verdicts: the
 share of fits favouring the power law falls from 77\% to 23\%, while the share
 significantly favouring the exponential rises from 3\% to 22\%.}
 \label{fig:window}
@@ -852,7 +862,7 @@ sense in which the two groups of constructions are not interchangeable. At
 $x_{\min}=2$ the fitted law describes counts of one and two cases; at
 $x_{\min}=730$ it describes the upper decade of a distribution. Two analyses
 reported as agreeing on the exponent can therefore be describing entirely
-different objects: L1 and L3 have median exponents of $1.95$ and $2.08$, a
+different objects: \lvl{W-mun} and \lvl{S-mun} have median exponents of $1.95$ and $2.08$, a
 difference of $0.13$, while their median lower bounds differ by a factor of
 $150$. The empirical complementary cumulative distribution of
 Figure~\ref{fig:ccdf} shows the same fact graphically, as a straight line over two
@@ -1235,7 +1245,7 @@ The distinction between this result and the weekly-count fits that collapse to
 $x_{\min} \le 5$ is substantive rather than technical. At $x_{\min}=2$ the fitted
 law describes counts of one and two cases; at $x_{\min}=730$ it describes the upper
 decade of a distribution. Two analyses reported as agreeing on the exponent can be
-describing entirely different objects, as the comparison of L1 and L3 shows: a
+describing entirely different objects, as the comparison of \lvl{W-mun} and \lvl{S-mun} shows: a
 difference of $0.13$ in the exponent and a factor of $150$ in the lower bound.
 
 \subsection{The tail as a risk specification rather than a forecast input}

@@ -47,65 +47,65 @@
     ]
   },
   "levels": {
-    "L1": {
-      "alpha": 1.95,
-      "exp_sig": 3,
-      "iqr_high": 2.29,
-      "iqr_low": 1.75,
-      "label": "L1 weekly, city",
-      "n": 5264,
-      "pl_pref": 77,
-      "pl_sig": 47,
-      "xmin": 2,
-      "xmin_max": 816
-    },
-    "L2": {
-      "alpha": 2.07,
-      "exp_sig": 22,
-      "iqr_high": 2.46,
-      "iqr_low": 1.73,
-      "label": "L2 weekly, city-year",
-      "n": 43673,
-      "pl_pref": 23,
-      "pl_sig": 3,
-      "xmin": 2,
-      "xmin_max": 1876
-    },
-    "L3": {
+    "S-mun": {
       "alpha": 2.08,
       "exp_sig": 3,
       "iqr_high": 2.49,
       "iqr_low": 1.81,
-      "label": "L3 annual total, city",
+      "label": "S-mun, size, city",
       "n": 1085,
       "pl_pref": 52,
       "pl_sig": 4,
       "xmin": 300,
       "xmin_max": 40738
     },
-    "L4": {
+    "S-nat": {
+      "alpha": 2.03,
+      "exp_sig": 0,
+      "iqr_high": 2.1,
+      "iqr_low": 1.9,
+      "label": "S-nat, size, national-year",
+      "n": 16,
+      "pl_pref": 100,
+      "pl_sig": 100,
+      "xmin": 730,
+      "xmin_max": 7753
+    },
+    "S-state": {
       "alpha": 1.98,
       "exp_sig": 0,
       "iqr_high": 2.15,
       "iqr_low": 1.8,
-      "label": "L4 size, state-year",
+      "label": "S-state, size, state-year",
       "n": 353,
       "pl_pref": 96,
       "pl_sig": 52,
       "xmin": 169,
       "xmin_max": 8628
     },
-    "L6": {
-      "alpha": 2.03,
-      "exp_sig": 0,
-      "iqr_high": 2.1,
-      "iqr_low": 1.9,
-      "label": "L6 size, national-year",
-      "n": 16,
-      "pl_pref": 100,
-      "pl_sig": 100,
-      "xmin": 730,
-      "xmin_max": 7753
+    "W-mun": {
+      "alpha": 1.95,
+      "exp_sig": 3,
+      "iqr_high": 2.29,
+      "iqr_low": 1.75,
+      "label": "W-mun, weekly, city",
+      "n": 5264,
+      "pl_pref": 77,
+      "pl_sig": 47,
+      "xmin": 2,
+      "xmin_max": 816
+    },
+    "W-seas": {
+      "alpha": 2.07,
+      "exp_sig": 22,
+      "iqr_high": 2.46,
+      "iqr_low": 1.73,
+      "label": "W-seas, weekly, city-year",
+      "n": 43673,
+      "pl_pref": 23,
+      "pl_sig": 3,
+      "xmin": 2,
+      "xmin_max": 1876
     }
   },
   "national": {
@@ -130,11 +130,11 @@
     "min": 1
   },
   "xmin_le5_pct": {
-    "L1": 77.0,
-    "L2": 81.0,
-    "L3": 0.0,
-    "L4": 0.0,
-    "L6": 0.0
+    "S-mun": 0.0,
+    "S-nat": 0.0,
+    "S-state": 0.0,
+    "W-mun": 77.0,
+    "W-seas": 81.0
   },
   "xmin_span_levels": [
     2,
