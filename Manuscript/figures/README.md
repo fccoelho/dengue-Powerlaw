@@ -9,13 +9,13 @@ All environments use `\includegraphics` **without an extension**, so either
 
 | File | Section | Content |
 |---|---|---|
-| `fig01_aggregation_levels` | Methods 2.2 | Schematic of the five aggregation levels (L1, L2, L3, L4, L6) as nested constructions: same weekly series, different window and different unit of observation. Shaded by the $x_{\min}$ diagnostic. |
+| `fig01_aggregation_levels` | Methods 2.2 | Schematic of the five aggregation levels (`W-mun`, `W-seas`, `S-mun`, `S-state`, `S-nat`) as nested constructions: same weekly series, different window and different unit of observation. Shaded by the $x_{\min}$ diagnostic. |
 | `fig02_alpha_by_level` | Results 3.1 | Box plot of $\alpha$ per construction, single panel; dashed line at $\alpha=2$. |
-| `fig03_verdict_by_level` | Results 3.1 | Grouped bars per level: share with $R>0$, share with $R>0$ and $p<0.05$, share with $R<0$ and $p<0.05$. |
+| `fig03_verdict_by_level` | Results 3.1 | Grouped bars per construction: share with $R>0$, share with $R>0$ and $p<0.05$, share with $R<0$ and $p<0.05$. |
 | `fig04_size_ccdf` | Results 3.2 | Single-panel empirical CCDF of epidemic size on log--log axes, national cross-section pooled over 16 years, with the fitted power law (solid) and the exponential alternative (dashed). |
-| `fig05_xmin_diagnostic` | Results 3.1 | Scatter of $\alpha$ vs $x_{\min}$ (log x), one point per fit, coloured by level; shaded band at $x_{\min}\le5$. |
+| `fig05_xmin_diagnostic` | Results 3.1 | Scatter of $\alpha$ vs $x_{\min}$ (log x), one point per fit, coloured by construction; shaded band at $x_{\min}\le5$. |
 | `fig06_example_fits` | Results 3.1 | Three individual fits side by side: (a) small city weekly, (b) state capital weekly, (c) state-year size cross-section. PL solid, exponential dashed. |
-| `fig07_window_flip` | Results 3.1 | Left: density of $\alpha$ for L1 vs L2. Right: verdict shares for L1 vs L2. |
+| `fig07_window_flip` | Results 3.1 | Left: density of $\alpha$ for `W-mun` vs `W-seas`. Right: verdict shares for `W-mun` vs `W-seas`. |
 | `fig08_alpha_stability` | Results 3.1 | (a) $\alpha$ by year, one line per state; (b) $\alpha$ vs $\log_{10}$ population with fitted slope and $r$. |
 | `fig09_exceedance` | Results 3.3 | Implied $\Pr(S\ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ vs empirical exceedance frequency, per national year. |
 | `fig10_pred_vs_obs` | Results 3.6 | Predicted vs observed annual cases, log--log, one point per unit-origin; identity line; 10:1 and 1:10 bands; dotted line at the largest training response. Two panels: random forest and the spline-basis quantile regression the ablation uses. |
@@ -27,7 +27,8 @@ All environments use `\includegraphics` **without an extension**, so either
 
 ## Where the numbers come from
 
-- Levels L1--L7 descriptive statistics: `powerlaw_results.db`
+- Construction descriptive statistics (`W-mun`, `W-seas`, `S-mun`, `S-state`,
+  `S-nat`): `powerlaw_results.db`
   (`powerlaw_fits`, `powerlaw_fits_yearly`, `powerlaw_fits_total_cases`,
   `episcanner_state_fits`, `episcanner_fits`). Queries in
   `Manuscript/verification/verify_tables.sql` reproduce Table 2 exactly.
@@ -42,7 +43,7 @@ All environments use `\includegraphics` **without an extension**, so either
 - `fig06_example_fits` panel (a)/(b): `Manuscript/figures/Ituiutaba_PL.png`
   and `Manuscript/figures/SP_weekly.png`.
 - `fig02_alpha_by_level`: `report/report_assets/pl_alpha_dist.png` gives a
-  first version, but it pools all levels and must be split by level.
+  first version, but it pools all constructions and must be split by construction.
 
 ## Note on the ablation figures
 

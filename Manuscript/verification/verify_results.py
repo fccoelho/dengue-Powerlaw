@@ -16,23 +16,24 @@ import pandas as pd
 DEFAULT_DB = os.path.join(os.path.dirname(__file__), "..", "..", "powerlaw_results.db")
 
 LEVELS = [
-    ("L1", "weekly cases, city (full series)", "powerlaw_fits", ""),
-    ("L2", "weekly cases, city-year", "powerlaw_fits_yearly", ""),
-    ("L3", "annual total, city (across years)", "powerlaw_fits_total_cases", ""),
-    ("L4", "epidemic size, state-year",
+    ("W-mun", "weekly count, city (full series)", "powerlaw_fits", ""),
+    ("W-seas", "weekly count, city-season", "powerlaw_fits_yearly", ""),
+    ("S-mun", "epidemic size, city (across seasons)",
+     "powerlaw_fits_total_cases", ""),
+    ("S-state", "epidemic size, state-year",
      "episcanner_state_fits", "metric='total_cases' AND year > 0"),
-    ("L6", "epidemic size, national-year",
+    ("S-nat", "epidemic size, national-year",
      "episcanner_fits", "metric='total_cases' AND year > 0"),
 ]
 
-#: The duration constructions (former L5 and L7) are not verified here
-#: because the manuscript no longer reports them: a season is bounded above
-#: by the length of the year, so a scale-free law cannot apply to duration a
-#: priori. ``fit_episcanner_pl.py`` no longer fits ``metric='ep_dur'``.
+#: The duration and peak-timing constructions are not verified here because the
+#: manuscript no longer reports them: a season is bounded above by the length of
+#: the year, so a scale-free law cannot apply to duration a priori.
+#: ``fit_episcanner_pl.py`` no longer fits ``metric='ep_dur'``.
 
 
 def summarise(con, table, where=""):
-    """Compute the summary statistics for one aggregation level."""
+    """Compute the summary statistics for one construction."""
     sql = "SELECT alpha, xmin, R, p FROM " + table
     if where:
         sql += " WHERE " + where
@@ -58,14 +59,14 @@ def main(db_path=DEFAULT_DB):
     rows = []
     for lvl, label, table, where in LEVELS:
         s = summarise(con, table, where)
-        s.update(level=lvl, unit=label)
+        s.update(construct=lvl, unit=label)
         rows.append(s)
     main_table = pd.DataFrame(rows)[
-        ["level", "unit", "n", "alpha_median", "q1", "q3", "xmin_median",
+        ["construct", "unit", "n", "alpha_median", "q1", "q3", "xmin_median",
          "pct_xmin_le5", "pl_preferred", "pl_significant", "exp_significant"]
     ]
     print("=" * 100)
-    print("TABLE 1 -- power-law fits by aggregation level")
+    print("TABLE 1 -- power-law fits by construction")
     print("=" * 100)
     print(main_table.to_string(index=False))
 
@@ -80,7 +81,7 @@ def main(db_path=DEFAULT_DB):
 
     print()
     print("=" * 100)
-    print("PER-STATE EXPONENTS -- epidemic size (L4)")
+    print("PER-STATE EXPONENTS -- epidemic size (S-state)")
     print("=" * 100)
     st = pd.read_sql(
         "SELECT state, alpha, R, p FROM episcanner_state_fits "
@@ -97,7 +98,7 @@ def main(db_path=DEFAULT_DB):
 
     print()
     print("=" * 100)
-    print("CORRELATION OF alpha WITH CITY SIZE (L1)")
+    print("CORRELATION OF alpha WITH CITY SIZE (W-mun)")
     print("=" * 100)
     m = pd.read_sql(
         "SELECT f.alpha, c.population, c.incidence FROM powerlaw_fits f "
