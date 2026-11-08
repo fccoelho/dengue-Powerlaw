@@ -2,7 +2,7 @@
 
 The manuscript used to carry a hand-typed copy of Table 1 while Methods claimed
 that *no statistic is transcribed by hand*. The database then gained fits and
-the table silently fell behind -- L2 alone was short by ~1000 city-years, and
+the table silently fell behind -- W-seas alone was short by ~1000 city-years, and
 every level's row was stale. This script removes the possibility: every number
 is emitted from the database, and ``--check`` fails when ``main.tex`` still
 asserts a value that the database no longer supports.
@@ -11,7 +11,7 @@ asserts a value that the database no longer supports.
     python make_tables.py --check    # audit only, exit 1 on staleness
     python make_tables.py --print    # dump the computed table
 
-Levels are defined once, as (key, label, SQL). Adding a level means adding a
+Constructions are defined once, as (key, label, SQL). Adding one means adding a
 line here, not editing LaTeX.
 """
 
@@ -30,24 +30,31 @@ GEN_DIR = os.path.join("Manuscript", "generated")
 #: them inflates every per-year level by one row per unit (26 states). The
 #: year counts the manuscript reports (353 state-years, 16 national years) only
 #: reproduce with them excluded, so that is the convention used here.
-#: Every level fits the *same* variable class -- epidemic size, at five
-#: different constructions. The duration constructions (the former L5 and L7)
-#: were removed: a season is bounded above by the length of the year, so a
-#: scale-free law cannot apply to duration a priori, and the fits confirmed it
-#: by running into the estimator's ceiling. Keeping them in the table invited
-#: the reader to compare an exponent that means something with one that does
-#: not. Duration and peak timing survive in the paper as covariates of size.
+#: Two variables are fitted -- the weekly count at two temporal windows, and the
+#: epidemic size at three dimensions of pooling -- under the five constructions
+#: of Table 1. The duration and peak-timing constructions were removed: a season
+#: is bounded above by the length of the year, so a scale-free law cannot apply
+#: to duration a priori, and the fits confirmed it by running into the
+#: estimator's ceiling. Keeping them in the table invited the reader to compare
+#: an exponent that means something with one that does not. Duration and peak
+#: timing survive in the paper as covariates of size.
 LEVELS = [
-    ("L1", "L1 weekly, city",             "SELECT * FROM powerlaw_fits"),
-    ("L2", "L2 weekly, city-year",        "SELECT * FROM powerlaw_fits_yearly WHERE year <> 0"),
-    ("L3", "L3 annual total, city",       "SELECT * FROM powerlaw_fits_total_cases"),
-    ("L4", "L4 size, state-year",         "SELECT * FROM episcanner_state_fits WHERE metric='total_cases' AND year <> 0"),
-    ("L6", "L6 size, national-year",      "SELECT * FROM episcanner_fits WHERE metric='total_cases' AND year <> 0"),
+    ("W-mun",   "W-mun, weekly, city",
+     "SELECT * FROM powerlaw_fits"),
+    ("W-seas",  "W-seas, weekly, city-year",
+     "SELECT * FROM powerlaw_fits_yearly WHERE year <> 0"),
+    ("S-mun",   "S-mun, size, city",
+     "SELECT * FROM powerlaw_fits_total_cases"),
+    ("S-state", "S-state, size, state-year",
+     "SELECT * FROM episcanner_state_fits WHERE metric='total_cases' AND year <> 0"),
+    ("S-nat",   "S-nat, size, national-year",
+     "SELECT * FROM episcanner_fits WHERE metric='total_cases' AND year <> 0"),
 ]
 
-#: Levels are addressed by key, never by position. The old code indexed
-#: ``LEVELS[5]`` and ``LEVELS[3]``; dropping L5 shifted every index silently
-#: and the national summary would have been computed from the state table.
+#: Constructions are addressed by key, never by position. The old code indexed
+#: ``LEVELS[5]`` and ``LEVELS[3]``; dropping a construction shifted every index
+#: silently and the national summary would have been computed from the state
+#: table.
 SQL_BY_KEY = {key: sql for key, _label, sql in LEVELS}
 
 
@@ -97,8 +104,8 @@ def _coupling(con) -> dict:
     def _rho(a, b) -> float:
         return float(spearmanr(np.asarray(a, float), np.asarray(b, float)).statistic)
 
-    nat = pd.read_sql(SQL_BY_KEY["L6"], con).dropna(subset=["alpha", "xmin"])
-    st = pd.read_sql(SQL_BY_KEY["L4"], con).dropna(subset=["alpha", "xmin"])
+    nat = pd.read_sql(SQL_BY_KEY["S-nat"], con).dropna(subset=["alpha", "xmin"])
+    st = pd.read_sql(SQL_BY_KEY["S-state"], con).dropna(subset=["alpha", "xmin"])
 
     per_rho, per_p = [], []
     for _state, g in st.groupby("state"):
@@ -182,8 +189,8 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
             "exp_sig": int(round(100 * float(((R < 0) & (p < 0.05)).mean()))),
         }
 
-    nat = pd.read_sql(SQL_BY_KEY["L6"], con).dropna(subset=["alpha", "xmin"])
-    st = pd.read_sql(SQL_BY_KEY["L4"], con).dropna(subset=["alpha", "xmin"])
+    nat = pd.read_sql(SQL_BY_KEY["S-nat"], con).dropna(subset=["alpha", "xmin"])
+    st = pd.read_sql(SQL_BY_KEY["S-state"], con).dropna(subset=["alpha", "xmin"])
     a_lo, a_hi = float(nat["alpha"].min()), float(nat["alpha"].max())
 
     # Exceedance above k*x_min, from Equation (2) of the manuscript:
@@ -247,7 +254,7 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
 def render_table(f: dict) -> str:
     """Complete LaTeX float for Table 1, byte-stable across runs."""
     body = "\n".join(
-        f"{d['label']:<27} & {_fmt(d['n'])} & {d['alpha']:.2f} & "
+        f"{d['label']:<28} & {_fmt(d['n'])} & {d['alpha']:.2f} & "
         f"{d['iqr_low']:.2f}--{d['iqr_high']:.2f} & {_fmt(d['xmin'])} & "
         f"{d['pl_pref']} & {d['pl_sig']} & {d['exp_sig']}\\\\"
         for d in f["levels"].values()
@@ -257,18 +264,18 @@ def render_table(f: dict) -> str:
         "% Regenerate with: python make_tables.py\n"
         "\\begin{table}[htbp]\n\\centering\n\\small\n"
         "\\setlength{\\tabcolsep}{3.5pt}\n"
-        "\\caption{Power-law fits of epidemic \\emph{size} under five nested\n"
-        "constructions. $\\alpha$ median with interquartile range; $x_{\\min}$\n"
+        "\\caption{Power-law fits under five constructions of the same municipal\n"
+        "series. $\\alpha$ median with interquartile range; $x_{\\min}$\n"
         "median; PL$_{\\text{pref}}$ = proportion with $R>0$;\n"
         "PL$_{\\text{sig}}$ = proportion with $R>0$ and $p<0.05$;\n"
         "Exp$_{\\text{sig}}$ = proportion with $R<0$ and $p<0.05$. Shares are\n"
-        "percentages. The weekly levels produce apparent support that the\n"
-        "$x_{\\min}$ diagnostic removes; the cross-sectional constructions L4 and\n"
-        "L6 are the ones where the support survives both tests, and they are the\n"
-        "object of the rest of the paper.}\n"
+        "percentages. The two weekly constructions produce apparent support that\n"
+        "the $x_{\\min}$ diagnostic removes; the cross-sectional constructions\n"
+        "\\lvl{S-state} and \\lvl{S-nat} are the ones where the support survives\n"
+        "both tests, and they are the object of the rest of the paper.}\n"
         "\\label{tab:main}\n"
         "\\begin{tabular}{@{}lrrrrrrr@{}}\n\\toprule\n"
-        "Level & $n$ & $\\alpha$ & IQR & $x_{\\min}$ & PL$_{\\text{pref}}$ & "
+        "Construction & $n$ & $\\alpha$ & IQR & $x_{\\min}$ & PL$_{\\text{pref}}$ & "
         "PL$_{\\text{sig}}$ & Exp$_{\\text{sig}}$\\\\\n\\midrule\n"
         f"{body}\n\\bottomrule\n" "\\end{tabular}\n\\end{table}\n"
     )
@@ -321,9 +328,9 @@ def claims(f: dict) -> list[dict]:
         {"name": "national alpha range",
          "want": f"${_f(N['alpha_min'])}$ and ${_f(N['alpha_max'])}$",
          "stale": ["1.78 and 2.27"]},
-        {"name": "L6 alpha/IQR/xmin",
-         "want": f"$\\alpha={L['L6']['alpha']:.2f}$ (IQR "
-                 f"{L['L6']['iqr_low']:.2f}--{L['L6']['iqr_high']:.2f})",
+        {"name": "S-nat alpha/IQR/xmin",
+         "want": f"$\\alpha={L['S-nat']['alpha']:.2f}$ (IQR "
+                 f"{L['S-nat']['iqr_low']:.2f}--{L['S-nat']['iqr_high']:.2f})",
          "stale": ["(IQR 1.92--2.11)"]},
         {"name": "national alpha min..max",
          "want": f"{_f(N['alpha_min'])} to {_f(N['alpha_max'])}",
@@ -341,12 +348,12 @@ def claims(f: dict) -> list[dict]:
          # 40{,}738 cases is "about 4 x 10^4"; derive it rather than typing it
          # so the phrase cannot drift from the database.
          "want": _sci(X["max"]), "stale": ["$1.5\\times10^{5}$"]},
-        {"name": "share of weekly fits at xmin<=5 (L1)",
-         "want": f"{f['xmin_le5_pct']['L1']:.0f}\\% of L1",
-         "stale": ["76\\% of L1"]},
-        {"name": "share of weekly fits at xmin<=5 (L2)",
-         "want": f"{f['xmin_le5_pct']['L2']:.0f}\\% of L2",
-         "stale": ["82\\% of L2"]},
+        {"name": "share of weekly fits at xmin<=5 (W-mun)",
+         "want": f"{f['xmin_le5_pct']['W-mun']:.0f}\\% of \\lvl{{W-mun}}",
+         "stale": ["76\\% of L1", "77\\% of L1"]},
+        {"name": "share of weekly fits at xmin<=5 (W-seas)",
+         "want": f"{f['xmin_le5_pct']['W-seas']:.0f}\\% of \\lvl{{W-seas}}",
+         "stale": ["82\\% of L2", "81\\% of L2"]},
         # Table 4 and the coupling paragraph. Every entry here is a number a
         # reader could check, and none of them existed as an artefact before.
         {"name": "coupling rho, national",

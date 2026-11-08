@@ -16,7 +16,7 @@ Optionally pass a path to another copy of the database:
 python Manuscript/verification/verify_results.py path/to/powerlaw_results.db
 ```
 
-Expected output: Table 1 of the manuscript (5 aggregation levels), the
+Expected output: Table 1 of the manuscript (five constructions), the
 national year-by-year fits, the per-state exponents, and the α-vs-population
 correlations. If the database is regenerated with different settings, this
 script will report different numbers — that is the point.
@@ -36,26 +36,27 @@ These are easy to get wrong and they change the reported percentages:
   you are looking at the comparison statistic.
 - **A positive `R` is not evidence.** "PL supported" throughout the manuscript
   means `R > 0 AND p < 0.05`. Counting positive-but-non-significant `R` as
-  support inflates the power-law share substantially, especially at L2.
+  support inflates the power-law share substantially, especially at `W-seas`.
 - **`year = 0` in the `episcanner` tables is a pooled all-years fit**, not a
   calendar year (documented in `fitpl.py`: "Use 0 for combined/all-years
-  fits"). All year counts therefore exclude it; the national levels have 16
+  fits"). All year counts therefore exclude it; the national construction has 16
   annual fits, not 17.
-- **`alpha` is not clipped at 3.** Only 0.02% of the 46,882 weekly fits return
-  α ≥ 2.9999. The apparent wall at 3.0 in the summary statistics is a handful
-  of boundary cases, not a constraint imposed by the estimator.
-- **`xmin` is the diagnostic, not a nuisance parameter.** In L1/L2 the KS
+- **`alpha` is not clipped at 3.** Only 12 of the 48,937 weekly fits return
+  α ≥ 2.9999 (0.02%). The apparent wall at 3.0 in the summary statistics is a
+  handful of boundary cases, not a constraint imposed by the estimator.
+- **`xmin` is the diagnostic, not a nuisance parameter.** In `W-mun` and
+  `W-seas` the KS
   selection drives `xmin` down to 1–5 cases in most fits, which means the
   fitted power law is describing the whole distribution. Those fits are
   reported but not interpreted as tails.
 
 ## Table correspondence
 
-| Level | Table | Filter |
+| Construction | Table | Filter |
 |---|---|---|
-| L1 | `powerlaw_fits` | none |
-| L2 | `powerlaw_fits_yearly` | none |
-| L3 | `powerlaw_fits_total_cases` | none |
-| L4 | `episcanner_state_fits` | `metric='total_cases' AND year > 0` |
-| L6 | `episcanner_fits` | `metric='total_cases' AND year > 0` |
-| -- | *(duration levels removed; only epidemic size is fitted)* | -- |
+| `W-mun` | `powerlaw_fits` | none |
+| `W-seas` | `powerlaw_fits_yearly` | none |
+| `S-mun` | `powerlaw_fits_total_cases` | none |
+| `S-state` | `episcanner_state_fits` | `metric='total_cases' AND year > 0` |
+| `S-nat` | `episcanner_fits` | `metric='total_cases' AND year > 0` |
+| -- | *(duration and peak-timing constructions removed)* | -- |
