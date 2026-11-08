@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "written_utc": "2026-11-06T18:20:48+00:00",
+  "written_utc": "2026-11-07T18:34:11+00:00",
   "database": {
     "path": "powerlaw_results.db",
     "sha256": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
@@ -88,7 +88,7 @@
   },
   "artifacts": {
     "powerlaw_results.db": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
-    "Manuscript/main.tex": "82b617481ff90ac3f1367d018e07832ba12ca057228a1029b9ae436e74c4ccd9",
+    "Manuscript/main.tex": "e832f03199e8ed6e4bc024d95b71126180568ff768d24463c2d87dbf1f04a3e4",
     "Manuscript/generated/facts.json": "4d6423577dd455cc5971d9a020f5c05dd259f274b91a796c9911cbdfc94fdd7b",
     "Manuscript/generated/tab_main.tex": "35f0085ee7e72e792c28da58fffd90ec7b30a503f872b2ca8b730d6db6517325",
     "Manuscript/generated/tab_ablation.tex": "7c097d99a734210bfedc85bf8d0ce98831edd2955a43cfa2c04828da25a8e52c",
