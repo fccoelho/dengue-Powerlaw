@@ -41,9 +41,9 @@ These are easy to get wrong and they change the reported percentages:
   calendar year (documented in `fitpl.py`: "Use 0 for combined/all-years
   fits"). All year counts therefore exclude it; the national construction has 16
   annual fits, not 17.
-- **`alpha` is not clipped at 3.** Only 0.02% of the 46,882 weekly fits return
-  α ≥ 2.9999. The apparent wall at 3.0 in the summary statistics is a handful
-  of boundary cases, not a constraint imposed by the estimator.
+- **`alpha` is not clipped at 3.** Only 12 of the 48,937 weekly fits return
+  α ≥ 2.9999 (0.02%). The apparent wall at 3.0 in the summary statistics is a
+  handful of boundary cases, not a constraint imposed by the estimator.
 - **`xmin` is the diagnostic, not a nuisance parameter.** In `W-mun` and
   `W-seas` the KS
   selection drives `xmin` down to 1–5 cases in most fits, which means the
