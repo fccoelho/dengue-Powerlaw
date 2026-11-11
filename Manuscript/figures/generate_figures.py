@@ -1,7 +1,7 @@
 """Generate candidate figures for every figure environment in main.tex.
 
 Usage:
-    python Manuscript/figures/generate_figures.py            # all 15
+    python Manuscript/figures/generate_figures.py            # all 14
     python Manuscript/figures/generate_figures.py 2 4 6      # subset
 
 Every figure is built from the repository's own artefacts (powerlaw_results.db,
@@ -319,50 +319,6 @@ def _load_classifier():
 
     return {"oof": oof, "meta": meta, "metrics": metrics,
             "importance": importance, "path": oof_path}
-
-
-def fig01():
-    """Schematic of the five constructions, on one dataset."""
-    fig, ax = plt.subplots(figsize=(8.4, 3.2))
-    ax.axis("off")
-
-    def box(x, y, w, h, text, fc):
-        ax.add_patch(mpl.patches.FancyBboxPatch(
-            (x, y), w, h, boxstyle="round,pad=0.02",
-            facecolor=fc, edgecolor="0.3", linewidth=0.8))
-        ax.text(x + w / 2, y + h / 2, text, ha="center", va="center", fontsize=8)
-
-    box(0.02, 0.72, 0.30, 0.16, "municipal weekly series\n(Infodengue, 2010–2025)", "#d9e8f4")
-    ax.annotate("", xy=(0.17, 0.52), xytext=(0.17, 0.70),
-                arrowprops=dict(arrowstyle="->", lw=0.8))
-    ax.text(0.18, 0.62, "temporal window:\nfull series / season / year",
-            fontsize=7, va="center")
-    box(0.02, 0.34, 0.30, 0.16, "random variable $X$:\nepidemic size", "#d9e8f4")
-
-    ax.annotate("", xy=(0.45, 0.42), xytext=(0.33, 0.42),
-                arrowprops=dict(arrowstyle="->", lw=0.8))
-    ax.text(0.39, 0.47, "unit of observation:\nmunicipality / cross-section",
-            fontsize=7, ha="center")
-
-    labels = [
-        ("W-mun weekly, city\n(full series)", 0.46, 0.80),
-        ("W-seas weekly, city\n(single seasons)", 0.46, 0.50),
-        ("S-mun size, city\n(across seasons)", 0.46, 0.20),
-        ("S-state size, state-year\ncross-section", 0.74, 0.65),
-        ("S-nat size, national-year\ncross-section", 0.74, 0.30),
-    ]
-    for t_text, x, y in labels:
-        # shaded by the x_min diagnostic, which is what decides whether the
-        # tail language is vacuous: the two weekly constructions collapse into
-        # the bulk.
-        fc = "#f6d6d0" if t_text.startswith("W-") else "#d8ecd8"
-        box(x, y, 0.24, 0.16, t_text, fc)
-    ax.text(0.50, 0.00, "green: $x_{\\min}$ above the bulk (the fit describes a tail)   "
-            "red: $x_{\\min}\\leq5$ (the fit describes the data)",
-            fontsize=7, color="0.3")
-    fig.savefig(OUT / "fig01_aggregation_levels.pdf", bbox_inches="tight")
-    fig.savefig(OUT / "fig01_aggregation_levels.png", bbox_inches="tight")
-    plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
@@ -1244,8 +1200,8 @@ def fig15():
 
 def main(which=None):
     everything = {
-        "fig01": fig01, "fig02": fig02, "fig03": fig03, "fig04": fig04,
-        "fig05": fig05, "fig06": fig06, "fig07": fig07, "fig08": fig08,
+        "fig02": fig02, "fig03": fig03, "fig04": fig04, "fig05": fig05,
+        "fig06": fig06, "fig07": fig07, "fig08": fig08,
         "fig09": fig09, "fig10": fig10, "fig11": fig11, "fig12": fig12,
         "fig13": fig13, "fig14": fig14, "fig15": fig15,
     }
