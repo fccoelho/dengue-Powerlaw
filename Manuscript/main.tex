@@ -535,31 +535,22 @@ Climate             & $\bar T_{Q1..Q4}$, $\bar H_{Q1..Q4}$  & mean minimum tempe
 \label{sec:regression}
 
 The choice of estimator is a design decision in this problem and not a tuning
-detail. A tree ensemble predicts a weighted average of the responses on which it
-was trained, and therefore cannot produce a value outside their range. Under
-$\alpha \approx 2$ the season of greatest public-health interest is precisely the
-one outside that range, so an estimator bounded by its training responses is
-bounded exactly where the question lies; a poor forecast from such a model is
-then uninterpretable, because the statements that the tail is unpredictable and
-that the model cannot name the number predict the same loss. The primary
-estimator is therefore a quantile regression on a cubic spline basis with linear
-boundary extrapolation \citep{koenker1978regression}. It minimises the same
-pinball loss, so every comparison reported here is unchanged by the substitution;
-inside the observed range the basis recovers the curvature that a tree would
-provide, and outside it the boundary segment continues linearly, which on the
+detail, because the quantity of interest can lie outside the range of the data to
+which the model is fitted. Under $\alpha \approx 2$ the season of greatest
+public-health interest is systematically larger than any season in the training
+record, so the forecast must be allowed to take a value beyond the largest
+response observed. The primary estimator is therefore a quantile regression on a
+cubic spline basis with linear boundary extrapolation
+\citep{koenker1978regression}. It minimises the pinball loss. Outside the
+observed range the boundary segment continues linearly, which on the
 $\log(1+S)$ scale is a multiplicative extrapolation on the scale of cases. The two
 predictors expressed in cases, $S_{t-1}$ and $x_{\min,t-1}$, are logged before
 entering the basis, without which the extrapolation would be linear in the wrong
 scale. The $L_1$ penalty is $10^{-4}$, deliberately weak.
 
-Three boosted alternatives are retained as a comparison arm, so that the question
-of whether the result is a property of the estimator class can be answered by
-holding everything else fixed: gradient boosting with quantile loss and
-piecewise-constant leaves, the same with piecewise-linear leaves, and a histogram
-gradient-boosted model. A random forest of 150 bootstrapped trees
-\citep{breiman2001random} appears only in the illustrative scatter of
-Figure~\ref{fig:predobs}, where displaying the bounded prediction is the purpose
-of the panel. All quantile models are fitted on the grid
+A random forest of 150 bootstrapped trees \citep{breiman2001random}, fitted to
+the same predictors, is reported alongside the primary model in
+Figure~\ref{fig:predobs}. All quantile models are fitted on the grid
 $\tau \in \{0.05, 0.10, \dots, 0.95\}$, which yields a full predictive
 distribution per unit and season rather than a point forecast, and all stochastic
 components were seeded identically across runs.
@@ -593,15 +584,14 @@ the closer of the two to a ranking by unit size (Section~\ref{sec:classresults})
 
 The classifier is a penalised logistic regression on the same spline basis, with
 the class imbalance handled by weighting the training rows by the
-negative-to-positive ratio. The reason is the same as for the regressor: the
-predicted probability of a boosted classifier is a function of the base rates
-observed in training, so it cannot express that a season lies far outside the
-range of the panel, whereas a logistic model extrapolates linearly in log-odds.
-Gradient-boosted classifiers \citep{chen2016xgboost, ke2017lightgbm} are retained
-as the comparison arm. Validation is an expanding-window split defined on the
-season index: fold $j$ trains on every unit-season earlier than $v_j$ and
-validates on season $v_j$ alone, where the $v_j$ are the
-$k=\min\{5,\, n_{\text{seasons}}-2\}$ most recent training seasons. A fold
+negative-to-positive ratio. As with the regressor, the specification must remain
+informative beyond the range covered by the training rows, and the logistic form
+does so by extrapolating linearly in log-odds, so that a season far outside the
+range of the panel is not forced towards the base rate observed in training.
+Validation is an expanding-window split defined on the season index: fold $j$
+trains on every unit-season earlier than $v_j$ and validates on season $v_j$
+alone, where the $v_j$ are the $k=\min\{5,\, n_{\text{seasons}}-2\}$ most recent
+training seasons. A fold
 therefore exists only once at least two earlier seasons are available, and the
 number of folds is capped at five. Because the folds are a function of the season
 index rather than of arbitrary ordering, they are invariant to the ordering of the
@@ -1162,27 +1152,24 @@ lies systematically outside the support of its observed history. A model that
 already knows the size of the previous season is therefore approximately correct in
 ordinary seasons and wrong by a large factor in the exceptional one, which is
 exactly the pattern of the table and of Figure~\ref{fig:predobs}. The choice of
-estimator stated in Section~\ref{sec:regression} changes the interpretation of
-that pattern and not the pattern itself. With a model that cannot produce a value
-outside its training responses, a large error in a record season is uninformative,
-because it is what the estimator must do. With one that can, the error is a
-statement about the data, and the failure of the size forecast can be read as a
-finding rather than as a property of the fit.
+estimator stated in Section~\ref{sec:regression} determines how that pattern is
+to be read, and not the pattern itself. Because the estimator can produce a value
+beyond its training responses, a large error in a record season is a statement
+about the data, and the failure of the size forecast can be read as a finding
+rather than as a property of the fit.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig10_pred_vs_obs}
 \caption{Out-of-sample forecasts of epidemic size, predicted against observed
 annual cases on logarithmic axes, one point per unit and forecast origin. Left, a
-random forest; right, the spline-basis quantile regression used in the ablation.
-The identity line is dashed, the 10:1 and 1:10 bands are shaded, and the dotted
-red line marks the largest annual total in the training window. A tree forecast
-cannot cross that line, because it is an average of training responses; the
-quantile regression continues the boundary trend, so that in the tail it can err
-in either direction rather than erring in one direction by construction. Because
-$\alpha \approx 2$, a handful of points in the upper right dominate any
-squared-error summary, which is why the primary loss in
-Table~\ref{tab:ablation_results} is the pinball loss rather than the root mean
+random forest; right, the spline-basis quantile regression described in
+Section~\ref{sec:regression}. The identity line is dashed, the 10:1 and 1:10
+bands are shaded, and the dotted red line marks the largest annual total in the
+training window, so that points lying above it are seasons larger than any on
+which the model was trained. Because $\alpha \approx 2$, a handful of points in
+the upper right dominate any squared-error summary, which is why the primary loss
+in Table~\ref{tab:ablation_results} is the pinball loss rather than the root mean
 squared error.}
 \label{fig:predobs}
 \end{figure}
@@ -1338,17 +1325,15 @@ calibrated persistence no rung achieves skill in more than 3 of 5 origins,
 and 2 of the 5 origins dominate the loss because they straddle a change of
 regime: 2024 was the largest season on record and 2025 fell back sharply.
 
-It would be convenient to attribute that to the estimator. The attribution does not
-hold. Tree ensembles predict within the support of their training responses, so that
-under a heavy tail the season of greatest public-health interest lies systematically
-outside it; but the primary model here is a spline-basis quantile regression, which
-by construction continues the boundary trend beyond the largest response on which it
-was trained (Figure~\ref{fig:predobs}). A record season is therefore a statement
-about the data rather than a property of a fit that cannot leave its support. The
-quantile regression at $\tau=0.95$ represents the upper region instead of
-interpolating within it, and the forecast still fails in 2024: knowledge of the
-previous season's size and duration, of its peak week, of the climate covariates and
-of the scaling descriptors does not order five origins at 23 to 25 units each.
+The failure is not an artefact of the estimator. The primary model is a
+spline-basis quantile regression, which by construction continues the boundary
+trend beyond the largest response on which it was trained
+(Figure~\ref{fig:predobs}), so that a record season is a statement about the data
+rather than a property of the estimator. The quantile regression at $\tau=0.95$
+represents the upper region instead of interpolating within it, and the forecast
+still fails in 2024: knowledge of the previous season's size and duration, of its
+peak week, of the climate covariates and of the scaling descriptors does not order
+five origins at 23 to 25 units each.
 
 The defensible summary is therefore a division of labour rather than a verdict. The
 tail does not indicate how large the next season will be; it indicates how likely an
@@ -1451,13 +1436,12 @@ produces in that region is an extrapolation of a local slope, and it is only as
 reliable as the assumption that the slope holds. In a simulation constructed at the
 scale of this panel, with a season twice the previous one and training seasons of 10
 to 1{,}000 cases, the model recovered the doubling to within 0.1\% at five times the
-largest value in its training window and within 0.2\% at twenty times, whereas every
-boosted variant returned the training maximum irrespective of the input. This
+largest value in its training window and within 0.2\% at twenty times. This
 establishes that the estimator recovers the relationship when the relationship is of
 the assumed form; it does not establish that the relationship holds for dengue. The
-defensible reading is that the estimator removes the structural ceiling documented
-above, so that a large error in a record season can be attributed to the data, and
-that it does not remove the risk of a large error.
+defensible reading is that the estimator removes the ceiling on the magnitude the
+forecast can take, so that a large error in a record season can be attributed to the
+data, and that it does not remove the risk of a large error.
 
 \emph{The classification threshold is a choice.} Exceeding the 75th percentile of a
 unit's own history defines a large season; at the 90th percentile the positive class

@@ -1634,7 +1634,7 @@ def run_classifier_ablation(df, ladder, unit_col, origins, level, seed, n_boot,
                     else fold["rungs"][rung])
             rows.append({
                 **common, "record_type": "loss", "rung": rung, "contrast": "",
-                "model": "base_rate" if rung == "M0" else "hist_gradient_boosting",
+                "model": "base_rate" if rung == "M0" else (model or DEFAULT_CLASSIFIER),
                 "value": float(L[rung].mean()) if n_val else np.nan,
                 "auc": _auc(y_val, prob),
                 "features": "|".join(ladder.get(rung, [])) if rung != "M0" else "",
@@ -1644,7 +1644,7 @@ def run_classifier_ablation(df, ladder, unit_col, origins, level, seed, n_boot,
         if fold["pop_prob"] is not None:
             rows.append({
                 **common, "record_type": "diagnostic", "rung": "POP",
-                "contrast": "", "model": "hist_gradient_boosting",
+                "contrast": "", "model": (model or DEFAULT_CLASSIFIER),
                 "value": float(np.mean((fold["pop_prob"] - y_val) ** 2)),
                 "auc": _auc(y_val, fold["pop_prob"]),
                 "features": "prev_log_pop",
