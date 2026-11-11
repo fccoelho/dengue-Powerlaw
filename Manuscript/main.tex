@@ -318,6 +318,18 @@ Handle & Fitted variable & Sampling unit & Pooling & Fits\\
 \end{tabular}
 \end{table}
 
+A construction is fixed by two independent decisions. The first selects the
+variable that enters the likelihood: the weekly count $c_{i,w}$ as observed, or
+the season total $S_{i,t}$, obtained by summing the weeks of the epidemic episode
+delimited by the seasonal decomposition described in Section~\ref{sec:data}. The
+second selects the sample over which that variable is pooled: the weeks of one
+municipality, taken over the complete series or over a single season; the seasons
+of one municipality; or the municipalities of one state or of the whole country
+within a single season. The five constructions of Table~\ref{tab:levels} are the
+combinations in use, not the full crossing of the two decisions; a pairing
+omitted from the table, such as the weekly counts of a national cross-section, is
+one that no contrast in this paper requires.
+
 Constructions \lvl{W-mun} and \lvl{W-seas} differ only in the temporal window over which the weekly
 counts are pooled: \lvl{W-mun} uses the complete available series of a municipality
 (January 2010 to January 2026), whereas \lvl{W-seas} restricts the sample to a single
@@ -334,23 +346,7 @@ scope respectively, and are therefore statements about how sizes vary across
 space in a given season. This nesting is deliberate: each contrast reported in
 Section~\ref{sec:results} is a single step within one of the two groups, so that a
 difference in the inferred regime is attributable to the construction rather than
-to a change of data source, period or variable. Figure~\ref{fig:levels} shows the
-scheme.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{figures/fig01_aggregation_levels}
-\caption{The five aggregation levels as nested partitions of a single dataset.
-Starting from the same municipal weekly series (top), one chooses a temporal
-window --- the full series or a single season --- and a dimension of pooling ---
-the weeks of one municipality, the seasons of one municipality, or the
-municipalities of one period --- and obtains random variables that differ in
-support, variance and tail behaviour. \lvl{W-mun} and \lvl{W-seas} differ only in the window; \lvl{S-mun}
-differs from \lvl{S-state} and \lvl{S-nat} only in the dimension of pooling; \lvl{S-state} and \lvl{S-nat} differ only in
-the spatial scope of the cross-section. Every contrast reported in
-Section~\ref{sec:results} is a single step in this scheme.}
-\label{fig:levels}
-\end{figure}
+to a change of data source, period or variable.
 
 \subsection{Discrete power-law estimation}
 \label{sec:estimation}
