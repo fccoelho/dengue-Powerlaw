@@ -46,11 +46,13 @@ simulation.
 Framed as exceedance, prediction is feasible where the panel resolves it: at municipal
 level, with the label referred to each unit's own history, lagged descriptors,
 including duration and peak timing, improve the Brier score over calibrated
-persistence in 4 of 5 origins, the only contrast satisfying the pre-specified
-rule, and raise the area under the ROC curve from $0.50$ to $0.65$; at state level the
-contrast holds in 2. The scaling block satisfies the rule at neither level; for size
-its median differential at $\tau=0.95$, $+4.9\%$, excludes zero in 2 origins in
-opposite directions. The tail belongs in a risk curve, not in a predictor.
+persistence in 4 of 5 origins and are significantly the worse in the fifth, the only
+contrast satisfying the pre-specified rule, and raise the area under the ROC curve from
+$0.50$ to $0.58$, the full ladder reaching $0.65$; at state level the same contrast
+holds in 2 of 5 origins, where the label is pooled across units. The scaling block
+satisfies the rule at neither level; for size its median differential at $\tau=0.95$,
+$+4.9\%$, excludes zero in 2 origins in opposite directions. The tail belongs in a
+risk curve, not in a predictor.
 \end{abstract}
 
 \section{Introduction}
@@ -581,6 +583,14 @@ information unavailable to the model. The same discipline governs the
 class-imbalance weight, set to the ratio of negative to positive observations in
 the training fold.
 
+The scope over which the percentile is taken is set by what each level can support.
+At municipal level $Q_p$ is computed from each unit's own training seasons, and
+3{,}976 of the 5{,}571 municipalities supply the five seasons that estimate requires.
+At state level the panel supplies 23 to 25 units per origin, too few for a within-unit
+percentile, and $Q_p$ is taken across the states of the fold's training seasons. The
+two labels therefore answer slightly different questions, and the state-level task is
+the closer of the two to a ranking by unit size (Section~\ref{sec:classresults}).
+
 The classifier is a penalised logistic regression on the same spline basis, with
 the class imbalance handled by weighting the training rows by the
 negative-to-positive ratio. The reason is the same as for the regressor: the
@@ -1013,8 +1023,9 @@ size, $R_0$ and population --- move the Brier score in the expected direction: a
 median of $+0.126$, positive in 4 of 5 origins and reaching $+0.212$. The
 intervals exclude zero in only 2 of the 5 origins, against the 3 that the rule requires, so the rung fails the rule at state level: each origin is a
 bootstrap over 23 to 25 units and the median interval is $0.26$ wide, wider than
-the effect it is asked to resolve. Climate adds nothing (median $+0.027$) and
-neither does the scaling block (median of $+0.000$, 0 of 5). The per-origin
+the effect it is asked to resolve. Climate adds nothing to it (median $+0.027$) and neither does the scaling block
+(median $+0.000$, with no origin in which the block improves by an interval excluding
+zero). The per-origin
 differentials for M1 against M0 are $-0.064$, $+0.074$, $+0.126$, $+0.212$ and $+0.149$ for 2021 to 2025, negative in the first origin and positive thereafter,
 which is the pattern expected of a model that requires history in order to be
 trained.
@@ -1023,24 +1034,31 @@ At municipal level the same ladder runs over 3{,}976 municipalities with enough
 history for a within-unit threshold, at least five seasons, with between 580 and
 1{,}484 units evaluated per origin. Two things change, and only one of them
 concerns the scaling descriptors. The first is a correction. With the threshold
-taken from each municipality's own seasons rather than pooled across the country,
-the population-only reference falls to a median area under the curve of $0.47$
-(range $0.454$--$0.522$), against $0.94$ when the threshold is pooled: the pooled
-label was measuring municipality size, whereas the within-unit label is not. The
-second is that the lagged block, which the state level could not resolve, satisfies
-the rule here. Its Brier differential has a median of $+0.049$, positive in 4 of 5 origins and excluding zero in 4 of 5 origins, the only contrast in this study to satisfy the pre-specified rule (Table~\ref{tab:exceed}). Discrimination
-rises from $0.50$ for the no-skill reference to $0.58$, $0.63$ and $0.65$ for M1,
-M2 and M3; M3 is the best of the three in 3 of 5 origins and gains a median $+0.013$ over M2.
+taken from each municipality's own seasons, the population-only reference falls to a
+median area under the curve of $0.47$ (range $0.454$--$0.522$), against $0.87$ (range
+$0.84$--$0.93$) where the threshold is pooled across units, as it must be at state
+level: a pooled label is largely a restatement of unit size, whereas the within-unit
+label is not. The second is that the lagged block, which the state level could not
+resolve, satisfies the rule here. Its Brier differential has a median of $+0.049$, positive and with an
+interval excluding zero in 4 of 5 origins, the only contrast in this study to satisfy
+the pre-specified rule (Table~\ref{tab:exceed}). Discrimination rises from $0.50$ for
+the no-skill reference to $0.58$, $0.63$ and $0.65$ for M1, M2 and M3; M3 is the best
+of the three in 3 of 5 origins and gains a median $+0.013$ over M2.
 
 The inversion between the two levels is a statement about precision and not about
 epidemiology. The state estimate of the same effect is the larger of the two in
 absolute terms, $+0.126$ against $+0.049$, and the less certain by a factor of
 eight in interval width, $0.26$ against $0.034$, so that a rule which fails at one
 level and passes at the other is failing on sample size: twenty-five units per
-origin cannot resolve an effect that 1{,}484 units can. What the two levels agree
-on is the ranking that matters for this paper. The scaling block satisfies the
-criterion at neither level: it moves in the expected direction in 5 of 5 origins, by a median of $+0.002$, but its interval excludes zero in only
-one of them, and at state level in none. Whether a municipality will experience an
+origin cannot resolve an effect that 1{,}484 units can. The two levels also differ in
+the scope of the label, which is pooled across states but taken within each
+municipality, so the state comparison inherits the size ranking described above and is
+the weaker of the two tests of epidemic rarity. What the two levels agree on is the
+ranking that matters for this paper. The scaling block satisfies the criterion at
+neither level: at municipal level it moves in the expected direction in 5 of 5 origins,
+by a median of $+0.002$, but its interval excludes zero in only one of them, and at
+state level it moves in the expected direction in 1 of 5 and has an interval excluding
+zero in 2, both against the block. Whether a municipality will experience an
 exceptional season is in part predictable from how large the previous one was; the
 exponent does not add to that.
 
@@ -1105,9 +1123,10 @@ essentially no skill for size (median skill $0.30$, range $-0.06$ to $0.86$, pos
 3 of 5 origins and with an interval excluding zero in 2 of 5), and
 successive rungs do not improve on it: M2 has median $0.12$ and M3 $0.15$. The
 differential of M3 against M2, the one that isolates
-$(\alpha_{t-1}, x_{\min,t-1}, \dot\alpha_{t-1})$ and nothing else, excludes zero in
-0 of the 5 origins against the three required, with a median relative change
-in pinball loss at $\tau=0.5$ of $-5.2\%$.
+$(\alpha_{t-1}, x_{\min,t-1}, \dot\alpha_{t-1})$ and nothing else, shows no origin in
+which the block improves with an interval excluding zero, against the three the rule
+requires; its interval excludes zero in 2 of the 5 origins, both against the block,
+with a median relative change in pinball loss at $\tau=0.5$ of $-5.2\%$.
 
 \input{generated/tab_ablation}
 
@@ -1269,11 +1288,12 @@ The predictive evaluation confirms the division of labour and locates it more
 sharply than a single level could. Where the question is posed as a probability ---
 will this municipality exceed its own upper quartile? --- the answer is
 affirmative, but only where the panel can resolve it. At municipal level lagged
-seasonal descriptors improve the Brier score over calibrated persistence in 4 of 5 origins, with the interval excluding zero in each of them, and raise
-discrimination from $0.50$ to $0.65$ in area under the curve. At state level the
-same rung produces a larger point estimate and fails the rule, on 23 to 25 units
-per origin. The scaling block, which is the object of the paper, satisfies the
-criterion at neither level. Where the question is posed as a magnitude, the answer
+seasonal descriptors improve the Brier score over calibrated persistence in 4 of 5
+origins and are significantly the worse in the fifth, and they raise discrimination
+from $0.50$ to $0.58$ in area under the curve, the full ladder reaching $0.65$. At
+state level the same rung produces a larger point estimate and fails the rule, on 23
+to 25 units per origin and with a label pooled across them. The scaling block, which is
+the object of the paper, satisfies the criterion at neither level. Where the question is posed as a magnitude, the answer
 is negative, and the failure is orderly rather than unexplained.
 
 \subsection{How the coupling explains both results}
@@ -1395,7 +1415,8 @@ exceedance label referred to each municipality's own history, the population-onl
 reference falls to a median area under the curve of $0.47$, so that the task no longer
 measures unit size, and the lagged block satisfies the pre-specified incremental test
 at that level. What bounds the claim is the purpose of the classifier: discrimination
-reaches a median of $0.65$, the scaling block adds a median $+0.002$ in Brier score,
+reaches a median of $0.65$ only with the full ladder, against $0.58$ for the rung that
+satisfies the rule, the scaling block adds a median $+0.002$ in Brier score,
 and the 2024 origin, in which 69.5\% of units exceeded their own upper quartile
 against a training base rate of 26.4\%, defeats every rung. The classifier orders
 municipalities within a season of familiar magnitude. It does not anticipate a change
@@ -1496,11 +1517,12 @@ frequency of large seasons over two decades of epidemic size. Posed as a probabi
 the question of whether a municipality will exceed its own upper quartile is
 tractable: lagged seasonal descriptors improve the Brier score over calibrated
 persistence in 4 of 5 municipal origins, the only contrast here to satisfy the
-pre-specified rule, and raise discrimination from $0.50$ to $0.65$ in area under the
-curve, whereas at state level the same contrast cannot be resolved on 25 units. Posed
-as a magnitude, it is not tractable: no rung achieves skill for size, and the scaling
-block specifically adds nothing, in 0 of 5 origins, its differential at the
-95th percentile being $+4.9\%$ in median with intervals that exclude zero in only 2 of 5 origins.
+pre-specified rule, and raise discrimination from $0.50$ to $0.58$ in area under the
+curve, the full ladder reaching $0.65$, whereas at state level the same contrast
+cannot be resolved on 25 units. Posed as a magnitude, it is not tractable: no rung
+achieves skill for size, and the scaling block specifically adds nothing, in 0 of 5
+origins, its differential at the 95th percentile being $+4.9\%$ in median with
+intervals that exclude zero in only 2 of 5 origins.
 
 That last result is not an accident of the data. The exponent co-varies with the
 lower bound, and hence with the scale of the season, at $0.89$ nationally and $0.64$
