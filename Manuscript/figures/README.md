@@ -1,15 +1,15 @@
 # Figure specifications
 
-The manuscript (`main.tex`) contains 15 `figure` environments with final
-captions and labels. The image files are **not** in the repository: generate
-them locally and drop them in this directory using the filenames below.
+The manuscript (`main.tex`) contains 14 `figure` environments with final
+captions and labels. Both renderings of each figure are committed in this
+directory, as `.pdf` and as `.png`; regenerate them with
+`generate_figures.py` after a data update.
 
 All environments use `\includegraphics` **without an extension**, so either
 `.pdf` (preferred for vector plots) or `.png` at >= 300 dpi will resolve.
 
 | File | Section | Content |
 |---|---|---|
-| `fig01_aggregation_levels` | Methods 2.2 | Schematic of the five aggregation levels (`W-mun`, `W-seas`, `S-mun`, `S-state`, `S-nat`) as nested constructions: same weekly series, different window and different unit of observation. Shaded by the $x_{\min}$ diagnostic. |
 | `fig02_alpha_by_level` | Results 3.1 | Box plot of $\alpha$ per construction, single panel; dashed line at $\alpha=2$. |
 | `fig03_verdict_by_level` | Results 3.1 | Grouped bars per construction: share with $R>0$, share with $R>0$ and $p<0.05$, share with $R<0$ and $p<0.05$. |
 | `fig04_size_ccdf` | Results 3.2 | Single-panel empirical CCDF of epidemic size on log--log axes, national cross-section pooled over 16 years, with the fitted power law (solid) and the exponential alternative (dashed). |
