@@ -55,3 +55,6 @@ slides/output/
 # chain run logs
 logs/
 powerlaw_results.db.bak*
+
+# fig01 (aggregation schematic) was dropped by PR #10 and must stay deleted
+Manuscript/figures/fig01_aggregation_levels.*
