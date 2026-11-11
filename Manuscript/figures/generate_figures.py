@@ -714,10 +714,11 @@ def fig10(oof):
     spline-basis quantile regression that the ablation now uses, which
     continues the boundary trend outside the observed range.
 
-    The dotted red line marks the largest annual total in the training window.
-    A tree forecast cannot cross it, and in a heavy-tailed setting the season
-    that matters is precisely the one on the far side of it, so the line is
-    the graphical form of the limitation the manuscript states.
+    The dotted red line marks the largest annual total in the training window,
+    so it separates the seasons the training data covers from those it does
+    not. The manuscript shows the two panels side by side and justifies the
+    estimator by the requirement it has to meet, without asserting a general
+    claim about other estimator classes.
     """
     from run_ablation import (
         CLIMATE_BLOCK, COVARIATE_DUR, COVARIATE_PEAK, DEMO, EPI,
