@@ -65,7 +65,12 @@ of observed incidence.
 
 Among the most influential results of the mechanistic tradition is the basic
 reproduction number $R_0$, which governs the speed of spread and defines the
-epidemic threshold. In the statistical tradition, incidence is most often
+epidemic threshold; in a vector-borne infection the threshold quantity rests on a
+generation interval that varies with temperature, and must be estimated
+accordingly \citep{codeco2018rt}. Because such models are seldom identifiable
+from incidence alone, their parameters are usually obtained within a calibration
+framework that returns a distribution rather than a point estimate
+\citep{coelho2011bayesian}. In the statistical tradition, incidence is most often
 modelled as a stochastic process, typically Poisson or negative binomial
 \citep{becker1999statistical, li2012log}. The central difficulty in either case
 is overdispersion: surveillance counts generate far more extreme observations
@@ -73,18 +78,27 @@ than tractable count models admit.
 
 A recurrent claim is that this overdispersion is not merely large but
 \emph{scale-free}, that incidence follows a power law
-\citep{rhodes1997critical, clauset2009power, neipel2020power}. The claim matters
-because a heavy tail implies extremes that most models fail to predict, and
-because those extremes account for most of the disease burden and most of its
-economic cost. Were the claim correct, it would bear directly on forecasting and
-on the allocation of resources.
+\citep{rhodes1997critical, clauset2009power, neipel2020power}. Where transmission
+is itself power-law-tailed the exponent is not a descriptive curiosity: the
+survival probability of an outbreak obeys a scaling law whose form is set by that
+exponent \citep{falco2022finite}. The claim matters because a heavy tail implies
+extremes that most models fail to predict, and because those extremes account for
+most of the disease burden and most of its economic cost. The quantity that public
+health planning acts on is the attack ratio, the fraction of the population
+infected in a season, which has to be inferred from aggregated notification data
+because serotype-specific immunity is unobserved \citep{coelho2015attack}. Were
+the claim correct, it would bear directly on forecasting and on the allocation of
+resources.
 
 The empirical record is inconsistent. Reported exponents for dengue vary widely,
 some studies find exponential rather than power-law behaviour, and the presence
 of a heavy tail appears to depend on the study period, on the spatial unit and on
 the outcome variable. This heterogeneity has generally been attributed to
 biology or to geography, on the assumption that different places or different
-years are governed by different regimes.
+years are governed by different regimes. In Brazil the geography has itself moved:
+dengue has expanded towards higher latitudes and towards municipalities with no
+prior transmission, so that the set of units entering a cross-section changes from
+one season to the next \citep{codeco2022expansion}.
 
 We test a narrower set of claims, and we begin from a different premise: that a
 power law is not a verdict on forecastability but a \emph{specification of risk}.
@@ -178,7 +192,8 @@ platform \citep{araujo2025large} for the period from 1 January 2010 to 22 Januar
 2026, for every Brazilian municipality represented in the platform. The analysed
 variable is the nowcast-adjusted estimated number of cases, that is, the
 platform's reconstruction of the number of infections occurring in each week
-after correcting for reporting delay; it is not the raw notification count. The
+after correcting for reporting delay by a hierarchical model of the delay
+distribution \citep{bastos2019reporting}; it is not the raw notification count. The
 series were projected onto a common epidemiological week ending on Sunday. Weeks
 without a reported case are retained in the series but excluded from
 distributional fits, since the power-law family is defined on positive support.
@@ -196,8 +211,7 @@ analysis as predictors of size.
 Municipal population figures are the estimates distributed with the platform
 (5{,}571 municipalities, one record with a zero entry excluded). Population enters
 no power-law fit; it is used to compute the descriptive correlations of
-Section%~\ref{sec:coupling}
-and, as $\log_{10}$ population, as one predictor in
+Section~\ref{sec:coupling} and, as $\log_{10}$ population, as one predictor in
 the forecasting models of Section~\ref{sec:targets}.
 
 \subsection{Definitions and notation}
@@ -1367,9 +1381,12 @@ trivially by persistence.
 
 Operational arbovirus platforms --- InfoDengue and Mosqlimate in Brazil, and the
 national systems reviewed elsewhere --- already produce weekly municipal nowcasts
-and short-horizon forecasts \citep{araujo2025large}. Those systems answer the question
-that this paper finds difficult: what is happening now, and what will happen in the
-coming weeks. The scaling description answers a question that they largely do not:
+and short-horizon forecasts \citep{araujo2025large}. Alongside them, multivariate
+machine-learning models have been fitted to municipal dengue series in Brazil,
+comparing recurrent networks with random forest regression
+\citep{mussumeci2020lstm}. The operational systems answer the question that this
+paper finds difficult: what is happening now, and what will happen in the coming
+weeks. The scaling description answers a question that they largely do not:
 given the history of a municipality, how often should its cross-section produce a
 season of a given size, expressed as a probability with two parameters. The two are
 complementary, and the second is inexpensive enough to be computed for every
@@ -1458,7 +1475,13 @@ in this paper is an unconstrained maximum.
 
 \emph{Predictors are ecological and coarse.} No serotype composition, no
 seroprevalence and no vector index enters the model, although all three are plausible
-determinants of season size. To the extent that these are stable within a unit they
+determinants of season size. None of the three is observable with the data at
+hand: the attack ratio can be recovered from aggregated incidence only under strong
+assumptions about the initial susceptible fraction, and serological surveys are what
+would be needed to characterise serotype-specific immunity \citep{coelho2015attack};
+where susceptibility has been built into municipal dengue forecasts it has improved
+their weather-based predictions, which is reason to expect its omission to matter
+here \citep{mcgough2021dynamic}. To the extent that these are stable within a unit they
 are absorbed by unit-level effects; to the extent that they vary by season they
 constitute unmodelled heterogeneity that the scaling block may be inadvertently
 representing. This is a tenable explanation for the null reported here, and it is the
