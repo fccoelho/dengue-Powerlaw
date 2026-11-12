@@ -21,7 +21,7 @@ Four nested rungs built on the lagged panel returned by
     M0  persistence        S_hat = S_{t-1}; D_hat = D_{t-1}; climatological
                            quantile for the peak week; training base rate for
                            the classifier
-    M1  lagged metrics     M0 predictors + P_{t-1}, R0_{t-1}, log10(pop)
+    M1  lagged metrics     M0 predictors + D_{t-1}, P_{t-1}, R0_{t-1}, log10(pop)
     M2  + climate          M1 + quarterly mean T and H of year t-1
                            (eight ``prev_avg_{temp,umid}_Q1..Q4`` columns, listed
                            in ``CLIMATE_BLOCK`` rather than discovered; the run
