@@ -255,13 +255,11 @@ fits `FIT_METRICS = ["total_cases"]` and offers `--purge-ep-dur` to remove any
 A machine learning framework for forecasting epidemic characteristics using historical power law patterns:
 - **Model Architecture**: a quantile regression on a cubic-spline basis with
   linear boundary extrapolation (`run_ablation.py --model spline_quantile`), the
-  default. A tree ensemble predicts a weighted average of its training
-  responses and therefore cannot produce a value outside their range, which
-  under a heavy tail is exactly where the interesting season sits; the spline
-  basis continues the boundary trend instead. Boosted alternatives
-  (`lightgbm`, `lightgbm_linear_tree`, `hist_gradient_boosting`) are kept as a
-  comparison arm, and a Random Forest is retained for the illustrative scatter
-  of figure 10.
+  default. The spline basis continues the boundary trend beyond the largest
+  observed response, which under a heavy tail is where the season of interest
+  lies. Boosted alternatives (`lightgbm`, `lightgbm_linear_tree`,
+  `hist_gradient_boosting`) remain available as a comparison arm but are not
+  reported in the manuscript.
 - **Target Variable**: Epidemic Size ($S_t$) only. Duration ($D_t$) and peak
   week ($P_t$) are *predictors*, not outcomes.
 - **Feature Engineering**:
