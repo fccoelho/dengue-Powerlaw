@@ -30,18 +30,19 @@ show that it specifies risk instead, and test it out of sample on weekly data fo
 Kolmogorov--Smirnov selection of the lower bound under five constructions of the same
 series (50{,}391 fits) against an exponential.
 
-Construction determines the verdict: median exponents range from $1.95$ to $2.08$, and
-the same counts support a power law in 77\% of municipalities pooled over a decade
+Construction determines the verdict: median exponents range from $1.95$ to $2.08$
+across the two fitted variables, the weekly count and the epidemic size, and the same
+weekly counts support a power law in 77\% of municipalities pooled over a decade
 against 23\% within single seasons. Epidemic size, the annual total of the episode,
-retains a genuine tail: the power law is preferred in all 16
-national cross-sections (median $\alpha=2.03$) and in 96\% of 353 state-years (median
-$\alpha=1.98$), with lower bounds two to three orders of magnitude above the bulk.
+retains a genuine tail: the power law is preferred in all 16 national cross-sections
+(median size exponent 2.03) and in 96\% of 353 state-years (median size exponent
+1.98), with lower bounds two to three orders of magnitude above the bulk.
 
-Because $\alpha\approx2$ fixes the exceedance curve, the pair is a two-parameter risk
-specification: 5.6--16.5\% of municipalities exceed ten times the lower bound in a
-given year, 0.3--2.7\% a hundred times it. The exponent is rank-correlated with that
-bound at $0.89$ nationally and $0.64$ within states, an association absent in
-simulation.
+Because the size exponent is close to two, it fixes the exceedance curve and the
+pair becomes a two-parameter risk specification: 5.6--16.5\% of municipalities exceed
+ten times the lower bound in a given year, 0.3--2.7\% a hundred times it. That
+exponent is rank-correlated with the bound at $0.89$ nationally and $0.64$ within
+states, an association absent in simulation.
 
 Framed as exceedance, prediction is feasible where the panel resolves it: at municipal
 level, with the label referred to each unit's own history, lagged descriptors,
@@ -103,9 +104,9 @@ one season to the next \citep{codeco2022expansion}.
 We test a narrower set of claims, and we begin from a different premise: that a
 power law is not a verdict on forecastability but a \emph{specification of risk}.
 An exponent of two assigns a determinate probability to every exceedance level,
-so that the fitted pair $(\alpha, x_{\min})$ summarises the entire risk curve of
-a municipality using two parameters --- in a setting where the observables vary by
-two orders of magnitude between years. What a heavy tail precludes is that the
+so that the fitted pair $(\alpha_S, x_{\min})$ summarises the entire risk curve of
+a municipality's epidemic size using two parameters --- in a setting where the
+observables vary by two orders of magnitude between years. What a heavy tail precludes is that the
 \emph{magnitude} of the largest event be estimated from the variance; what it
 supplies is the probability that such an event occurs. These are distinct
 problems, and a proper scoring rule keeps them distinct.
@@ -121,8 +122,9 @@ admits several legitimate partitionings --- the weekly counts of one
 municipality, its annual epidemic totals, the set of epidemic sizes across
 municipalities within one season --- and these are different random variables
 with different supports. We fit the same estimator to the same surveillance data
-under five constructions and report the exponent together with the diagnostic
-($x_{\min}$) that makes it interpretable. Epidemic size, the quantity
+under five constructions, obtaining two exponents rather than one, $\alpha_W$ for
+the weekly count and $\alpha_S$ for the epidemic size, and report each together
+with the diagnostic ($x_{\min}$) that makes it interpretable. Epidemic size, the quantity
 surveillance services act on, is the construction that survives. Epidemic
 duration and peak timing are not submitted to that test: both are bounded by the
 length of the season, so a scale-free law cannot hold for them a priori, and the
@@ -162,13 +164,13 @@ the national fits reproduce the observed exceedance frequency over two decades o
 epidemic size. This is a decision-relevant output that a point forecast does not
 provide, and it is obtained from two parameters.
 
-\item \textbf{A measured coupling that identifies what the exponent
-represents.} Within units, $\alpha$ and $\log_{10} x_{\min}$ are rank-correlated
+\item \textbf{A measured coupling that identifies what the size exponent
+represents.} Within units, $\alpha_S$ and $\log_{10} x_{\min}$ are rank-correlated
 at $0.64$ (median over 24 states) and at $0.89$ across national cross-sections,
-whereas a simulation with the exponent held fixed recovers no such association.
+whereas a simulation with $\alpha_S$ held fixed recovers no such association.
 The pair is therefore a low-variance summary of seasonal magnitude: informative
-about size, but not independent of lagged incidence, which a reading of the
-exponent as an independent predictor would require.
+about size, but not independent of lagged incidence, which a reading of
+$\alpha_S$ as an independent predictor would require.
 
 \item \textbf{An out-of-sample answer in the form in which the question can be
 answered.} The probability of a large season is predictable where the panel is
@@ -252,6 +254,20 @@ a fixed unit.
 unit, dimension of pooling) that determines which random variable is estimated
 and what each observation of the fitted sample represents.
 
+\emph{The two exponents.} The estimator of Section~\ref{sec:estimation} is
+applied to two different random variables, and the two exponents are kept apart
+throughout. $\alpha_W$ is the exponent of the weekly count $c_{i,w}$, fitted at
+constructions \lvl{W-mun} and \lvl{W-seas}; $\alpha_S$ is the exponent of the
+epidemic size $S_{i,t}$, fitted at \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat}.
+The unsubscripted $\alpha$ names the exponent of the law
+$p(x)\propto x^{-\alpha}$ under discussion, whatever the variable, and is used
+where that variable is named in the same sentence or fixed by the equation.
+Every statement in this paper about exceedance, risk or forecasting is a statement
+about $\alpha_S$. $\alpha_W$ appears only where the construction, the diagnostic or
+the reporting convention is at issue, and it never carries a risk statement here: at
+its own constructions the lower bound collapses into the bulk, which is what
+disqualifies it.
+
 \emph{Lower bound and bulk.} The lower bound $x_{\min}$ is the threshold above
 which the power-law form is assumed to hold, and the \emph{bulk} is the part of
 the empirical distribution below it. A fit is \emph{tail-informative} when
@@ -279,7 +295,8 @@ $S_{i,t}$ & epidemic size: total cases of the episode of $i$ in $t$\\
 $D_{i,t}$, $P_{i,t}$ & duration (weeks) and peak week of that episode\\
 $R_{0,t}$ & effective reproduction number reported for season $t$\\
 \midrule
-$\alpha$ & power-law exponent\\
+$\alpha$ & power-law exponent of the law $p(x)\propto x^{-\alpha}$\\
+$\alpha_W$, $\alpha_S$ & that exponent for the weekly count and for epidemic size\\
 $x_{\min}$ & lower bound of the power-law regime\\
 $R$ & normalised log-likelihood ratio, power law against exponential\\
 \midrule
@@ -301,6 +318,15 @@ count $c_{i,w}$ at constructions \lvl{W-mun} and \lvl{W-seas}, and the epidemic 
 constructions \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat}. Within each group the constructions differ only in
 the dimension along which the variable is pooled, which is what allows a
 contrast between two of them to be read as the effect of that dimension alone.
+
+The paper therefore estimates two exponents, not one: $\alpha_W$ for the weekly
+count and $\alpha_S$ for the epidemic size. They are close in value --- the
+median across the five constructions spans $1.95$ to $2.08$, and the two groups
+overlap inside that span --- and the near-agreement is why the distinction has to
+be carried by the notation rather than by the number. An $\alpha_W$ of $1.95$ and
+an $\alpha_S$ of $2.08$ differ by $0.13$ in the exponent and by a factor of $150$
+in the lower bound (Section~\ref{sec:size}), and only the second describes the
+risk of a large season.
 
 Every handle is read as a variable and a scope. The initial letter names the
 fitted variable --- \emph{W} for the weekly count, \emph{S} for the epidemic size
@@ -457,8 +483,8 @@ municipality experiences an epidemic of at least any given size. Four
 consequences of Equation~\eqref{eq:exceed} shape the design of the forecasting
 evaluation.
 
-First, the exponent summarises \emph{risk} rather than \emph{activity}. Two
-municipalities with the same expected annual incidence but different $\alpha$
+First, the size exponent summarises \emph{risk} rather than \emph{activity}. Two
+municipalities with the same expected annual incidence but different $\alpha_S$
 face different probabilities of a catastrophic season, and that difference is
 invisible to the mean. The fitted models quantify the claim rather than merely
 asserting it: applied to the 16 national size fits, Equation~\eqref{eq:exceed}
@@ -467,19 +493,22 @@ $x_{\min}$ in a given year, and that between 0.3\% and 2.7\% exceed one hundred
 times $x_{\min}$. These are falsifiable implications of the description, and
 Figure~\ref{fig:exceed} confronts them with the empirical exceedance frequencies.
 
-Second, $\alpha$ is a low-variance quantity \emph{relative to its target}. Across
-the national cross-sections it takes values between $1.78$ and $2.25$, and it is
-essentially unrelated to municipality size ($r=-0.043$). Annual case counts over
-the same period vary by two orders of magnitude. The dispersion of
-$\hat\alpha$ is not zero --- it exceeds sampling noise by roughly a factor of five
-in standard deviation, and it co-varies with the selected $x_{\min}$
-(Section~\ref{sec:coupling}) --- but it is small along precisely the dimension in
-which the target is volatile. That is the specific reason to carry $\alpha$ into
-the predictive models rather than treating it as a descriptive curiosity, and the
-same coupling is the reason the ablation, rather than the correlation, has to
-decide the question.
+Second, $\alpha_S$ is a low-variance quantity \emph{relative to its target}.
+Across the national cross-sections it takes values between $1.78$ and $2.25$, over
+a period in which annual case counts vary by two orders of magnitude. The weekly
+exponent is in the same position across units: $\alpha_W$ is essentially unrelated
+to municipality size ($r=-0.043$ over $5{,}264$ municipalities,
+Section~\ref{sec:coupling}), so an exponent is not a restatement of how large a
+municipality is, and $\alpha_S$ is not a restatement of how heavily burdened it
+is. The dispersion of $\hat\alpha_S$ is not zero --- it exceeds sampling noise by
+roughly a factor of five in standard deviation, and it co-varies with the selected
+$x_{\min}$ (Section~\ref{sec:coupling}) --- but it is small along precisely the
+dimension in which the target is volatile. That is the specific reason to carry
+$\alpha_S$ into the predictive models rather than treating it as a descriptive
+curiosity, and the same coupling is the reason the ablation, rather than the
+correlation, has to decide the question.
 
-Third, $\alpha\approx2$ has a direct methodological consequence for evaluation.
+Third, $\alpha_S\approx2$ has a direct methodological consequence for evaluation.
 The second moment of a power law with $\alpha \le 2$ does not exist in the
 continuous limit, and at $\alpha \approx 2$ the sample mean is unstable, so that
 squared-error losses are decided by the few largest outbreaks. A model that is
@@ -489,9 +518,9 @@ evaluate on quantile (pinball) losses and on the classification of tail events,
 and treat the root mean squared error as a secondary, tail-dominated diagnostic.
 
 Finally, the predictive hypothesis is stated in a form that can fail. If
-$(\alpha, x_{\min})$ carries information about the coming season beyond what
+$(\alpha_S, x_{\min})$ carries information about the coming season beyond what
 lagged counts already encode, a model containing them should outperform an
-otherwise identical model without them, out of sample. If instead the exponent is
+otherwise identical model without them, out of sample. If instead $\alpha_S$ is
 close to a deterministic function of the lower moments of the same series, the
 two models should be indistinguishable, and the descriptive result would carry no
 forecasting content. Section~\ref{sec:ablation} specifies the comparison that
@@ -779,8 +808,11 @@ interpreting from those that are not.
 
 One estimator, one body of surveillance data, five constructions, and verdicts
 that range from unanimous support for a power law (\lvl{S-nat}, 16 of 16 seasons) to the
-23\% of fits favouring a power law at \lvl{W-seas}. Median exponents span $1.95$ to
-$2.08$; individual estimates of the lower bound range from one case to
+Median exponents span $1.95$ to
+$2.08$; the ends of that span are the two variables, $\alpha_W=1.95$ at \lvl{W-mun}
+and $\alpha_S=2.08$ at \lvl{S-mun}, so that the pair a comparison across studies
+would read as agreement is here the outermost pair of the table. Individual
+estimates of the lower bound range from one case to
 $4\times10^{4}$, four orders of magnitude. No two analyses in the table differ
 in data source, period or variable: \lvl{W-mun} and \lvl{W-seas} are the same variable over
 different windows, and \lvl{S-state} and \lvl{S-nat} the same variable at different spatial scopes.
@@ -803,9 +835,10 @@ size constructions, \lvl{S-mun} (the annual totals of one municipality across
 seasons), \lvl{S-state} (the municipalities of one state in one season) and
 \lvl{S-nat} (the municipalities of the country in one season), each fit a single
 variable, so that the movement of the box within a group is the movement of the
-construction and not of the object. Sizes concentrate near $\alpha\approx2$
-throughout, with the weekly constructions producing the widest dispersion because
-most of their fits describe the bulk rather than a tail.}
+construction and not of the object. The two weekly boxes therefore carry
+$\alpha_W$ and the three size boxes $\alpha_S$. Sizes concentrate near
+$\alpha_S\approx2$ throughout, with the weekly constructions producing the widest
+dispersion because most of their fits describe the bulk rather than a tail.}
 \label{fig:alpha}
 \end{figure}
 
@@ -877,12 +910,12 @@ tail.}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig07_window_flip}
-\caption{The window reverses the verdict on identical data. Left, density of the estimated
-power-law exponent $\alpha$, of the discrete law $p(x)\propto x^{-\alpha}$ fitted
-above the lower bound $x_{\min}$, from the full municipal series (\lvl{W-mun})
-and from the same series partitioned into single seasons (\lvl{W-seas}); the
-dashed line marks $\alpha=2$, below which the second moment of the fitted law
-diverges. Right, the corresponding verdicts: the share of fits favouring the
+\caption{The window reverses the verdict on identical data. Left, density of the
+estimated weekly exponent $\alpha_W$, of the discrete law $p(x)\propto x^{-\alpha}$
+fitted above the lower bound $x_{\min}$, from the full municipal series
+(\lvl{W-mun}) and from the same series partitioned into single seasons
+(\lvl{W-seas}); the dashed line marks $\alpha_W=2$, below which the second moment
+of the fitted law diverges. Right, the corresponding verdicts: the share of fits favouring the
 power law falls from 77\% to 23\%, and the share significantly favouring the
 exponential rises from 3\% to 22\%, a fit counting as significantly favouring the
 exponential when $R<0$ and $p<0.05$ in the normalised log-likelihood comparison
@@ -897,13 +930,13 @@ level.}
 The construction that survives both criteria is the one that matters
 operationally: the distribution of epidemic size across units within a season. At
 the national cross-section, all 16 annual fits favour the power law and all are
-significant, with median $\alpha=2.03$ (IQR 1.90--2.10) and
-median $x_{\min}=730$ cases. The exponent is stable, ranging from 1.78 to 2.25 over
+significant, with median $\alpha_S=2.03$ (IQR 1.90--2.10) and
+median $x_{\min}=730$ cases. $\alpha_S$ is stable, ranging from 1.78 to 2.25 over
 sixteen seasons in a period in which annual case counts vary by two orders of
 magnitude. At state level the picture is consistent and weaker in
 significance, as expected from smaller cross-sections: the power law is preferred
 in 96\% of the 353 state-year cross-sections and significant in 52\%, with median
-$\alpha=1.98$ and median $x_{\min}=169$ cases.
+$\alpha_S=1.98$ and median $x_{\min}=169$ cases.
 
 This is the object with which the remainder of the paper works, and the reason is
 worth stating precisely. The median lower bound of 730 cases at national level
@@ -914,11 +947,11 @@ sense in which the two groups of constructions are not interchangeable. At
 $x_{\min}=2$ the fitted law describes counts of one and two cases; at
 $x_{\min}=730$ it describes the upper decade of a distribution. Two analyses
 reported as agreeing on the exponent can therefore be describing entirely
-different objects: \lvl{W-mun} and \lvl{S-mun} have median exponents of $1.95$ and $2.08$, a
-difference of $0.13$, while their median lower bounds differ by a factor of
-$150$. The empirical complementary cumulative distribution of
-Figure~\ref{fig:ccdf} shows the same fact graphically, as a straight line over two
-decades above $x_{\min}$.
+different objects: \lvl{W-mun} and \lvl{S-mun} have median exponents, $\alpha_W$ and
+$\alpha_S$ respectively, of $1.95$ and $2.08$, a difference of $0.13$, while their
+median lower bounds differ by a factor of $150$. The empirical complementary
+cumulative distribution of Figure~\ref{fig:ccdf} shows the same fact graphically, as
+a straight line over two decades above $x_{\min}$.
 
 \begin{figure}[htbp]
 \centering
@@ -927,7 +960,7 @@ decades above $x_{\min}$.
 cross-section --- the annual totals of all municipalities, pooled over the 16
 seasons --- with the fitted power law and the exponential alternative superimposed
 on logarithmic axes. Both curves are evaluated at the parameters of the fit to the
-pooled sample, whose exponent $\alpha$ and lower bound $x_{\min}$ --- the threshold
+pooled sample, whose exponent $\alpha_S$ and lower bound $x_{\min}$ --- the threshold
 above which the law is fitted --- are given in the legend. That pair is not the
 median of the sixteen per-season fits reported in the text: pooling the seasons
 yields a single sample, with its own lower bound, and the two are not
@@ -937,25 +970,25 @@ paper, and the exponential alternative bends away from it over the same region.}
 \label{fig:ccdf}
 \end{figure}
 
-\subsection{What the exponent represents: a readout of seasonal scale}
+\subsection{What the size exponent represents: a readout of seasonal scale}
 \label{sec:coupling}
 
 The fitted pair is not a pair of independent coefficients, and the direction of
 their dependence determines how the description can be used.
 Table~\ref{tab:coupling} collects the association between the two estimates at the
 levels where it can be measured, together with the association recovered from
-simulated data in which the true exponent was held fixed.
+simulated data in which the true $\alpha_S$ was held fixed.
 
 \begin{table}[htbp]
 \centering
 \small
 \setlength{\tabcolsep}{4pt}
-\caption{Association between the estimated exponent and the selected lower bound.
-The first three rows are the surveillance data; the last row is a control in
-which data were generated from a power law with true $\alpha=2.0$ while the true
-lower bound was varied over the same range, so that any association recovered
-there would be induced by the estimator. Values are Spearman rank correlations
-between $\alpha$ and $\log_{10} x_{\min}$.}
+\caption{Association between the estimated size exponent $\alpha_S$ and the
+selected lower bound. The first three rows are the surveillance data; the last row
+is a control in which data were generated from a power law with true
+$\alpha_S=2.0$ while the true lower bound was varied over the same range, so that
+any association recovered there would be induced by the estimator. Values are
+Spearman rank correlations between $\alpha_S$ and $\log_{10} x_{\min}$.}
 \label{tab:coupling}
 \begin{tabular}{@{}llrr@{}}
 \toprule
@@ -965,7 +998,7 @@ National cross-section, season to season & 16 seasons            & $0.89$ & 16\\
 Within state, season to season           & median of 24 states   & $0.64$ & --\\
 Between states                           & state means           & $0.34$ & 26\\
 \midrule
-Simulated, $\alpha$ fixed at $2.0$       & control               & $-0.20$ & 40\\
+Simulated, $\alpha_S$ fixed at $2.0$    & control               & $-0.20$ & 40\\
 \bottomrule
 \end{tabular}
 \end{table}
@@ -975,21 +1008,21 @@ time --- positive in 92\% of the 24 states with at least six seasons of data, an
 significantly positive in 67\% --- but weak between states. It is therefore a
 within-unit, over-time relationship and not a contrast between places. The
 control recovers no such association, so the estimator does not generate it: it
-places the sampling dispersion of $\hat\alpha$ at $0.03$ (40 replicates, samples
-of 800 to 4{,}000 points, true exponent fixed at $2.0$), against an observed
+places the sampling dispersion of $\hat\alpha_S$ at $0.03$ (40 replicates, samples
+of 800 to 4{,}000 points, true $\alpha_S$ fixed at $2.0$), against an observed
 standard deviation of $0.150$ across the 16 national fits. The season-to-season
-movement in $\alpha$ is real, roughly five times the sampling noise in standard
+movement in $\alpha_S$ is real, roughly five times the sampling noise in standard
 deviation, even though it remains small next to the variation in the case counts
 themselves.
 
 Read as description, this is the most informative single result about
-$(\alpha, x_{\min})$ in the paper. Because $x_{\min}$ is measured in cases, it
+$(\alpha_S, x_{\min})$ in the paper. Because $x_{\min}$ is measured in cases, it
 tracks the magnitude of the season: seasons in which municipalities produce large
-epidemics place the threshold higher, and the exponent moves with it. The pair is
+epidemics place the threshold higher, and $\alpha_S$ moves with it. The pair is
 therefore a two-number summary of how large a season was, available for every
 municipality, far less volatile than the case count it summarises, and stable
 enough to be compared across seasons (Figure~\ref{fig:stability}). Read as a
-predictor set, the same fact is a warning: an exponent that co-varies with the
+predictor set, the same fact is a warning: an $\alpha_S$ that co-varies with the
 scale of the season is, to that extent, a re-encoding of $S_{t-1}$, which any
 model of size already carries. Both readings are correct, and they make different
 predictions about the ablation of Section~\ref{sec:prediction}.
@@ -997,32 +1030,33 @@ predictions about the ablation of Section~\ref{sec:prediction}.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig08_alpha_stability}
-\caption{Stability of the exponent. (a) Estimated power-law exponent $\alpha$, of the
-discrete law $p(x)\propto x^{-\alpha}$ fitted above the lower bound $x_{\min}$,
-for epidemic size by season, one line per state, at the state-year
-cross-section: the lines are flat, and the spread between states is far smaller
-than the season-to-season variation in case counts. (b) Estimated $\alpha$ of the
-weekly municipal construction against $\log_{10}$ municipal population, a
-different construction and a different object from panel (a), which shows no
-association (Pearson $r=-0.043$, Spearman $-0.048$, $n=5{,}264$). Panel (a) is
-the empirical reason the exponent can serve as a compact descriptor of a season:
-it varies slowly along exactly the axis in which the observables do not.}
+\caption{Stability of the two exponents. (a) Estimated size exponent
+$\alpha_S$ of the discrete law $p(x)\propto x^{-\alpha}$ fitted above the lower
+bound $x_{\min}$, for epidemic size by season, one line per state, at the
+state-year cross-section: the lines are flat, and the spread between states is far
+smaller than the season-to-season variation in case counts. (b) Estimated weekly
+exponent $\alpha_W$ of the municipal construction against $\log_{10}$ municipal
+population, a different construction and a different object from panel (a), which
+shows no association (Pearson $r=-0.043$, Spearman $-0.048$, $n=5{,}264$). Panel
+(a) is the empirical reason $\alpha_S$ can serve as a compact descriptor of a
+season: it varies slowly along exactly the axis in which the observables do not.}
 \label{fig:stability}
 \end{figure}
 
-The exponent is essentially unrelated to municipality size
-($\mathrm{corr}(\alpha, \log_{10}\text{population})=-0.043$, Spearman $-0.048$;
+The weekly exponent $\alpha_W$ is essentially unrelated to municipality size
+($\mathrm{corr}(\alpha_W, \log_{10}\text{population})=-0.043$, Spearman $-0.048$;
 $n=5{,}264$) and only weakly related to incidence
 (Pearson $-0.143$, Spearman $-0.248$; $n=4{,}663$). Larger or more heavily burdened
-municipalities are not in a different scaling regime: the exponent is a property of
-the construction, and within a unit, a property of the scale of the season.
+municipalities are therefore not in a different scaling regime, and $\alpha_W$ is
+not a proxy for how much transmission a place sees. It is a property of the
+construction; $\alpha_S$ is, within a unit, a property of the scale of the season.
 
 \subsection{The fitted law as a risk curve}
 \label{sec:riskmodel}
 
 Equation~\eqref{eq:exceed} makes the description operational. A power law with
-exponent $\alpha$ and lower bound $x_{\min}$ assigns
-$\Pr(S \ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ for every level $s$, so that
+exponent $\alpha_S$ and lower bound $x_{\min}$ assigns
+$\Pr(S \ge s)=\zeta(\alpha_S,s)/\zeta(\alpha_S,x_{\min})$ for every level $s$, so that
 the fitted pair is a complete statement about the frequency of extreme seasons. It
 requires no fitted case count, no covariate and no training period: it is
 available from the current cross-section alone.
@@ -1041,8 +1075,8 @@ and which a subsequent season can falsify.
 \caption{The fitted power law as a probabilistic statement about exceedance. Epidemic size
 $S$ is the annual total of a municipality and $s$ a size threshold; the curves
 give, for three national cross-sections (2016, 2019 and 2024),
-$\Pr(S\ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ evaluated at the fitted
-exponent $\alpha$ and lower bound $x_{\min}$, where $\zeta$ is the Hurwitz zeta
+$\Pr(S\ge s)=\zeta(\alpha_S,s)/\zeta(\alpha_S,x_{\min})$ evaluated at the fitted
+size exponent $\alpha_S$ and lower bound $x_{\min}$, where $\zeta$ is the Hurwitz zeta
 function that normalises the discrete law, rescaled by the empirical fraction of the cross-section at or
 above $x_{\min}$ so that curve and points share an unconditional scale. The
 points give the empirical exceedance frequency of the same cross-section.
@@ -1187,8 +1221,8 @@ increase in the Brier score --- the mean squared error of the predicted
 probabilities, so that lower is better --- when a predictor is permuted, so that a
 negative value means the model is better with the predictor than without it.
 Panel (a) ranks the individual predictors, with the block of scaling descriptors
-in red: $\alpha$ is the power-law exponent, $x_{\min}$ the lower bound above
-which the law is fitted, $\dot\alpha$ the least-squares slope of $\alpha$ over
+in red: $\alpha_S$ is the size exponent, $x_{\min}$ the lower bound above
+which the law is fitted, $\dot\alpha$ the least-squares slope of $\alpha_S$ over
 the seasons before $t$, and the subscript $t-1$ marks the value measured in the
 previous season. Panel (b) tracks the three scaling descriptors across forecast
 origins. The joint bar is the scaling block permuted as a single unit: permuting
@@ -1401,17 +1435,18 @@ many alerts a season will generate.
 \section{Discussion}
 \label{sec:discussion}
 
-\subsection{What the exponent is, and what it is not}
+\subsection{What each exponent is, and what neither is}
 
 The comparison across five constructions settles a question that the applied
 literature has treated as empirical when it is largely definitional. Median
-exponents span $1.95$ to $2.08$ across constructions of the same series, the share
-of fits favouring a power law ranges from 23\% to 100\%, and a single change of
+exponents span $1.95$ to $2.08$ across constructions of the same series and across
+the two fitted variables, the weekly count and the epidemic size; the share of fits
+favouring a power law ranges from 23\% to 100\%, and a single change of
 temporal window moves support from 77\% to 23\% with no transmission parameter
 altered. What does not survive is the inference from an exponent to a regime: the
-step that treats $\alpha$ as a property of the pathogen or of the place, when it is
-a property of the tuple (variable, sampling unit, dimension of pooling, comparison
-model).
+step that treats $\alpha_W$ or $\alpha_S$ as a property of the pathogen or of the
+place, when it is a property of the tuple (variable, sampling unit, dimension of
+pooling, comparison model).
 
 The same comparison identifies which construction \emph{does} carry a stable tail.
 Epidemic size across units within a season is power-law at every construction at
@@ -1424,13 +1459,16 @@ The distinction between this result and the weekly-count fits that collapse to
 $x_{\min} \le 5$ is substantive rather than technical. At $x_{\min}=2$ the fitted
 law describes counts of one and two cases; at $x_{\min}=730$ it describes the upper
 decade of a distribution. Two analyses reported as agreeing on the exponent can be
-describing entirely different objects, as the comparison of \lvl{W-mun} and \lvl{S-mun} shows: a
-difference of $0.13$ in the exponent and a factor of $150$ in the lower bound.
+describing entirely different objects, as the comparison of \lvl{W-mun} and
+\lvl{S-mun} shows: $\alpha_W=1.95$ against $\alpha_S=2.08$, a difference of $0.13$
+in the exponent and a factor of $150$ in the lower bound. The two exponents are
+not two estimates of one quantity; they are estimates of two quantities that
+happen to be nearly equal.
 
 \subsection{The tail as a risk specification rather than a forecast input}
 
-The most consequential move in this paper is to stop treating $\alpha \approx 2$ as
-a verdict on forecastability and to treat it as a probability statement. A power
+The most consequential move in this paper is to stop treating $\alpha_S \approx 2$
+as a verdict on forecastability and to treat it as a probability statement. A power
 law assigns $\Pr(S \ge s)$ at every level; what it precludes is that the
 \emph{magnitude} of the largest event be estimated from the variance. These are
 distinct claims, and conflating them is what produced the intuition that
@@ -1460,11 +1498,11 @@ is negative, and the failure is orderly rather than unexplained.
 
 \subsection{How the coupling explains both results}
 
-The coupling between $\alpha$ and $x_{\min}$ is the mechanism behind both halves of
-the predictive result, and it merits reading as a finding rather than as a caveat.
-Within units the two estimates are rank-correlated at $0.64$ (median over 24 states)
-and at $0.89$ nationally, whereas a simulation with the true exponent held fixed at
-$2.0$ recovers $-0.20$. The association is a property of the data and not of the
+The coupling between $\alpha_S$ and $x_{\min}$ is the mechanism behind both halves
+of the predictive result, and it merits reading as a finding rather than as a
+caveat. Within units the two estimates are rank-correlated at $0.64$ (median over 24
+states) and at $0.89$ nationally, whereas a simulation with the true $\alpha_S$ held
+fixed at $2.0$ recovers $-0.20$. The association is a property of the data and not of the
 estimator.
 
 Descriptively, this makes the pair a compact readout of seasonal magnitude: two
@@ -1474,8 +1512,8 @@ are available for every unit. This is a substantive contribution to the
 characterisation of a season, since it reduces a quantity spanning two orders of
 magnitude to a stable low-dimensional summary.
 
-Predictively, the same fact accounts for the null. An exponent that co-varies with
-the scale of the season is, to that extent, a re-encoding of $S_{t-1}$, which the
+Predictively, the same fact accounts for the null. $\alpha_S$ co-varies with the
+scale of the season and is, to that extent, a re-encoding of $S_{t-1}$, which the
 model already contains. The ablation measures that redundancy directly: the scaling
 block adds nothing to a rung that already knows the previous season's size, in 0 of 5 origins, and at $\tau=0.95$ its differential is $+4.9\%$ in median with
 intervals that exclude zero in only 2 of 5 origins and in opposite directions,
@@ -1490,7 +1528,7 @@ Asking whether a season will be large is a question about upper-tail probability
 and the coefficient on the lagged descriptors is doing the work there; adding a
 transformation of the same lagged quantity cannot improve it, which is why the
 Brier differentials of the scaling block sit near zero with no interval excluding
-it. The information the exponent carries is real, and it is already contained in
+it. The information $\alpha_S$ carries is real, and it is already contained in
 the lagged count.
 
 \subsection{Size as the hard target, consistently with the description}
@@ -1534,7 +1572,7 @@ above that threshold; 300 cases is an attack rate of 2.3\% in the median municip
 and of 0.3\% in one of 100{,}000 inhabitants. A small municipality therefore
 enters the tail only in its exceptional seasons, which are precisely the seasons
 the forecast is asked about, and it contributes few such points, so that the
-exponent which would order its next season is estimated from a handful of
+$\alpha_S$ which would order its next season is estimated from a handful of
 observations.
 
 The second quantity is the noise of the target. The annual total of a small
@@ -1561,12 +1599,16 @@ is inexpensive to adopt. An exponent should travel with the lower bound that
 produced it, the construction of the sample, the number of observations and the
 alternative model against which it was tested. Of these, $x_{\min}$ is the most
 informative and the most frequently omitted, because it separates two analyses that
-look identical in a table of results. The diagnostic is easy to apply and difficult
-to manipulate, since $x_{\min}$ is selected by the same goodness-of-fit criterion
-that selects the model and cannot be tuned to produce a desired $\alpha$. We would
-argue further that an $\alpha$ reported without $x_{\min}$ should be treated as an
-incomplete statistic, in the same way that a correlation is incomplete without its
-sample size.
+look identical in a table of results. The convention holds for $\alpha_W$ as much
+as for $\alpha_S$, and it is what exposes the difference between them: an
+$\alpha_W$ of $1.95$ accompanied by its lower bound is the same number as an
+$\alpha_S$ of $2.08$ accompanied by its own, and the two bounds differ by two
+orders of magnitude. The diagnostic is easy to apply and difficult to manipulate,
+since $x_{\min}$ is selected by the same goodness-of-fit criterion that selects the
+model and cannot be tuned to produce a desired $\alpha$. We would argue further
+that an $\alpha_W$ or an $\alpha_S$ reported without $x_{\min}$ should be treated
+as an incomplete statistic, in the same way that a correlation is incomplete
+without its sample size.
 
 We would add a second convention, specific to the argument tested here. A claim that
 a scaling description improves forecasts is meaningful only against a specified
@@ -1701,11 +1743,14 @@ Three practices follow, none of them costly.
 First, report the tuple. An exponent accompanied by its construction, its $x_{\min}$,
 its sample size and its comparison model can be assessed by a reader; an exponent
 alone cannot, and the five constructions examined here show that the same exponent can
-carry opposite meanings.
+carry opposite meanings. Name the variable as well: an $\alpha_W$ and an $\alpha_S$
+are not interchangeable, and here they differ by $0.13$ while the objects they
+describe differ by a factor of $150$ in scale.
 
-Second, use the exceedance curve. Two parameters fitted to the current cross-section
-give the probability that a municipality will exceed any level, and the national fits
-reproduce the observed frequency of large seasons over two decades. This is an
+Second, use the exceedance curve. The pair $(\alpha_S, x_{\min})$ fitted to the
+current cross-section gives the probability that a municipality will exceed any
+level, and the national fits reproduce the observed frequency of large seasons over
+two decades. This is an
 inexpensive input to planning that requires no model training and no history beyond
 the current season.
 
@@ -1716,19 +1761,21 @@ and the exceedance statement is usually the one a health service requires.
 
 \section{Conclusion}
 
-The distribution of dengue epidemic size in Brazil is heavy-tailed with an exponent
-close to two, and this is among the few robust facts in the applied literature on
-epidemic scaling: 16 of 16 national cross-sections, 96\% of 353 state-year
-cross-sections, and a lower bound two to three orders of magnitude above the bulk.
+The distribution of dengue epidemic size in Brazil is heavy-tailed with a size
+exponent $\alpha_S$ close to two, and this is among the few robust facts in the
+applied literature on epidemic scaling: 16 of 16 national cross-sections, 96\% of 353
+state-year cross-sections, and a lower bound two to three orders of magnitude above
+the bulk.
 Which of these statements a study reports, and whether it reports a power law or an
 exponential at all, is determined by the construction it imposes on the data; that
 heterogeneity is methodological before it is biological.
 
 The consequence for forecasting is not the one usually drawn. Because
-$\alpha \approx 2$ fixes the entire exceedance curve, the fitted pair is a
-two-parameter risk specification, and it is well calibrated against the empirical
-frequency of large seasons over two decades of epidemic size. Posed as a probability,
-the question of whether a municipality will exceed its own upper quartile is
+$\alpha_S \approx 2$ fixes the entire exceedance curve, the pair $(\alpha_S,
+x_{\min})$ is a two-parameter risk specification, and it is well calibrated against
+the empirical frequency of large seasons over two decades of epidemic size. Posed as
+a probability, the question of whether a municipality will exceed its own upper
+quartile is
 tractable: lagged seasonal descriptors improve the Brier score over calibrated
 persistence in 4 of 5 municipal origins, the only contrast here to satisfy the
 pre-specified rule, and raise discrimination from $0.50$ to $0.58$ in area under the
@@ -1738,7 +1785,7 @@ achieves skill for size, and the scaling block specifically adds nothing, in 0 o
 origins, its differential at the 95th percentile being $+4.9\%$ in median with
 intervals that exclude zero in only 2 of 5 origins.
 
-That last result is not an accident of the data. The exponent co-varies with the
+That last result is not an accident of the data. $\alpha_S$ co-varies with the
 lower bound, and hence with the scale of the season, at $0.89$ nationally and $0.64$
 within states, in a manner that simulation does not reproduce. The pair is therefore
 a genuine low-variance summary of how large a season was, and for that same reason a
@@ -1749,8 +1796,17 @@ ablation confirmed it.
 What generalises beyond this dataset is the shape of the question. A heavy tail does
 not render epidemics unpredictable; it bounds how well the magnitude of the largest
 event can be estimated from second moments, and it leaves the probability of exceeding
-any level fully specified. The exponent is worth reporting. It is worth reporting as
-a risk curve, with its lower bound, and not as a predictor.
+any level fully specified.
+
+Which of the two exponents carries that statement is part of the result rather than a
+matter of notation. $\alpha_W$, the exponent of the weekly count, is the one that
+looks like a verdict: it sits at $1.95$ in the pooled series and at $2.07$ within
+single seasons --- close enough to two to be read as the usual finding --- but at
+those constructions the lower bound has collapsed to two cases, so the fitted law
+describes counts of one and two, and the exceedance curve attached to that pair says
+nothing about the risk of a large season. $\alpha_S$, the exponent of the epidemic
+size, is the one worth reporting, and it is worth reporting as a risk curve, with its
+lower bound, and not as a predictor.
 
 \bibliographystyle{apalike}
 \bibliography{refs}
