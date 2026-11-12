@@ -1091,6 +1091,29 @@ and attribution for the municipal classifier. The calibration panel is the
 relevant one: a classifier useful for planning must track the diagonal in the
 upper deciles, not merely rank well on average.
 
+Attribution needs its own reading, and Figure~\ref{fig:importance} is easy to
+misread as a list of failures. 11 of the 16 individual predictors have a negative
+median permutation: permuting them \emph{lowers} the Brier score. The three most
+detrimental are $x_{\min,t-1}$, the peak week $P_{t-1}$ and the previous total
+$S_{t-1}$, with medians of $-0.087$, $-0.047$ and $-0.036$, all three negative in
+every origin. This is a statement about redundancy rather than about irrelevance,
+and the three that lead the list are the three that overlap most: each of them
+stands close to a restatement of the previous season's curve. A permutation
+replaces one column with its own marginal distribution and leaves its correlated
+partners in place, so
+what it destroys is the combination the classifier had learned; a column that
+duplicates information held elsewhere therefore reads as harmful when the
+duplicate is removed. The figure makes the opposite point from the other side:
+the scaling block permuted as a single unit raises the Brier score in five of
+five origins, by a median of $+0.049$ (range $0.035$ to $0.065$). Block and
+member disagree, and correctly. That the block carries information when destroyed
+does not make it an increment when added, and the ladder in
+Table~\ref{tab:exceed} is the test that settles the question: adding it to M2
+moves the Brier score by a median of
+$+0.002$, with an interval excluding zero in one origin of five. Redundancy with
+$S_{t-1}$ reconciles the two readings, and it is the coupling of
+Section~\ref{sec:coupling} seen from a third direction.
+
 \input{generated/tab_exceed}
 
 \begin{figure}[htbp]
@@ -1162,6 +1185,29 @@ coupling predicts. Both statistics are functions of the magnitude of the previou
 season, so that the block is at best a second and noisier copy of $S_{t-1}$; the
 ablation shows that the copy carries no usable increment, which leaves the upper
 quantile where it was rather than displacing it in either direction.
+
+\input{generated/tab_regression}
+
+A skill score is a ratio and hides magnitude: it says that a rung is no better
+than persistence without saying whether the miss is a hundred cases or a hundred
+thousand. Table~\ref{tab:regression} measures the same forecasts on the case
+scale, at the same loss. At $\tau=0.5$ the median forecast misses an annual total
+by a median of $44{,}471$ cases under M1 and $54{,}242$ under M3, against
+$64{,}089$ for calibrated persistence, and the corresponding median root mean
+squared errors are $111{,}884$, $100{,}872$ and $117{,}728$. The scale-free
+measure is harsher. MASE divides each absolute error by the mean absolute
+one-step error the same unit showed in training, so a value above one means the
+forecast is worse than carrying the previous season's count forward unchanged.
+The best rung on that measure is M2, at $1.12$, and the MASE exceeds one in 4 of
+the 5 origins for every rung. The ladder beats the naive rule only in isolated
+cells, 2021 for M1 at $0.72$ and 2025 for M2 at $0.68$.
+
+The levels also show what a pooled average would hide. In the record season the
+median absolute error runs from $2.99\times10^{5}$ to $3.28\times10^{5}$ cases
+across the four rungs, against $1.52\times10^{4}$ to $6.71\times10^{4}$ in the 3
+origins before it. The ratio in Table~\ref{tab:ablation_results} and the levels
+here are the same finding read from either end: the ladder does not separate the
+rungs, and it does not approach a usable error at any of them.
 
 Two origins dominate the size target and require separate treatment. The 2024
 season was the largest on record and 2025 fell back sharply; persistence
@@ -1253,13 +1299,32 @@ at the top of the size distribution. The dashed vertical line marks
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig15_pred_map}
-\caption{Out-of-sample forecasts of epidemic size by state for one forecast
-origin, in the form in which a surveillance service reads them. The map shows the
-median quantile forecast of annual cases; the legend is truncated at the 95th
-percentile of the plotted values so that the largest states do not flatten the
-colour scale for the remainder.}
+\caption{The forecast read as a risk map, for the record season and the M3 rung
+of Table~\ref{tab:exceed}. Panel (a) classes each municipality by the predicted
+probability that its season exceeds the 75th percentile of its own history, in
+quintiles of that probability; panel (b) gives the realisation of the same
+event. Panel (c) confronts the two by quintile of the prediction: bars are the
+mean predicted probability, dots the observed share, and the dotted and dashed
+rules their overall means. The ranking survives --- the observed share rises
+from $0.51$ in the lowest quintile to $0.82$ in the fourth and settles at $0.80$
+in the fifth --- but the level does not: the prediction sits between $0.15$ and
+$0.27$ below the observed share in every quintile, with an overall mean of
+$0.47$ against an observed $0.70$. A reader who took the classes as frequencies
+would therefore under-alert everywhere. Municipalities without the five seasons
+of history needed to define their own threshold carry no forecast and are drawn
+in grey.}
 \label{fig:map}
 \end{figure}
+
+A probability map with no observed counterpart cannot be checked, so
+Figure~\ref{fig:map} carries both the prediction for the record season and its
+realisation. What the two panels separate are the properties the area under the
+curve averages together: within the season the ordering of the municipalities is
+informative, and the level of the probabilities is not, because every quintile
+under-predicts a season that no model trained on earlier ones could have placed
+at its realised base rate. A map of this kind is therefore usable as a ranking of
+municipalities for attention within a season, and unusable as a forecast of how
+many alerts a season will generate.
 
 \section{Discussion}
 \label{sec:discussion}

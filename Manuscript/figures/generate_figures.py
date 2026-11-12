@@ -12,7 +12,7 @@ drawn. Predictive figures (10-15) retrain the models described in the Methods;
 their numbers therefore move when the database is refreshed, and the figures
 should be regenerated after every data update.
 
-Three exceptions, deliberately. Figures 11, 12 and 13 are *read* from
+Four exceptions, deliberately. Figures 11, 12, 13 and 15 are *read* from
 artefacts, not recomputed here:
 
 * Figure 11 reads ``ablation_results.csv`` / ``.meta.json`` from
@@ -27,6 +27,10 @@ artefacts, not recomputed here:
   reference reaches AUC 0.94 against 0.96 for the full model -- so the ROC
   panel was reporting the ability to tell a large municipality from a small
   one. ``_load_classifier`` refuses such an artefact instead of drawing it.
+* Figure 15 (the risk map) refitted its own classifier the same way, so its
+  colours could disagree with the rung the tables report. It now reads the
+  out-of-fold predictions, which also supplies the realised outcome -- the
+  comparison that makes a probability map checkable.
 
 A figure that is a view of the same artefact cannot disagree with it.
 """
@@ -1242,62 +1246,126 @@ def fig14(oof):
 # ---------------------------------------------------------------------------
 # Fig 15 -- predicted-probability map for one forecast origin
 # ---------------------------------------------------------------------------
-def fig15():
-    """Map of the predicted probability of a large season, one origin.
+def fig15(clf):
+    """The risk map against its realisation, for the record season.
 
-    The classifier is the one the ablation reports (``run_ablation.make_classifier``
-    with its default), on the M3 feature set. It used to be a separate XGBoost
-    fit with its own feature list, which is the same defect the ablation
-    figures had: a second, undeclared experiment drawn as if it were a view of
-    the first.
+    Predicted probability alone is unfalsifiable on a page: a reader cannot tell
+    a map that ranked the country correctly from one that produced a plausible
+    gradient, and the two differ exactly where surveillance decisions are made.
+    So the map pair is drawn with the outcome beside it and the agreement
+    quantified, which is what turns the panel from an illustration into a
+    measurement.
+
+    The origin is the season in which the largest share of municipalities
+    exceeded their own upper quartile, not a fixed year: the figure follows the
+    data rather than a constant.
+
+    This used to refit its own classifier -- a second, undeclared experiment
+    drawn as if it were a view of the first, which is the defect figures 11 to
+    13 already lost. It now reads the out-of-fold artefact, so the map cannot
+    disagree with Table 4.
     """
-    from run_ablation import (
-        CLIMATE_BLOCK, COVARIATE_DUR, COVARIATE_PEAK, DEMO, EPI,
-        LAGGED_SIZE, SCALING_SIZE, make_classifier,
-    )
+    oof = clf["oof"]
+    rate_by_origin = oof.groupby("origin")["y_true"].mean()
+    origin = int(rate_by_origin.idxmax())
+    rungs = set(oof["rung"].dropna())
+    rung = "M3" if "M3" in rungs else sorted(rungs)[-1]
+    s = oof[(oof["rung"] == rung) & (oof["origin"] == origin)][
+        ["unit", "y_true", "y_prob"]].copy()
+    if s.empty:
+        raise RuntimeError(
+            f"classifier_results.parquet holds no {rung} rows for origin "
+            f"{origin}; nothing to map")
 
-    df = _city_panel()
-    feats = (LAGGED_SIZE + COVARIATE_DUR + COVARIATE_PEAK + EPI + DEMO
-             + list(CLIMATE_BLOCK) + SCALING_SIZE + ["log_pop"])
-    m3 = [c for c in feats if c in df.columns and not df[c].isnull().all()]
-    train = df[df["year"] < 2024].dropna(subset=m3 + ["total_cases"])
-    y = (train["total_cases"] > train["total_cases"].quantile(0.75)).astype(int)
-    clf = make_classifier()
-    clf.fit(train[m3], y)
-    test = df[df["year"] == 2024].copy()
-    test_ok = test.dropna(subset=m3)
-    prob = clf.predict_proba(test_ok[m3])[:, 1]
-    test_ok["prob"] = prob
+    s["q"] = pd.qcut(s["y_prob"], 5, labels=False, duplicates="drop")
+    agree = (s.groupby("q").agg(n=("y_true", "size"),
+                                observed=("y_true", "mean"),
+                                predicted=("y_prob", "mean")).sort_index())
 
     gdf = gpd.read_file("muni_br.gpkg")
     gdf["code_muni"] = gdf["code_muni"].astype(int)
-    merged = gdf[["code_muni", "abbrev_state", "geometry"]].merge(
-        test_ok[["geocode", "prob"]], left_on="code_muni",
-        right_on="geocode", how="left")
-    q = [0, 0.2, 0.4, 0.6, 0.8, 1.0]
-    cats = np.where(merged["prob"].notna(),
-                    np.digitize(merged["prob"], merged["prob"].quantile([.2, .4, .6, .8])), -1)
-    from matplotlib.colors import ListedColormap
+    merged = gdf[["code_muni", "geometry"]].merge(
+        s, left_on="code_muni", right_on="unit", how="left")
+    unmatched = int(merged["q"].isna().sum() - (len(gdf) - len(s)))
+    if unmatched > 0:
+        warnings.warn(f"{unmatched} forecast unit(s) have no polygon in "
+                      "muni_br.gpkg and are absent from the map", stacklevel=2)
 
-    cmap = ListedColormap(["#f7f4f9", "#e7e1ef", "#d4b9da", "#c994c7",
-                           "#df65b0", "#dd1c77"])
-    fig, ax = plt.subplots(figsize=(6.4, 6.0))
-    merged.plot(column=cats, cmap=cmap, ax=ax, linewidth=0.05, edgecolor="0.4",
-                missing_kwds={"color": "#d0d0d0", "label": "no forecast"},
-                categorical=True, legend=False)
-    sm = plt.cm.ScalarMappable(cmap=cmap,
-                               norm=mpl.colors.BoundaryNorm(range(6), 6))
-    cbar = fig.colorbar(sm, ax=ax, shrink=0.55, ticks=range(6))
-    cbar.ax.set_yticklabels(["lowest 20%", "", "middle", "", "highest 20%", ""],
-                            fontsize=8)
-    ax.set_title("predicted probability of a large 2024 season\n"
-                 "(exceeds own 75th percentile; quintile classes; grey = no forecast)",
-                 fontsize=9)
-    ax.set_axis_off()
-    fig.tight_layout()
+    palette = ["#f4f0f7", "#ddd0e6", "#bfa3d3", "#9663b7", "#5b1a7a"]
+    cls = merged["q"].astype(float)
+
+    fig = plt.figure(figsize=(11.0, 4.5))
+    gs = fig.add_gridspec(2, 3, width_ratios=[1, 1, 0.95],
+                          height_ratios=[1, 0.05], wspace=0.13, hspace=0.28)
+    ax_a = fig.add_subplot(gs[0, 0])
+    ax_b = fig.add_subplot(gs[0, 1])
+    ax_c = fig.add_subplot(gs[0, 2])
+    cax = fig.add_subplot(gs[1, 0])
+
+    merged.plot(column=cls, cmap=mpl.colors.ListedColormap(palette),
+                norm=mpl.colors.BoundaryNorm(range(6), 5), ax=ax_a,
+                linewidth=0.03, edgecolor="0.55",
+                missing_kwds={"color": "#efefef"})
+    ax_a.set_title(f"(a) predicted probability, {origin} season", fontsize=8)
+    ax_a.set_axis_off()
+    sm = plt.cm.ScalarMappable(cmap=mpl.colors.ListedColormap(palette),
+                              norm=mpl.colors.BoundaryNorm(range(6), 5))
+    cb = fig.colorbar(sm, cax=cax, orientation="horizontal", ticks=[0.5, 4.5])
+    cb.ax.set_xticklabels(["lowest\nquintile", "highest\nquintile"], fontsize=6.5)
+    cb.outline.set_visible(False)
+
+    observed = merged["y_true"].astype(float)
+    merged.plot(column=observed, cmap=mpl.colors.ListedColormap(["#cfe8cf", "#1b5e20"]),
+                norm=mpl.colors.BoundaryNorm([-0.5, 0.5, 1.5], 2), ax=ax_b,
+                linewidth=0.03, edgecolor="0.55",
+                missing_kwds={"color": "#efefef"})
+    ax_b.set_title(f"(b) observed: above its own Q75?", fontsize=8)
+    ax_b.set_axis_off()
+
+    x = np.arange(len(agree))
+    ax_c.bar(x, agree["predicted"], width=0.55, color="#9663b7", alpha=0.8,
+             label="mean predicted")
+    ax_c.plot(x, agree["observed"], "o", color="#1b5e20", ms=6.0,
+              label="observed share")
+    ax_c.axhline(s["y_true"].mean(), ls="--", lw=1.0, color="#1b5e20")
+    ax_c.axhline(s["y_prob"].mean(), ls=":", lw=1.0, color="#5b1a7a")
+    ax_c.set_xticks(x)
+    ax_c.set_xticklabels([f"Q{i + 1}" for i in x], fontsize=7.5)
+    ax_c.set_ylim(0, 1.0)
+    ax_c.set_ylabel("probability", fontsize=7.5)
+    ax_c.tick_params(labelsize=7)
+    ax_c.set_title("(c) agreement by predicted quintile", fontsize=8)
+    ax_c.legend(fontsize=6.5, loc="upper left", frameon=False)
+    for xi, (n_i, obs_i) in enumerate(zip(agree["n"], agree["observed"])):
+        ax_c.annotate(f"{obs_i:.2f}", (xi, obs_i), textcoords="offset points",
+                      xytext=(0, 5), ha="center", fontsize=6.5, color="#1b5e20")
+
     fig.savefig(OUT / "fig15_pred_map.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig15_pred_map.png", bbox_inches="tight")
     plt.close(fig)
+
+    # The sidecar is what lets the design gate tell a committed image drawn by
+    # this code from one that merely has the right name. It also records the two
+    # choices the figure makes -- which origin and which rung -- so that a
+    # caption cannot describe a selection nobody has drawn.
+    height, width = plt.imread(OUT / "fig15_pred_map.png").shape[:2]
+    sidecar = {
+        "figure": "fig15_pred_map",
+        "level": "city",
+        "origin": int(origin),
+        "origin_rule": (
+            "the forecast origin in which the largest share of municipalities "
+            "exceeded the 75th percentile of their own history -- the record "
+            "season -- rather than a fixed year, so that the figure follows the "
+            "data instead of freezing on one origin"
+        ),
+        "rung": rung,
+        "n_units": int(len(s)),
+        "panels": ["predicted probability quintiles", "realised outcome",
+                   "agreement by predicted quintile"],
+        "png_shape": [int(width), int(height)],
+    }
+    (OUT / "fig15_map.json").write_text(json.dumps(sidecar, indent=2) + "\n")
 
 
 def main(which=None):
@@ -1330,7 +1398,7 @@ def main(which=None):
 
     # figs 12 and 13 read the classifier artefacts written by run_classifier.py.
     clf = None
-    if {"fig12", "fig13"} & set(todo):
+    if {"fig12", "fig13", "fig15"} & set(todo):
         clf = _load_classifier()
         print(f"[fig12/13] reading {clf['path'].name} "
               f"({len(clf['oof'])} OOF rows, "
@@ -1343,7 +1411,7 @@ def main(which=None):
         print(f"[{name}] generating...", flush=True)
         if name == "fig11":
             everything[name](abl)
-        elif name in ("fig12", "fig13"):
+        elif name in ("fig12", "fig13", "fig15"):
             everything[name](clf)
         elif name == "fig14":
             everything[name](oof)

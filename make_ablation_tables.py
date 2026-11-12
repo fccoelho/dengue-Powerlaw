@@ -128,6 +128,21 @@ SOURCES = {
         "what": "municipal-level out-of-fold classifier metrics",
         "design": ("classifier_model",),
     },
+    "classifier_oof": {
+        "path": "classifier_results.parquet",
+        "meta": "classifier_results.meta.json",
+        "columns": ("origin", "rung", "unit", "y_true", "y_prob"),
+        "what": "municipal-level out-of-fold predictions",
+        "design": ("classifier_model",),
+    },
+    "classifier_importance": {
+        "path": "classifier_results_importance.csv",
+        "meta": "classifier_results.meta.json",
+        "columns": ("origin", "rung", "feature", "importance"),
+        "values": {"rung": ("M3",)},
+        "what": "held-out permutation importance of the municipal classifier",
+        "design": ("classifier_model",),
+    },
 }
 
 
@@ -145,6 +160,20 @@ def _num(x: float, d: int = 2) -> str:
     return f"{float(x):.{d}f}"
 
 
+def _cases(x: float) -> str:
+    """Case count with a LaTeX thousands separator, e.g. ``44{,}471``."""
+    return f"{float(x):,.0f}".replace(",", "{,}")
+
+
+def _sci(x: float) -> str:
+    """Compact power-of-ten literal for LaTeX, e.g. ``$2.99\\times10^{5}$``."""
+    x = float(x)
+    if not np.isfinite(x) or x == 0:
+        return "$0$"
+    e = int(np.floor(np.log10(abs(x))))
+    return f"${x / 10 ** e:.2f}\\times10^{{{e}}}$"
+
+
 def _load(name: str, root: str = ".") -> tuple[pd.DataFrame | None, dict, str | None]:
     """Load one artefact. Returns ``(df, meta, problem)``; df is None if absent."""
     spec = SOURCES[name]
@@ -152,7 +181,8 @@ def _load(name: str, root: str = ".") -> tuple[pd.DataFrame | None, dict, str | 
     if not os.path.exists(path):
         return None, {}, f"{spec['path']} absent ({spec['what']})"
     try:
-        df = pd.read_csv(path)
+        # The out-of-fold predictions are a parquet; everything else is csv.
+        df = pd.read_parquet(path) if path.endswith(".parquet") else pd.read_csv(path)
     except Exception as e:  # noqa: BLE001
         return None, {}, f"{spec['path']} unreadable: {e}"
     miss = [c for c in spec["columns"] if c not in df.columns]
@@ -279,6 +309,58 @@ def compute_facts(root: str = ".") -> dict:
         }
         facts["size"]["contrasts"] = _contrast_summary(df, "size", PRIMARY_TAU)
 
+        # Absolute error of the same forecasts. Table 3 compares the rungs as a
+        # ratio against persistence, which is the right scale for ranking them
+        # and the wrong one for asking how large the miss is. These are the
+        # case-scale errors, plus MASE, whose denominator is the mean absolute
+        # one-step error the same unit showed in *training*: a value above one
+        # therefore reads as "worse than carrying the previous count forward
+        # unchanged", which is the only form comparable across units whose
+        # counts differ by orders of magnitude.
+        lr = df[(df["record_type"] == "loss") & (df["task"] == "size")
+                & np.isclose(df["tau"].astype(float), PRIMARY_TAU)]
+        absolute: dict = {}
+        for loss in ("mae", "rmse", "mase"):
+            sub = lr[lr["loss"] == loss]
+            if sub.empty:
+                continue
+            piv = sub.pivot_table(index="origin", columns="rung", values="value")
+            piv = piv.reindex(columns=[c for c in ("M0", "M1", "M2", "M3")
+                                       if c in piv.columns])
+            entry = {
+                "by_origin": {str(int(o)): {r: float(v) for r, v in row.items()
+                                            if pd.notna(v)}
+                              for o, row in piv.iterrows()},
+                "median": {r: float(piv[r].median()) for r in piv.columns},
+                "n_origins": int(piv.notna().any(axis=1).sum()),
+            }
+            if loss == "mase":
+                entry["n_above_one"] = {r: int((piv[r] > 1).sum())
+                                        for r in piv.columns}
+            absolute[loss] = entry
+        if "mae" in absolute:
+            # The record origin is whichever carries the largest mean error
+            # across rungs. Deriving it rather than writing "2024" keeps the
+            # comparison attached to the data if the series is extended.
+            mae_bo = absolute["mae"]["by_origin"]
+            mean_by_origin = {o: float(np.mean(list(v.values())))
+                              for o, v in mae_bo.items()}
+            record = max(mean_by_origin, key=mean_by_origin.get)
+            earlier = [o for o in mae_bo if int(o) < int(record)]
+            absolute["mae"]["record"] = {
+                "origin": record,
+                "min": min(mae_bo[record].values()),
+                "max": max(mae_bo[record].values()),
+            }
+            if earlier:
+                absolute["mae"]["before_record"] = {
+                    "origins": sorted(earlier),
+                    "min": min(min(mae_bo[o].values()) for o in earlier),
+                    "max": max(max(mae_bo[o].values()) for o in earlier),
+                }
+        if absolute:
+            facts["size"]["absolute"] = absolute
+
         # The quantile grid, for the extreme-tail claim.
         c = df[(df["record_type"] == "contrast") & (df["task"] == "size")
                & (df["contrast"] == "M3-M2") & (df["loss"] == "pinball")]
@@ -404,6 +486,60 @@ def compute_facts(root: str = ".") -> dict:
                     f"{facts['classifier']['auc_median']['M3']:.3f} "
                     f"(classifier_results); the manuscript quotes the first and "
                     f"figure 12 draws the second")
+
+    # ---- Predicted-versus-observed agreement, the map's own numbers -------
+    odf, _ometa, _ = _load("classifier_oof", root)
+    if odf is not None and facts["sources"]["classifier_oof"]["present"]:
+        # The map draws one origin. It is the origin in which the largest share
+        # of municipalities exceeded their own upper quartile -- the record
+        # season -- rather than a fixed year, so that extending the series moves
+        # the figure instead of freezing it on 2024.
+        rate = odf.groupby("origin")["y_true"].mean()
+        origin = int(rate.idxmax())
+        rungs = set(odf["rung"].dropna())
+        rung = "M3" if "M3" in rungs else sorted(rungs)[-1]
+        s = odf[(odf["rung"] == rung) & (odf["origin"] == origin)].copy()
+        if len(s) > 5 and s["y_prob"].nunique() > 5:
+            s["q"] = pd.qcut(s["y_prob"], 5, labels=False, duplicates="drop")
+            g = (s.groupby("q").agg(observed=("y_true", "mean"),
+                                    predicted=("y_prob", "mean"))
+                 .sort_index())
+            gap = g["predicted"] - g["observed"]
+            facts["map_agreement"] = {
+                "origin": str(origin), "rung": rung, "n_units": int(len(s)),
+                "observed_rate": float(s["y_true"].mean()),
+                "predicted_mean": float(s["y_prob"].mean()),
+                "first": float(g["observed"].iloc[0]),
+                "fourth": float(g["observed"].iloc[len(g) - 2]),
+                "last": float(g["observed"].iloc[-1]),
+                "gap_min": float(gap.min()), "gap_max": float(gap.max()),
+            }
+
+    # ---- Permutation importance behind figure 10 -------------------------
+    idf, _imeta, _ = _load("classifier_importance", root)
+    if idf is not None and facts["sources"]["classifier_importance"]["present"]:
+        agg = (idf.groupby("feature")["importance"]
+                  .agg(median="median",
+                       n_positive=lambda s: int((s > 0).sum()),
+                       n_origins="size"))
+        indiv = agg.drop(index="SCALING_BLOCK", errors="ignore")
+        block_rows = idf[idf["feature"] == "SCALING_BLOCK"]["importance"]
+        facts["importance"] = {
+            "n_features": int(len(indiv)),
+            "n_negative": int((indiv["median"] < 0).sum()),
+            "worst": [
+                {"feature": f, "median": float(r["median"]),
+                 "n_positive": int(r["n_positive"])}
+                for f, r in indiv.sort_values("median").head(3).iterrows()
+            ],
+            "block": ({
+                "median": float(block_rows.median()),
+                "min": float(block_rows.min()),
+                "max": float(block_rows.max()),
+                "n_positive": int((block_rows > 0).sum()),
+                "n_origins": int(len(block_rows)),
+            } if not block_rows.empty else None),
+        }
 
     # ---- Fallback: municipal block from the fresh classifier artefact ----
     # The exceedance ablation carries the bootstrap intervals and therefore the
@@ -575,7 +711,92 @@ def render_exceed_table(f: dict) -> str:
     )
 
 
+
+def render_regression_table(f: dict) -> str:
+    """LaTeX float for the absolute error of the size forecast.
+
+    Table 3 ranks the rungs by a ratio against persistence and says nothing
+    about magnitude: a skill of zero is compatible with a miss of a thousand
+    cases or of three hundred thousand. This is the same forecast measured on
+    the case scale, with MASE beside it so that the reader can see where the
+    ladder falls relative to doing nothing.
+    """
+    ab = (f.get("size") or {}).get("absolute") or {}
+    if "mae" not in ab or "mase" not in ab:
+        prob = (f.get("sources", {}).get("state_size") or {}).get("problem")
+        raise ValueError(
+            "ablation_results.csv carries no absolute-error rows (mae/rmse/mase "
+            "at tau=0.5); cannot render the absolute table\n"
+            f"    ablation_results.csv: {prob or 'absent'}\n"
+            "    regenerate with: python run_ablation.py --level state "
+            "--attach-climate --force")
+
+    origins = sorted(ab["mae"]["by_origin"], key=int)
+    rungs = [r for r in ("M0", "M1", "M2", "M3") if r in ab["mae"]["median"]]
+    span = len(rungs) + 1
+    rule = r"\\"                      # LaTeX row terminator
+    head = "Origin & " + " & ".join(rungs) + " " + rule
+
+    def block_title(label: str) -> str:
+        return (r"\multicolumn{%d}{@{}l}{\emph{%s}}%s"
+                % (span, label, rule))
+
+    def rows(loss: str, fmt) -> list[str]:
+        out = []
+        for o in origins:
+            cells = [fmt(ab[loss]["by_origin"].get(o, {}).get(r)) for r in rungs]
+            out.append(o + " & " + " & ".join(cells) + " " + rule)
+        out.append(r"\addlinespace")
+        out.append("median & "
+                   + " & ".join(fmt(ab[loss]["median"].get(r)) for r in rungs)
+                   + " " + rule)
+        return out
+
+    body = [
+        "% GENERATED by make_ablation_tables.py from ablation_results.csv "
+        "-- do not edit.\n% Regenerate with: python make_ablation_tables.py",
+        r"\begin{table}[htbp]", r"\centering", r"\small",
+        r"\setlength{\tabcolsep}{5pt}",
+    ]
+    body.append(
+        "\\caption{Absolute out-of-sample error of the size forecast, state "
+        "level,\nfive forecast origins, at $\\tau=0.5$. Upper block: median "
+        "absolute error\nin cases. Lower block: MASE, the same error divided by "
+        "the mean absolute\none-step error the unit showed in training, so that "
+        "a value above one\nmeans the forecast is worse than carrying the "
+        "previous season's count\nforward unchanged. The last two rows of the "
+        "lower block give the median\nMASE and the number of origins in which it "
+        "exceeds one. The ratios these\nerrors produce against persistence are "
+        "in Table~\\ref{tab:ablation_results}.}"
+    )
+    body.append(r"\label{tab:regression}")
+    body.append(r"\begin{tabular}{@{}l" + "r" * len(rungs) + r"@{}}")
+    body.append(r"\toprule")
+    body.append(block_title("MAE, cases"))
+    body.append(r"\addlinespace")
+    body.append(head)
+    body.append(r"\midrule")
+    body += rows("mae", lambda v: _cases(v) if v is not None else "--")
+    body.append(r"\midrule")
+    body.append(block_title("MASE, scaled by the naive within-unit error"))
+    body.append(r"\addlinespace")
+    body.append(head)
+    body.append(r"\midrule")
+    body += rows("mase", lambda v: f"{v:.2f}" if v is not None else "--")
+    up = ab["mase"].get("n_above_one") or {}
+    if up:
+        body.append(r"\addlinespace")
+        body.append("origins with MASE $>1$ & "
+                    + " & ".join(f"{up[r]} of {len(origins)}" for r in rungs
+                                 if r in up) + " " + rule)
+    body.append(r"\bottomrule")
+    body.append(r"\end{tabular}")
+    body.append(r"\end{table}")
+    return "\n".join(body) + "\n"
+
+
 # ------------------------------------------------------------------- claims
+
 
 def claims(f: dict) -> list[dict]:
     """Prose statements the artefacts must satisfy.
@@ -746,6 +967,97 @@ def claims(f: dict) -> list[dict]:
              "want": "training base rate of 26.4\\%", "stale": [],
              "needs": "train_prevalence"})
 
+    # Absolute error of the size forecast. Table 3 is a ratio and these are the
+    # levels; both are read from the same loss rows, so a drift in either shows
+    # up here rather than in a reader's arithmetic.
+    ab = (f.get("size") or {}).get("absolute") or {}
+    mae, rmse, mase = ab.get("mae"), ab.get("rmse"), ab.get("mase")
+    if mae and mase:
+        m, ms = mae["median"], mase["median"]
+        up = mase.get("n_above_one") or {}
+        out += [
+            {"name": "median MAE of the size forecast",
+             "want": f"${_cases(m['M1'])}$ cases under M1 and "
+                     f"${_cases(m['M3'])}$ under M3",
+             "stale": [], "needs": "state_size"},
+            {"name": "median MAE of calibrated persistence",
+             "want": f"against ${_cases(m['M0'])}$ for calibrated persistence",
+             "stale": [], "needs": "state_size"},
+            {"name": "median MASE of the best rung",
+             "want": f"The best rung on that measure is M2, at ${ms['M2']:.2f}$",
+             "stale": [], "needs": "state_size"},
+            {"name": "origins where MASE exceeds one",
+             # Every rung clears the naive benchmark in the same number of
+             # origins; if a refit ever breaks that, the sentence has to change
+             # rather than silently describe four rungs with one number.
+             "want": (f"exceeds one in {min(up.values())} of the "
+                      f"{mase['n_origins']} origins for every rung"
+                      if len(set(up.values())) == 1
+                      else f"exceeds one in {min(up.values())} to "
+                           f"{max(up.values())} of the {mase['n_origins']} origins"),
+             "stale": [], "needs": "state_size"},
+        ]
+        rec, aft = mae.get("record") or {}, mae.get("before_record") or {}
+        if rec:
+            out.append(
+                {"name": "MAE in the record season",
+                 "want": f"runs from {_sci(rec['min'])} to {_sci(rec['max'])} cases",
+                 "stale": [], "needs": "state_size"})
+        if aft:
+            out.append(
+                {"name": "MAE in the origins before the record",
+                 "want": (f"against {_sci(aft['min'])} to {_sci(aft['max'])} in "
+                          f"the {len(aft['origins'])} origins before it"),
+                 "stale": [], "needs": "state_size"})
+    if rmse:
+        r = rmse["median"]
+        out.append(
+            {"name": "median RMSE ladder",
+             "want": (f"${_cases(r['M1'])}$, ${_cases(r['M3'])}$ and "
+                      f"${_cases(r['M0'])}$"),
+             "stale": [], "needs": "state_size"})
+
+    # What the classifier is using. Permutation importance answers a different
+    # question from the ablation -- how much a predictor is *relied on*, not how
+    # much it *adds* -- and the two numbers are quoted together, so both are
+    # derived here to keep the contrast attached to the artefacts.
+    imp = f.get("importance") or {}
+    if imp.get("block") and imp.get("worst"):
+        b, w = imp["block"], imp["worst"]
+        out += [
+            {"name": "predictors with negative permutation importance",
+             "want": (f"{imp['n_negative']} of the {imp['n_features']} individual "
+                      f"predictors have a negative median permutation"),
+             "stale": [], "needs": "classifier_importance"},
+            {"name": "the most detrimental predictors",
+             "want": (f"${w[0]['median']:.3f}$, ${w[1]['median']:.3f}$ and "
+                      f"${w[2]['median']:.3f}$"),
+             "stale": [], "needs": "classifier_importance"},
+            {"name": "joint scaling block importance",
+             "want": (f"by a median of ${b['median']:+.3f}$ (range "
+                      f"${b['min']:.3f}$ to ${b['max']:.3f}$)"),
+             "stale": [], "needs": "classifier_importance"},
+        ]
+
+    # The map's own numbers: predicted quintile against the realised outcome.
+    ma = f.get("map_agreement") or {}
+    if ma:
+        out += [
+            {"name": "realised exceedance by predicted quintile",
+             "want": (f"rises from ${ma['first']:.2f}$ in the lowest quintile to "
+                      f"${ma['fourth']:.2f}$ in the fourth and settles at "
+                      f"${ma['last']:.2f}$ in the fifth"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "level gap of the map prediction",
+             "want": (f"between ${abs(ma['gap_max']):.2f}$ and "
+                      f"${abs(ma['gap_min']):.2f}$ below the observed share"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "overall means of the map",
+             "want": (f"${ma['predicted_mean']:.2f}$ against an observed "
+                      f"${ma['observed_rate']:.2f}$"),
+             "stale": [], "needs": "classifier_oof"},
+        ]
+
     for o in out:
         if o["needs"] == "train_prevalence":
             o["available"] = "train_prevalence" in (
@@ -881,7 +1193,8 @@ def main(argv=None) -> int:
     # nothing would say so.
     rendered = {}
     for name, fn in (("tab_ablation.tex", render_ablation_table),
-                     ("tab_exceed.tex", render_exceed_table)):
+                     ("tab_exceed.tex", render_exceed_table),
+                     ("tab_regression.tex", render_regression_table)):
         try:
             rendered[name] = fn(f)
         except ValueError as e:
