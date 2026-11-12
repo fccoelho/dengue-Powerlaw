@@ -238,28 +238,24 @@ def create_dashboard():
                 gr.Markdown("""
                 **Model Equation:**
 
-                $$Y_t = f(X_{t-1})$$
+                $$Q_{\\tau}(Y_t \\mid X_{t-1}) = f(X_{t-1})$$
                 """)
                 gr.Markdown(
                     r"""
-                > **Tip**: For improved accuracy, we recommend incorporating climate data (e.g., ERA5 temperature/precipitation) from the [Mosqlimate](https://mosqlimate.org) platform.
+                > **Estimator**: quantile regression on a cubic spline basis with linear
+                boundary extrapolation (Koenker & Bassett 1978), fitted on the
+                $\log(1+S)$ scale -- so outside the observed range the boundary
+                segment continues linearly, which is a multiplicative extrapolation
+                on the case scale. Minimises the pinball loss at the chosen
+                quantile level $\tau$.
 
+                **Target Variable ($Y_t$):**
 
+                $S_t$: Epidemic Size (Total Cases) -- the only target.
 
+                **Predictors ($X_{t-1}$), all measured in year $t-1$:**
 
-                where $f$ is the selected regression model (Random Forest, LightGBM, or HistGradientBoosting).
-
-                **Target Variables ($Y_t$):**
-
-                $S_t$: Epidemic Size (Total Cases)
-                
-                $D_t$: Epidemic Duration (Weeks)
-                
-                $P_t$: Peak Week
-                
-                **Features ($X_{t-1}$):**
-
-                1. **Lagged Epidemic Metrics**: $S_{t-1}, D_{t-1}, P_{t-1}$
+                1. **Lagged Epidemic Metrics**: $S_{t-1}$ (size), $D_{t-1}$ (epidemic duration, weeks), $P_{t-1}$ (peak week)
                 2. **Scaling Factors**: $\alpha_{S, t-1}, x_{min, S, t-1}$ (Power Law fit for Size)
                 3. **Historical Trend**: $\dot{\alpha}_{S, t-1}$ (Slope of alpha over past years)
                 4. **Epidemiological Driver**: $R_{0, t-1}$ (Lagged Basic Reproduction Number)
@@ -295,11 +291,9 @@ def create_dashboard():
 
                         pred_model_type = gr.Dropdown(
                             choices=[
-                                ("Random Forest", "random_forest"),
-                                ("LightGBM (Quantile)", "lightgbm_quantile"),
-                                ("HistGradientBoosting (Quantile)", "hist_gradient_boosting_quantile"),
+                                ("Quantile regression (spline basis)", "spline_quantile"),
                             ],
-                            value="random_forest",
+                            value="spline_quantile",
                             label="Model Type",
                         )
 
@@ -308,8 +302,8 @@ def create_dashboard():
                             maximum=0.95,
                             step=0.05,
                             value=0.5,
-                            label="Quantile Level (for Quantile Models)",
-                            visible=False,
+                            label="Quantile Level (τ) -- pinball loss",
+                            visible=True,
                         )
 
                         pred_min_pop = gr.Slider(
@@ -337,12 +331,6 @@ def create_dashboard():
                             pred_plot_size = gr.Plot(
                                 label="Predicted vs Actual: Total Cases (Annual)"
                             )
-                            pred_plot_dur = gr.Plot(
-                                label="Predicted vs Actual: Duration (Annual)"
-                            )
-                            pred_plot_peak = gr.Plot(
-                                label="Predicted vs Actual: Peak Week (Annual)"
-                            )
 
                         with gr.Row():
                             pred_feat_imp_plot = gr.Plot(label="Feature Importance")
@@ -359,34 +347,16 @@ def create_dashboard():
                             pred_hist_size = gr.Plot(
                                 label="Pop. Histogram: Total Cases Error > 20%"
                             )
-                            pred_hist_dur = gr.Plot(
-                                label="Pop. Histogram: Duration Error > 20%"
-                            )
-                            pred_hist_peak = gr.Plot(
-                                label="Pop. Histogram: Peak Week Error > 20%"
-                            )
 
                         gr.Markdown("### Residual Analysis")
                         with gr.Row():
                             pred_resid_size = gr.Plot(
                                 label="Residuals vs Predicted: Total Cases"
                             )
-                            pred_resid_dur = gr.Plot(
-                                label="Residuals vs Predicted: Duration"
-                            )
-                            pred_resid_peak = gr.Plot(
-                                label="Residuals vs Predicted: Peak Week"
-                            )
 
                         with gr.Row():
                             pred_resid_hist_size = gr.Plot(
                                 label="Residual Distribution: Total Cases"
-                            )
-                            pred_resid_hist_dur = gr.Plot(
-                                label="Residual Distribution: Duration"
-                            )
-                            pred_resid_hist_peak = gr.Plot(
-                                label="Residual Distribution: Peak Week"
                             )
 
             tab_binary_predictive = gr.TabItem(
@@ -552,17 +522,14 @@ def create_dashboard():
             outputs=[pred_city_dropdown],
         )
 
-        def update_quantile_visibility(model_type):
-            is_quantile = model_type in ("lightgbm_quantile", "hist_gradient_boosting_quantile")
-            return gr.update(visible=is_quantile)
-
-        pred_model_type.change(
-            fn=update_quantile_visibility,
-            inputs=[pred_model_type],
-            outputs=[pred_quantile_input],
-        )
-
         def run_prediction(region, city_str, year, model_type, quantile, min_pop):
+            """Train the manuscript's primary estimator and forecast epidemic size.
+
+            Epidemic size is the only target; previous-season epidemic duration
+            and peak week enter the model as *predictors* (covariates of the
+            coming season's magnitude), alongside the lagged size, R0, the
+            scaling block, log-population and the quarterly climate aggregates.
+            """
             try:
                 df_all = predictive_model.prepare_lagged_data(
                     region, target_year=None, level="city"
@@ -582,301 +549,163 @@ def create_dashboard():
                     )
 
                 if df_all.empty:
-                    return [
-                        go.Figure().update_layout(title="No data for training")
-                    ] * 4 + ["", "No data available for this selection.", pd.DataFrame()] + [go.Figure().update_layout(title="No data")] * 9
+                    empty = go.Figure().update_layout(title="No data for training")
+                    return (
+                        empty, empty, "No data available for this selection.",
+                        "Run prediction to see values.", pd.DataFrame(),
+                        empty, empty, empty,
+                    )
 
-                models, metrics, feature_cols, train_data, bias_correction = (
-                    predictive_model.train_predictive_models(
-                        df_all, test_year=year, model_type=model_type, quantile=quantile
+                models, metrics, feature_cols = (
+                    predictive_model.train_size_quantile_model(
+                        df_all, test_year=year, tau=quantile
                     )
                 )
 
-                val_preds = predictive_model.predict_future(
-                    models, df_all, feature_cols, bias_correction=bias_correction
+                if not models:
+                    empty = go.Figure().update_layout(
+                        title="Training failed (no usable rows)"
+                    )
+                    return (
+                        empty, empty, "Training failed: no usable rows.",
+                        "Run prediction to see values.", pd.DataFrame(),
+                        empty, empty, empty,
+                    )
+
+                est = models["total_cases"]
+                m = metrics.get("total_cases", {})
+
+                # point predictions on every panel row; the pipeline imputes
+                # missing feature medians internally
+                from run_ablation import predict_cases
+
+                y_pred = predict_cases(est, df_all[feature_cols], "total_cases")
+                y_true = df_all["total_cases"].to_numpy(dtype=float)
+
+                is_test = (df_all["year"] >= year).to_numpy()
+                is_train = ~is_test
+
+                rel_error = pd.Series(
+                    np.where(
+                        y_true > 0,
+                        np.abs(y_true - y_pred) / np.where(y_true > 0, y_true, 1),
+                        np.nan,
+                    ),
+                    index=df_all.index,
+                )
+                high_error_mask = rel_error > 0.20
+
+                # --- Predicted vs Actual (log-log: sizes span three decades) ---
+                hover = []
+                for i, row in df_all.iterrows():
+                    txt = (
+                        f"Year: {int(row['year'])} "
+                        f"({'Test' if is_test[i] else 'Train'})<br>"
+                    )
+                    if "city_name" in df_all.columns:
+                        txt += f"City: {row['city_name']} ({int(row['geocode'])})"
+                    elif "state" in df_all.columns:
+                        txt += f"State: {row['state']}"
+                    e = rel_error.loc[i]
+                    if np.isfinite(e):
+                        txt += f"<br>Error: {e * 100:.1f}%"
+                    hover.append(txt)
+
+                fig_pred = go.Figure()
+                if is_train.any():
+                    fig_pred.add_trace(go.Scatter(
+                        x=y_true[is_train],
+                        y=y_pred[is_train],
+                        mode="markers",
+                        name="Train",
+                        marker=dict(size=8, color="steelblue", opacity=0.6),
+                        hovertext=[h for h, t in zip(hover, is_train) if t],
+                        hoverinfo="text+x+y",
+                    ))
+                if is_test.any():
+                    fig_pred.add_trace(go.Scatter(
+                        x=y_true[is_test],
+                        y=y_pred[is_test],
+                        mode="markers",
+                        name="Test",
+                        marker=dict(size=10, symbol="diamond", color="darkgreen",
+                                    opacity=0.8),
+                        hovertext=[h for h, t in zip(hover, is_test) if t],
+                        hoverinfo="text+x+y",
+                    ))
+                positive = y_true > 0
+                lo = min(np.nanmin(y_true[positive]), np.nanmin(y_pred[y_pred > 0]))
+                hi = max(np.nanmax(y_true), np.nanmax(y_pred))
+                fig_pred.add_trace(go.Scatter(
+                    x=[lo, hi], y=[lo, hi], mode="lines",
+                    line=dict(dash="dash", color="gray"), name="Ideal",
+                ))
+                fig_pred.update_xaxes(type="log")
+                fig_pred.update_yaxes(type="log")
+                fig_pred.update_layout(
+                    title="Epidemic size: Actual vs Predicted (Log-Log)",
+                    xaxis_title="Actual (cases)",
+                    yaxis_title="Predicted (cases)",
+                    template="plotly_white",
                 )
 
-                plots = []
-                hist_plots = []
-                for target in ["total_cases", "ep_dur", "peak_week"]:
-                    if target not in val_preds:
-                        plots.append(
-                            go.Figure().update_layout(
-                                title=f"{target}: Model not trained (Insufficient data)"
-                            )
-                        )
-                        hist_plots.append(
-                            go.Figure().update_layout(title=f"{target}: No Error Data")
-                        )
-                        continue
+                # --- Feature importance: permutation on the held-out seasons ---
+                df_test_ok = df_all[df_all["year"] >= year].dropna(
+                    subset=["total_cases"]
+                )
+                if len(df_test_ok) >= 5:
+                    from sklearn.inspection import permutation_importance
 
-                    y_true = df_all[target]
-                    y_pred = val_preds[target]
-
-                    rel_error = np.abs(y_true - y_pred) / (y_true.replace(0, 1e-5))
-                    high_error_mask = rel_error > 0.2
-
-                    # Split into train and test for different marker shapes
-                    is_test = df_all["year"] >= year
-                    is_train = ~is_test
-
-                    fig = go.Figure()
-
-                    # Train set markers
-                    if is_train.any():
-                        train_hover = []
-                        for i, row in df_all[is_train].iterrows():
-                            txt = f"Year: {int(row['year'])} (Train)<br>"
-                            if "city_name" in df_all.columns:
-                                txt += f"City: {row['city_name']} ({int(row['geocode'])})"
-                            elif "state" in df_all.columns:
-                                txt += f"State: {row['state']}"
-                            err_val = rel_error.loc[i] * 100
-                            txt += f"<br>Error: {err_val:.1f}%"
-                            train_hover.append(txt)
-
-                        fig.add_trace(go.Scatter(
-                            x=y_true[is_train],
-                            y=y_pred[is_train],
-                            mode="markers",
-                            name="Train",
-                            marker=dict(
-                                symbol="circle",
-                                size=8,
-                                color=high_error_mask[is_train].map({True: "red", False: "steelblue"}),
-                                opacity=0.6,
-                            ),
-                            hovertext=train_hover,
-                            hoverinfo="text+x+y",
-                        ))
-
-                    # Test set markers
-                    if is_test.any():
-                        test_hover = []
-                        for i, row in df_all[is_test].iterrows():
-                            txt = f"Year: {int(row['year'])} (Test)<br>"
-                            if "city_name" in df_all.columns:
-                                txt += f"City: {row['city_name']} ({int(row['geocode'])})"
-                            elif "state" in df_all.columns:
-                                txt += f"State: {row['state']}"
-                            err_val = rel_error.loc[i] * 100
-                            txt += f"<br>Error: {err_val:.1f}%"
-                            test_hover.append(txt)
-
-                        fig.add_trace(go.Scatter(
-                            x=y_true[is_test],
-                            y=y_pred[is_test],
-                            mode="markers",
-                            name="Test",
-                            marker=dict(
-                                symbol="diamond",
-                                size=10,
-                                color=high_error_mask[is_test].map({True: "darkred", False: "darkgreen"}),
-                                opacity=0.8,
-                            ),
-                            hovertext=test_hover,
-                            hoverinfo="text+x+y",
-                        ))
-
-                    min_val = min(y_true.min(), y_pred.min())
-                    max_val = max(y_true.max(), y_pred.max())
-                    fig.add_trace(
-                        go.Scatter(
-                            x=[min_val, max_val],
-                            y=[min_val, max_val],
-                            mode="lines",
-                            line=dict(dash="dash", color="gray"),
-                            name="Ideal",
-                        )
+                    y_log = np.log1p(df_test_ok["total_cases"].to_numpy(dtype=float))
+                    pi = permutation_importance(
+                        est, df_test_ok[feature_cols], y_log,
+                        n_repeats=5, random_state=42,
+                        scoring="neg_mean_absolute_error",
                     )
-                    fig.update_layout(
-                        title=f"{target}: Actual vs Predicted",
-                        xaxis_title="Actual",
-                        yaxis_title="Predicted",
-                        template="plotly_white",
-                    )
-
-                    if target == "total_cases":
-                        fig.update_layout(
-                            xaxis_title="Actual (log scale)",
-                            yaxis_title="Predicted (log scale)",
-                            title=f"{target}: Actual vs Predicted (Log-Log)",
-                        )
-                        fig.update_xaxes(type="log")
-                        fig.update_yaxes(type="log")
-
-                    plots.append(fig)
-
-                    if "population" in df_all.columns:
-                        high_error_pop = df_all.loc[high_error_mask, "population"]
-                        fig_hist = go.Figure()
-                        if not high_error_pop.empty:
-                            fig_hist.add_trace(
-                                go.Histogram(
-                                    x=high_error_pop,
-                                    name="Pop. Size",
-                                    marker_color="red",
-                                )
-                            )
-                            fig_hist.update_layout(
-                                title=f"Pop. Distribution of Cities with >20% Error in {target}",
-                                xaxis_title="Population Size",
-                                yaxis_title="Count",
-                                template="plotly_white",
-                            )
-                        else:
-                            fig_hist.update_layout(
-                                title=f"No cities with >20% error in {target}"
-                            )
-                        hist_plots.append(fig_hist)
-                    else:
-                        hist_plots.append(
-                            go.Figure().update_layout(
-                                title="Population data not available"
-                            )
-                        )
-
-                # --- Residual analysis plots ---
-                resid_plots = []
-                resid_hist_plots = []
-                for target in ["total_cases", "ep_dur", "peak_week"]:
-                    if target not in val_preds:
-                        resid_plots.append(
-                            go.Figure().update_layout(
-                                title=f"{target}: Residuals not available"
-                            )
-                        )
-                        resid_hist_plots.append(
-                            go.Figure().update_layout(
-                                title=f"{target}: Residual distribution not available"
-                            )
-                        )
-                        continue
-
-                    y_true = df_all[target]
-                    y_pred = val_preds[target]
-                    residuals = y_true - y_pred
-
-                    # Residuals vs Predicted
-                    fig_resid = go.Figure()
-                    fig_resid.add_trace(
-                        go.Scatter(
-                            x=y_pred,
-                            y=residuals,
-                            mode="markers",
-                            marker=dict(color="steelblue", opacity=0.5),
-                            hovertext=[
-                                f"Year: {int(row['year'])}<br>"
-                                + (
-                                    f"City: {row['city_name']} ({int(row['geocode'])})"
-                                    if "city_name" in df_all.columns
-                                    else f"State: {row['state']}"
-                                )
-                                for _, row in df_all.iterrows()
+                    imp_df = (
+                        pd.DataFrame({
+                            "Feature": [
+                                c.replace("prev_", "") for c in feature_cols
                             ],
-                            hoverinfo="text+x+y",
-                        )
+                            "Importance": pi.importances_mean,
+                        })
+                        .sort_values("Importance", ascending=False)
                     )
-                    fig_resid.add_hline(y=0, line_dash="dash", line_color="red")
-                    fig_resid.update_layout(
-                        title=f"{target}: Residuals vs Predicted",
-                        xaxis_title="Predicted",
-                        yaxis_title="Residual (Actual - Predicted)",
-                        template="plotly_white",
-                    )
-                    resid_plots.append(fig_resid)
+                    imp_df = imp_df[imp_df["Importance"] > 0]
+                else:
+                    imp_df = pd.DataFrame({"Feature": [], "Importance": []})
 
-                    # Residual distribution histogram
-                    fig_resid_hist = go.Figure()
-                    fig_resid_hist.add_trace(
-                        go.Histogram(
-                            x=residuals,
-                            name="Residuals",
-                            marker_color="steelblue",
-                            opacity=0.7,
-                        )
-                    )
-                    mean_resid = residuals.mean()
-                    fig_resid_hist.add_vline(
-                        x=0, line_dash="dash", line_color="green", annotation_text="Zero"
-                    )
-                    fig_resid_hist.add_vline(
-                        x=mean_resid,
-                        line_dash="dot",
-                        line_color="red",
-                        annotation_text=f"Mean: {mean_resid:.1f}",
-                    )
-                    fig_resid_hist.update_layout(
-                        title=f"{target}: Residual Distribution",
-                        xaxis_title="Residual",
-                        yaxis_title="Count",
-                        template="plotly_white",
-                    )
-                    resid_hist_plots.append(fig_resid_hist)
-
-                # Get X_train from any available target (same for all)
-                x_train_ref = None
-                y_train_ref = {}
-                if train_data:
-                    for t, d in train_data.items():
-                        y_train_ref[t] = d.get('y_train')
-                        if x_train_ref is None and d.get('X_train') is not None:
-                            x_train_ref = d['X_train']
-
-                imp_df = predictive_model.get_variable_importance(
-                    models, feature_cols,
-                    X_train=x_train_ref,
-                    y_train_dict=y_train_ref,
-                )
                 fig_imp = go.Figure()
-                for col in imp_df.columns:
-                    if col != "Feature":
-                        fig_imp.add_trace(
-                            go.Bar(
-                                name=col,
-                                y=imp_df["Feature"],
-                                x=imp_df[col],
-                                orientation="h",
-                            )
-                        )
+                if not imp_df.empty:
+                    fig_imp.add_trace(go.Bar(
+                        y=imp_df["Feature"],
+                        x=imp_df["Importance"],
+                        orientation="h",
+                        marker_color="#4c78a8",
+                    ))
                 fig_imp.update_layout(
-                    title="Feature Importance",
-                    barmode="group",
+                    title="Feature Importance (permutation, held-out seasons)",
+                    xaxis_title="mean increase in MAE when shuffled (log scale)",
                     template="plotly_white",
                     height=500,
                 )
 
-                # Build feature importance explanation
-                if model_type == "random_forest":
-                    fi_text = """
+                fi_text = r"""
 ### How Feature Importance is Calculated
 
-- **Model**: Random Forest Regressor
-- **Method**: Mean Decrease in Impurity (MDI), also known as Gini importance.
-  Each tree in the forest tracks how much each feature reduces the variance (impurity) across all its splits. The importances are averaged over all trees and normalized so they sum to 1.
-- **Interpretation**: A higher value means the feature contributes more to reducing prediction error across all decision tree splits.
+- **Model**: quantile regression on a cubic spline basis with linear boundary
+  extrapolation (the manuscript's primary estimator, Section 2.8), fitted on
+  $\log(1+S)$ at the chosen $\\tau$; predictions are back-transformed with
+  $\exp(\\cdot)-1$.
+- **Method**: permutation importance on the held-out seasons. Each predictor's
+  column is randomly shuffled and the resulting increase in mean absolute error
+  (log scale) is recorded, averaged over 5 repeats.
+- **Interpretation**: a larger value means the forecast degrades when the
+  predictor carries no information. Previous-season **epidemic duration**
+  (`ep_dur`) and **peak week** (`peak_week`) are among these predictors -- they
+  are covariates of the coming season's size and are never modelled as outcomes
+  themselves.
 """
-                elif model_type == "lightgbm_quantile":
-                    fi_text = f"""
-### How Feature Importance is Calculated
-
-- **Model**: LightGBM (Quantile Regression, τ={quantile})
-- **Method**: Split-based importance (number of times each feature is used to split nodes across all trees).
-  If all features show zero split importance, **Permutation Importance** is used as fallback: each feature's values are randomly shuffled and the resulting drop in prediction accuracy is measured.
-- **Interpretation**: Features that are used more frequently for splitting (or cause a larger accuracy drop when permuted) are considered more important.
-"""
-                elif model_type == "hist_gradient_boosting_quantile":
-                    fi_text = f"""
-### How Feature Importance is Calculated
-
-- **Model**: HistGradientBoosting Regressor (Quantile Regression, τ={quantile})
-- **Method**: Permutation Importance. Since this model does not expose native `feature_importances_`, each feature is randomly shuffled one at a time and the drop in prediction accuracy is measured. The mean decrease across 10 random permutations is reported.
-- **Interpretation**: A higher value means that shuffling that feature's values causes a larger drop in model accuracy, indicating the model relies on it more heavily.
-"""
-                else:
-                    fi_text = ""
-
-                is_quantile = model_type in ("lightgbm_quantile", "hist_gradient_boosting_quantile")
 
                 def _fmt_reg(val, spec=".2f"):
                     """NaN-safe metric formatting: NaN/None means 'not measured'."""
@@ -884,139 +713,149 @@ def create_dashboard():
                         return "N/A"
                     return f"{val:{spec}}"
 
-                metrics_data = []
-                for t, m in metrics.items():
-                    if is_quantile:
-                        pinball_val = m.get('Pinball_Loss')
-                        quantile_val = m.get('Quantile')
-                        metrics_data.append(
-                            [
-                                t,
-                                _fmt_reg(m.get('MAE')),
-                                _fmt_reg(m.get('RMSE')),
-                                _fmt_reg(pinball_val, ".4f") if pinball_val is not None else "N/A",
-                                _fmt_reg(quantile_val, ".2f") if quantile_val is not None else "N/A",
-                            ]
-                        )
-                    else:
-                        oob = m.get('OOB_R2')
-                        metrics_data.append(
-                            [
-                                t,
-                                _fmt_reg(m.get('MAE')),
-                                _fmt_reg(m.get('RMSE')),
-                                _fmt_reg(oob),
-                            ]
-                        )
+                metrics_df = pd.DataFrame(
+                    [[
+                        "Epidemic size (total cases)",
+                        _fmt_reg(m.get("MAE"), ".1f"),
+                        _fmt_reg(m.get("RMSE"), ".1f"),
+                        _fmt_reg(m.get("Pinball_Loss"), ".1f"),
+                        f"{quantile:.2f}",
+                        f"{m.get('n_train', 0):,}",
+                        f"{m.get('n_test', 0):,}",
+                    ]],
+                    columns=[
+                        "Target", "MAE (cases)", "RMSE (cases)",
+                        "Pinball Loss (τ)", "τ", "Train rows", "Test rows",
+                    ],
+                )
 
-                if is_quantile:
-                    metrics_df = pd.DataFrame(
-                        metrics_data,
-                        columns=["Metric", "MAE", "RMSE", "Pinball Loss", "Quantile"],
-                    )
-                else:
-                    metrics_df = pd.DataFrame(
-                        metrics_data, columns=["Metric", "MAE", "RMSE", "OOB R2"]
-                    )
-
+                # --- Forecast for the selected year (size only) ---
                 target_pred_text = f"### Forecast for Year {year}\n"
-
                 df_target_year = df_all[df_all["year"] == year].copy()
 
                 if not df_target_year.empty:
-                    X_target_all = df_target_year[feature_cols]
-
-                    # Epidemic size is the only trained target: duration and
-                    # peak timing are bounded by the length of the season and
-                    # are not modelled as outcomes. They are still listed so
-                    # the panel wiring stays fixed; anything untrained is
-                    # simply reported as not modelled instead of as a zero.
-                    targets = ["total_cases", "ep_dur", "peak_week"]
-                    preds_all = {t: np.zeros(len(df_target_year)) for t in targets}
-
-                    for t in targets:
-                        model = models.get(t)
-                        if model:
-                            preds = model.predict(X_target_all)
-                            if t == "total_cases":
-                                preds = np.expm1(preds)
-                                if bias_correction and t in bias_correction:
-                                    preds = preds * bias_correction[t]
-                            preds_all[t] = preds
-
-                    trained = [t for t in targets if models.get(t)]
-
-                    if region != "BR":
-                        pred_cases_total = np.sum(preds_all["total_cases"])
-
-                        weights = preds_all["total_cases"]
-                        if np.sum(weights) > 0:
-                            pred_dur_agg = np.sum(
-                                preds_all["ep_dur"] * weights
-                            ) / np.sum(weights)
-                            pred_peak_agg = np.sum(
-                                preds_all["peak_week"] * weights
-                            ) / np.sum(weights)
-                        else:
-                            pred_dur_agg = np.mean(preds_all["ep_dur"])
-                            pred_peak_agg = np.mean(preds_all["peak_week"])
-
-                        obs_cases_total = df_target_year["total_cases"].sum()
-                        obs_weights = df_target_year["total_cases"]
-                        if obs_cases_total > 0:
-                            obs_dur_agg = (
-                                np.sum(df_target_year["ep_dur"] * obs_weights)
-                                / obs_cases_total
-                            )
-                            obs_peak_agg = (
-                                np.sum(df_target_year["peak_week"] * obs_weights)
-                                / obs_cases_total
-                            )
-                        else:
-                            obs_dur_agg = df_target_year["ep_dur"].mean()
-                            obs_peak_agg = df_target_year["peak_week"].mean()
-
-                        err_cases = pred_cases_total - obs_cases_total
-                        err_dur = pred_dur_agg - obs_dur_agg
-                        err_peak = pred_peak_agg - obs_peak_agg
-
-                        target_pred_text += f"#### State Aggregate ({region})\n"
-                        target_pred_text += f"- **Total Cases**: {pred_cases_total:.0f} (Observed: {obs_cases_total:.0f}, Error: {err_cases:+.0f})\n"
-                        if "ep_dur" in trained:
-                            target_pred_text += f"- **Duration (Weighted)**: {pred_dur_agg:.1f} weeks (Observed: {obs_dur_agg:.1f}, Error: {err_dur:+.1f})\n"
-                        if "peak_week" in trained:
-                            target_pred_text += f"- **Peak Week (Weighted)**: {pred_peak_agg:.1f} (Observed: {obs_peak_agg:.1f}, Error: {err_peak:+.1f})\n"
-                        target_pred_text += "\n"
+                    preds_year = predict_cases(
+                        est, df_target_year[feature_cols], "total_cases"
+                    )
+                    pred_cases_total = float(np.sum(preds_year))
+                    obs_cases_total = float(df_target_year["total_cases"].sum())
+                    target_pred_text += (
+                        f"#### State Aggregate ({region})\n"
+                        f"- **Total Cases**: {pred_cases_total:.0f} "
+                        f"(Observed: {obs_cases_total:.0f}, "
+                        f"Error: {pred_cases_total - obs_cases_total:+.0f})\n\n"
+                    )
 
                     if city_str:
                         geocode = extract_geocode(city_str)
                         if geocode:
-                            city_row_idx = df_target_year.index[
+                            city_idx = df_target_year.index[
                                 df_target_year["geocode"] == int(geocode)
                             ]
-                            if not city_row_idx.empty:
-                                pos = df_target_year.index.get_loc(city_row_idx[0])
+                            if not city_idx.empty:
+                                pos = city_idx[0]
+                                p = float(
+                                    preds_year[df_target_year.index.get_loc(pos)]
+                                )
+                                o = float(df_target_year.loc[pos, "total_cases"])
                                 target_pred_text += (
                                     f"#### Individual City: {city_str}\n"
+                                    f"- **Epidemic Size**: {p:.1f} "
+                                    f"(Observed: {o:.1f}, Error: {p - o:+.1f})\n"
                                 )
-                                for t in ["total_cases", "ep_dur", "peak_week"]:
-                                    if t not in trained:
-                                        continue
-                                    val = preds_all[t][pos]
-                                    obs = df_target_year.loc[city_row_idx[0], t]
-                                    err = val - obs
-                                    label = t.replace("_", " ").title()
-                                    if t == "ep_dur":
-                                        label = "Duration"
-                                    target_pred_text += f"- **{label}**: {val:.1f} (Observed: {obs:.1f}, Error: {err:+.1f})\n"
                             else:
-                                target_pred_text += f"*City {city_str} data not available for {year}.*\n"
+                                target_pred_text += (
+                                    f"*City {city_str} data not available for {year}.*\n"
+                                )
                 else:
                     target_pred_text += (
                         f"*No data available for year {year} in {region}.*\n"
                     )
 
-                return plots + [fig_imp, fi_text, target_pred_text, metrics_df] + hist_plots + resid_plots + resid_hist_plots
+                # --- Error histogram: population distribution of >20% errors ---
+                if "population" in df_all.columns:
+                    high_error_pop = df_all.loc[
+                        high_error_mask.fillna(False), "population"
+                    ]
+                    fig_hist = go.Figure()
+                    if not high_error_pop.empty:
+                        fig_hist.add_trace(go.Histogram(
+                            x=high_error_pop,
+                            name="Pop. Size",
+                            marker_color="red",
+                        ))
+                        fig_hist.update_layout(
+                            title="Pop. Distribution of Cities with >20% Error",
+                            xaxis_title="Population Size",
+                            yaxis_title="Count",
+                            template="plotly_white",
+                        )
+                    else:
+                        fig_hist.update_layout(
+                            title="No cities with >20% error"
+                        )
+                else:
+                    fig_hist = go.Figure().update_layout(
+                        title="Population data not available"
+                    )
+
+                # --- Residual analysis ---
+                residuals = pd.Series(y_true - y_pred, index=df_all.index)
+
+                fig_resid = go.Figure()
+                fig_resid.add_trace(go.Scatter(
+                    x=y_pred,
+                    y=residuals,
+                    mode="markers",
+                    marker=dict(color="steelblue", opacity=0.5),
+                    hovertext=hover,
+                    hoverinfo="text+x+y",
+                ))
+                fig_resid.add_hline(y=0, line_dash="dash", line_color="red")
+                mean_resid = float(residuals.mean())
+                fig_resid.add_vline(
+                    x=0, line_dash="dot", line_color="green",
+                    annotation_text="Zero",
+                )
+                fig_resid.update_layout(
+                    title="Residuals vs Predicted: Total Cases",
+                    xaxis_title="Predicted",
+                    yaxis_title="Residual (Actual - Predicted)",
+                    template="plotly_white",
+                )
+
+                fig_resid_hist = go.Figure()
+                fig_resid_hist.add_trace(go.Histogram(
+                    x=residuals,
+                    name="Residuals",
+                    marker_color="steelblue",
+                    opacity=0.7,
+                ))
+                fig_resid_hist.add_vline(
+                    x=0, line_dash="dash", line_color="green",
+                    annotation_text="Zero",
+                )
+                fig_resid_hist.add_vline(
+                    x=mean_resid, line_dash="dot", line_color="red",
+                    annotation_text=f"Mean: {mean_resid:.1f}",
+                )
+                fig_resid_hist.update_layout(
+                    title="Residual Distribution: Total Cases",
+                    xaxis_title="Residual",
+                    yaxis_title="Count",
+                    template="plotly_white",
+                )
+
+                return (
+                    fig_pred,
+                    fig_imp,
+                    fi_text,
+                    target_pred_text,
+                    metrics_df,
+                    fig_hist,
+                    fig_resid,
+                    fig_resid_hist,
+                )
 
             except Exception as e:
                 print(f"Prediction failed: {e}")
@@ -1025,9 +864,10 @@ def create_dashboard():
                 traceback.print_exc()
                 empty = go.Figure().update_layout(title=f"Error: {str(e)}")
                 return (
-                    [empty] * 4
-                    + [f"### How Feature Importance is Calculated\n\n*Error occurred: {str(e)}*", "", pd.DataFrame()]
-                    + [empty] * 9
+                    empty, empty,
+                    f"### Error\n\n*{str(e)}*",
+                    "Prediction failed.", pd.DataFrame(),
+                    empty, empty, empty,
                 )
 
         pred_train_btn.click(
@@ -1042,21 +882,13 @@ def create_dashboard():
             ],
             outputs=[
                 pred_plot_size,
-                pred_plot_dur,
-                pred_plot_peak,
                 pred_feat_imp_plot,
                 pred_feat_imp_explanation,
                 pred_values_output,
                 pred_metrics_table,
                 pred_hist_size,
-                pred_hist_dur,
-                pred_hist_peak,
                 pred_resid_size,
-                pred_resid_dur,
-                pred_resid_peak,
                 pred_resid_hist_size,
-                pred_resid_hist_dur,
-                pred_resid_hist_peak,
             ],
         )
 

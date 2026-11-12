@@ -574,6 +574,79 @@ def train_predictive_models(train_df, test_year=None, model_type="random_forest"
 
     return models, metrics, feature_cols, train_data_dict, bias_correction_dict
 
+def train_size_quantile_model(df, test_year=None, tau=0.5, model="spline_quantile"):
+    """Epidemic size with the manuscript's primary estimator (Section 2.8).
+
+    Quantile regression on a cubic spline basis with linear boundary
+    extrapolation (Koenker & Bassett 1978), fitted to ``log1p(total_cases)``
+    and back-transformed with ``expm1`` -- no Jensen factor, because ``expm1``
+    is monotone and maps the log-space tau-quantile to the case-space
+    tau-quantile.
+
+    Target: epidemic size only. Duration and peak timing are *predictors*,
+    not outcomes: the feature matrix is every informative ``prev_*`` column
+    of the lagged panel -- previous-season size, epidemic duration and peak
+    week, R0, the scaling block (alpha, x_min, alpha trend) -- plus
+    ``log_pop``.
+
+    Returns ``(models, metrics, feature_cols)`` where ``models`` carries the
+    single key ``'total_cases'`` and predictions must go through
+    ``run_ablation.predict_cases`` (expm1 + clip at zero).
+    """
+    from run_ablation import fit_quantile_model, predict_cases  # lazy: no import cycle
+
+    feature_cols = [
+        c for c in df.columns if c.startswith("prev_") and not df[c].isnull().all()
+    ]
+    if "log_pop" in df.columns and "log_pop" not in feature_cols:
+        feature_cols.append("log_pop")
+
+    if test_year is not None:
+        train = df[df["year"] < test_year]
+        test = df[df["year"] >= test_year]
+    else:
+        train = df
+        test = df
+
+    train_clean = train.dropna(subset=feature_cols + ["total_cases"])
+    if train_clean.empty:
+        print("[SizeQuantile] no usable training rows")
+        return {}, {"total_cases": {"MAE": np.nan, "RMSE": np.nan,
+                                    "Pinball_Loss": np.nan, "Quantile": tau}}, feature_cols
+
+    y_train = np.log1p(train_clean["total_cases"].to_numpy(dtype=float))
+    est = fit_quantile_model(
+        train_clean[feature_cols], y_train, float(tau), model=model
+    )
+    est.fit(train_clean[feature_cols], y_train)
+
+    tau_d = float(tau)
+    metrics = {"total_cases": {
+        "MAE": np.nan, "RMSE": np.nan, "Pinball_Loss": np.nan,
+        "Quantile": tau_d, "n_train": len(train_clean), "n_test": 0,
+    }}
+    test_ok = test.dropna(subset=["total_cases"])
+    if not test_ok.empty:
+        pred = predict_cases(est, test_ok[feature_cols], "total_cases")
+        y_test = test_ok["total_cases"].to_numpy(dtype=float)
+        err = y_test - pred
+        metrics["total_cases"].update({
+            "MAE": float(np.mean(np.abs(err))),
+            "RMSE": float(np.sqrt(np.mean(err ** 2))),
+            "Pinball_Loss": float(np.mean(
+                np.maximum(tau_d * err, (tau_d - 1.0) * err)
+            )),
+            "n_test": int(len(test_ok)),
+        })
+        print(
+            f"[SizeQuantile] tau={tau_d}: pinball={metrics['total_cases']['Pinball_Loss']:.1f} "
+            f"MAE={metrics['total_cases']['MAE']:.1f} (test rows {len(test_ok)})",
+            flush=True,
+        )
+
+    return {"total_cases": est}, metrics, feature_cols
+
+
 def predict_future(models, current_data_df, feature_cols, bias_correction=None):
     """
     Predicts for the rows in current_data_df using trained models.
