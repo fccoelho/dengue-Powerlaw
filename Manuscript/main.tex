@@ -536,7 +536,10 @@ later rung adds.
 \small
 \setlength{\tabcolsep}{4pt}
 \caption{Predictor blocks. All predictors refer to season $t-1$ or earlier. The
-scaling block is the object of the ablation of Section~\ref{sec:ablation}.}
+lagged descriptors are the epidemic size, duration and peak timing of the
+previous season; duration and peak timing enter only here, as predictors, and
+are never fitted as targets. The scaling block is the object of the ablation of
+Section~\ref{sec:ablation}.}
 \label{tab:features}
 \begin{tabular}{@{}lll@{}}
 \toprule
@@ -677,7 +680,7 @@ the power-law scaling descriptors.}
 Rung & Name & Predictors\\
 \midrule
 M0 & Persistence       & $\hat S_t=S_{t-1}$; training base rate for the classifier\\
-M1 & Lagged descriptors & M0 predictors + $D_{t-1}$, $P_{t-1}$, $R_{0,t-1}$, $\log_{10}(\text{pop})$\\
+M1 & Lagged metrics   & M0 predictors + $D_{t-1}$, $P_{t-1}$, $R_{0,t-1}$, $\log_{10}(\text{pop})$\\
 M2 & \quad + climate   & M1 + quarterly $\bar T$, $\bar H$ from season $t-1$\\
 M3 & \quad + scaling   & M2 + $\alpha_{S,t-1}$, $x_{\min,S,t-1}$, $\dot\alpha_{t-1}$\\
 \bottomrule
@@ -1036,7 +1039,7 @@ median of $+0.126$, positive in 4 of 5 origins and reaching $+0.212$. The
 intervals exclude zero in only 2 of the 5 origins, against the 3 that the rule requires, so the rung fails the rule at state level: each origin is a
 bootstrap over 23 to 25 units and the median interval is $0.26$ wide, wider than
 the effect it is asked to resolve. Climate adds nothing to it (median $+0.027$) and neither does the scaling block
-(median $+0.000$, with no origin in which the block improves by an interval excluding
+(median of $+0.000$, with no origin in which the block improves by an interval excluding
 zero). The per-origin
 differentials for M1 against M0 are $-0.064$, $+0.074$, $+0.126$, $+0.212$ and $+0.149$ for 2021 to 2025, negative in the first origin and positive thereafter,
 which is the pattern expected of a model that requires history in order to be
