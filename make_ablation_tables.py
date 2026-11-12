@@ -283,18 +283,30 @@ def compute_facts(root: str = ".") -> dict:
         c = df[(df["record_type"] == "contrast") & (df["task"] == "size")
                & (df["contrast"] == "M3-M2") & (df["loss"] == "pinball")]
         if not c.empty:
+            # ``ci_excludes_zero`` is direction-agnostic: an interval can exclude
+            # zero while pointing against the block. Count both directions
+            # separately, or the "three origins agree" criterion silently counts
+            # agreement that the block is worse as agreement that it is better.
+            c = c.copy()
+            c["_excl"] = (c["ci_excludes_zero"].astype("boolean")
+                          .fillna(False).astype(bool))
+            c["_imp"] = c["improves"].astype("boolean").fillna(False).astype(bool)
+            c["_against"] = c["_excl"] & ~c["_imp"]
             g = c.groupby("tau").agg(
                 median_rel=("rel_improvement", "median"),
-                n_same_direction_ci=("improves", "sum"),
-                n_ci=("ci_excludes_zero", "sum"),
+                n_favouring_ci=("_imp", "sum"),
+                n_ci=("_excl", "sum"),
+                n_against_ci=("_against", "sum"),
             )
             ext = c[np.isclose(c["tau"].astype(float), EXTREME_TAU)]
             facts["size"]["scaling_vs_tau"] = {
                 "n_taus": int(len(g)),
                 "grid_median_min": float(g["median_rel"].min()),
                 "grid_median_max": float(g["median_rel"].max()),
-                "taus_with_three_same_direction": [
-                    float(t) for t in g.index[g["n_same_direction_ci"] >= 3]],
+                "taus_with_three_favouring": [
+                    float(t) for t in g.index[g["n_favouring_ci"] >= 3]],
+                "taus_with_three_against": [
+                    float(t) for t in g.index[g["n_against_ci"] >= 3]],
                 "at_extreme": {
                     "median_rel": float(ext["rel_improvement"].median()),
                     "n_positive": int((ext["rel_improvement"] > 0).sum()),
@@ -620,9 +632,16 @@ def claims(f: dict) -> list[dict]:
             {"name": "extreme-tau interval count",
              "want": f"2 of {ext['n_positive'] + ext['n_negative']}",
              "stale": [], "needs": "state_size"},
-            {"name": "no tau clears the rule",
-             "want": f"{len(tau.get('taus_with_three_same_direction', []))} "
-                     f"of {tau.get('n_taus')} quantiles",
+            {"name": "no tau favours the block",
+             "want": ("no quantile has three of the five origins agreeing in favour"
+                      if not tau.get("taus_with_three_favouring")
+                      else f"{len(tau['taus_with_three_favouring'])} of "
+                           f"{tau.get('n_taus')} quantiles"),
+             "stale": ["0 of 19 quantiles clearing the criterion"],
+             "needs": "state_size"},
+            {"name": "taus where three origins agree against the block",
+             "want": f"{len(tau.get('taus_with_three_against', []))} of "
+                     f"the {tau.get('n_taus')} levels",
              "stale": [], "needs": "state_size"},
         ]
     if city:

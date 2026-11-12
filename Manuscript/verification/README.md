@@ -21,6 +21,43 @@ national year-by-year fits, the per-state exponents, and the α-vs-population
 correlations. If the database is regenerated with different settings, this
 script will report different numbers — that is the point.
 
+## The predictive layer
+
+```bash
+python Manuscript/verification/verify_predictive.py           # audit
+python Manuscript/verification/verify_predictive.py --strict  # exit 1 on any drift
+```
+
+`verify_results.py` covers the descriptive half of the paper. This script
+covers the half that used to be unauditable: every predictive number in
+`main.tex` is recomputed from the four committed artefacts
+(`classifier_results_metrics.csv`, `ablation_city.csv`,
+`ablation_state_exceedance.csv`, `ablation_results.csv`) and nothing is
+refitted, so it runs without the data directory.
+
+It is a **two-sided** check. A gate that only compares against artefacts
+drifts away from the manuscript: it keeps re-deriving a value that a rewrite
+removed, reports drift for ever, and stops being read. So each claim has to
+pass twice — the quoted value must still occur in `main.tex` (`STALE` if not)
+and the artefact must still produce it (`DRIFT` if not). The two verdicts mean
+opposite things.
+
+Two counting rules are worth knowing before reading its output:
+
+- **`ci_excludes_zero` is direction-agnostic.** An interval can exclude zero
+  while pointing *against* the rung. Every "satisfies the rule" count is taken
+  jointly with `improves`; the script prints the counts in both directions, so
+  a pass count can never be read off the raw column.
+- **Tolerance follows the printed precision.** Two-decimal values are compared
+  at 0.0051, three-decimal at 0.0006, percentages at 0.051. One tolerance for
+  everything would flag a correctly rounded 0.5825 quoted as 0.58.
+
+Numbers quoted in `main.tex` with no artefact behind them are printed under
+**NOT AUDITABLE** rather than silently skipped. Currently one: the
+population-only AUC under a pooled threshold (0.87, range 0.84--0.93), which
+needs `run_classifier.py` rerun with `threshold_scope='pooled'` — the
+committed classifier artefact carries `per_unit` only.
+
 `verify_tables.sql` contains the same computations as plain SQL, for readers
 who prefer to query the database directly with `sqlite3` or DuckDB.
 

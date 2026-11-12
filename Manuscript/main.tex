@@ -1152,9 +1152,11 @@ constructed to test precisely that. It shows not a degradation but an absence of
 signal. At $\tau=0.95$ the median differential is $+4.9\%$, with M3 ahead, and it
 is positive in 4 of 5 origins; but the intervals exclude zero in only 2 of 5, and those two point in \emph{opposite} directions, $+32.7\%$ in 2021 and
 $-15.4\%$ in 2024. The same holds across the grid: the median of the per-origin
-differential moves between $-13.6\%$ and $+7.2\%$ with no trend, and there is no
-quantile at which 3 of 5 origins agree in direction with an interval
-excluding zero, 0 of 19 quantiles clearing the criterion. This is what the
+differential moves between $-13.6\%$ and $+7.2\%$ with no trend, and no quantile
+has three of the five origins agreeing in favour of the block with an interval
+excluding zero. At 2 of the 19 levels ($\tau=0.05$ and $\tau=0.25$) 3
+origins do exclude zero, and at both they agree that the block makes the
+forecast worse. This is what the
 coupling predicts. Both statistics are functions of the magnitude of the previous
 season, so that the block is at best a second and noisier copy of $S_{t-1}$; the
 ablation shows that the copy carries no usable increment, which leaves the upper
@@ -1230,10 +1232,12 @@ surveillance service would read (Figure~\ref{fig:map}).
 \centering
 \includegraphics[width=\textwidth]{figures/fig14_error_vs_pop}
 \caption{Forecast error against population size. Absolute percentage error of the
-size forecast by unit population, one point per unit and origin, with a locally
-weighted smooth. Errors are largest for the smallest municipalities, where case
-counts are low and a single imported case represents a large relative change, and
-they narrow but do not vanish at the top of the size distribution.}
+size forecast by unit population, one point per unit and forecast origin, with the
+median within population bins. The forecast is the median quantile ($\tau=0.5$) of
+the model whose ladder is given in Table~\ref{tab:ablation_results}. Errors are
+largest for the smallest municipalities, where case counts are low and a single
+imported case represents a large relative change, and they narrow but do not vanish
+at the top of the size distribution.}
 \label{fig:errors}
 \end{figure}
 
