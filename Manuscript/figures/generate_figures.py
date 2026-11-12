@@ -751,6 +751,23 @@ def fig10():
         ax.set_title(title, fontsize=8.5)
         ax.legend(fontsize=6.5, loc="upper left")
 
+    # The panel drawn here has to be the paper's model, which is the full M3
+    # feature set, because the caption says so and because the figure is read as
+    # that model. ``use`` below drops whatever is absent, so a panel without the
+    # climate extracts would draw M3-minus-climate under a caption describing
+    # M3 -- the same silent substitution that the ablation guards against with
+    # ``require_climate``. Abort instead.
+    absent = [c for c in list(CLIMATE_BLOCK)
+              if c not in df.columns or df[c].isnull().all()]
+    if absent:
+        raise SystemExit(
+            "fig10 draws the M3 model and the panel has no climate block "
+            f"({', '.join(absent)} absent).\n"
+            "  Those columns come from data/<geocode>.parquet (Infodengue weekly "
+            "tempmin/umidmin); build them with update_data.py. Without them the "
+            "figure would show a model the caption does not describe."
+        )
+
     feats = (LAGGED_SIZE + COVARIATE_DUR + COVARIATE_PEAK + EPI + DEMO
              + list(CLIMATE_BLOCK) + SCALING_SIZE)
     use = [c for c in feats if c in df.columns and not df[c].isnull().all()]

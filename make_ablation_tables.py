@@ -736,6 +736,19 @@ def claims(f: dict) -> list[dict]:
     return [o for o in out if o["want"]]
 
 
+def _squash(text: str) -> str:
+    """Collapse all whitespace runs to single spaces.
+
+    Prose wraps, so a claim that is present in the manuscript straddles a
+    newline about as often as not. Searching the raw ``.tex`` reported those as
+    MISSING and asked for a rebuild that was not needed -- and a check that
+    cries wolf over its own line breaks is a check that gets ignored, which is
+    how a real stale value slips through. Both comparisons below, the stale
+    literals as well as the wanted one, run on squashed text.
+    """
+    return " ".join(text.split())
+
+
 def audit_prose(tex_path: str, f: dict) -> dict:
     """Sort every claim into ok / stale / missing / unverified."""
     res = {"stale": [], "missing": [], "unverified": [], "ok": []}
@@ -743,17 +756,17 @@ def audit_prose(tex_path: str, f: dict) -> dict:
         res["stale"].append({"name": "main.tex", "found": ["absent"],
                              "want": tex_path})
         return res
-    tex = open(tex_path, encoding="utf-8", errors="replace").read()
+    tex = _squash(open(tex_path, encoding="utf-8", errors="replace").read())
     for c in claims(f):
         if not c["available"]:
             res["unverified"].append({"name": c["name"], "want": c["want"],
                                       "source": c["needs"]})
             continue
-        stale = [s for s in c["stale"] if s in tex]
+        stale = [s for s in c["stale"] if _squash(s) in tex]
         if stale:
             res["stale"].append({"name": c["name"], "found": stale,
                                  "want": c["want"]})
-        elif c["want"] not in tex:
+        elif _squash(c["want"]) not in tex:
             res["missing"].append({"name": c["name"], "want": c["want"]})
         else:
             res["ok"].append(c["name"])
@@ -763,7 +776,7 @@ def audit_prose(tex_path: str, f: dict) -> dict:
     for c in claims(f):
         if c["available"] or c["name"] in seen or not c["stale"]:
             continue
-        hit = [s for s in c["stale"] if s in tex]
+        hit = [s for s in c["stale"] if _squash(s) in tex]
         if hit:
             res["stale"].append({"name": c["name"], "found": hit,
                                  "want": "value of the superseded run"})
