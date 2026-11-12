@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import os
 import sqlite3
+import struct
 import sys
 
 import make_ablation_tables
@@ -74,6 +75,16 @@ ALLOWED_TARGETS = {"total_cases"}
 
 #: Modules that draw the predictive figures.
 FIGURE_SOURCES = (os.path.join("Manuscript", "figures", "generate_figures.py"),)
+
+#: Figure index, image stem and the sidecar the drawing function writes.
+#: The sidecar records the pixel shape of the file that run saved, which is the
+#: only cheap evidence that the committed image and the code that claims to
+#: draw it are the same vintage. A caption edited to describe a new layout over
+#: an old image is otherwise invisible to every check here: the image is not in
+#: the manifest, and no artefact knows how many panels it has.
+FIGURE_SIDECARS = (
+    ("10", "fig10_pred_vs_obs", "fig10_states.json"),
+)
 
 #: Constructors that cannot predict outside their training responses. They are
 #: legitimate comparison arms inside ``run_ablation.py``, which is why that file
@@ -114,6 +125,59 @@ def check_figure_sources(root: str = ".") -> list[str]:
                 f"{rel} still fits {found}: a figure has to draw the estimator "
                 "the ablation reports (run_ablation.fit_quantile_model / "
                 "make_classifier), not one of its own"
+            )
+    return problems
+
+
+def _png_shape(path: str) -> tuple[int, int]:
+    """Width and height of a PNG, read from its IHDR chunk."""
+    with open(path, "rb") as fh:
+        head = fh.read(24)
+    if head[:8] != b"\x89PNG\r\n\x1a\n" or head[12:16] != b"IHDR":
+        raise ValueError("not a PNG")
+    return struct.unpack(">II", head[16:24])
+
+
+def check_figure_layout(root: str = ".") -> list[str]:
+    """Refuse a committed figure that does not come from the current code.
+
+    ``check_figure_sources`` reads the module; this reads the image the module
+    wrote. The two are different questions, and only the second one catches a
+    caption that was rewritten to describe panels nobody has drawn yet.
+    """
+    import json
+
+    problems = []
+    figdir = os.path.join(root, "Manuscript", "figures")
+    for number, stem, sidecar in FIGURE_SIDECARS:
+        png = os.path.join(figdir, f"{stem}.png")
+        side = os.path.join(figdir, sidecar)
+        if not os.path.exists(png):
+            continue
+        if not os.path.exists(side):
+            problems.append(
+                f"Manuscript/figures/{stem}.png has no {sidecar}: the image was "
+                "not drawn by the current code. Regenerate it with "
+                f"python Manuscript/figures/generate_figures.py {number}"
+            )
+            continue
+        try:
+            meta = json.loads(open(side, encoding="utf-8").read())
+            recorded = tuple(int(v) for v in meta["png_shape"])
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"Manuscript/figures/{sidecar} unreadable: {e}")
+            continue
+        try:
+            actual = _png_shape(png)
+        except Exception as e:  # noqa: BLE001
+            problems.append(f"Manuscript/figures/{stem}.png unreadable: {e}")
+            continue
+        if actual != recorded:
+            problems.append(
+                f"Manuscript/figures/{stem}.png is {actual[0]}x{actual[1]} px "
+                f"but {sidecar} records {recorded[0]}x{recorded[1]}: the "
+                "committed image predates the current drawing code. Regenerate "
+                f"it with python Manuscript/figures/generate_figures.py {number}"
             )
     return problems
 
@@ -165,6 +229,11 @@ def check_design(root: str = ".") -> list[str]:
                     f"{name} still reports the target(s) {bad}; duration and "
                     "peak timing are covariates now"
                 )
+    # Until now these two were defined and called only from the tests, so the
+    # guard against a figure drawing a superseded estimator never ran in the
+    # workflow that is supposed to enforce it.
+    problems.extend(check_figure_sources(root))
+    problems.extend(check_figure_layout(root))
     return problems
 
 

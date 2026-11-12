@@ -108,6 +108,25 @@
       "xmin_max": 1876
     }
   },
+  "municipal_size": {
+    "below_100k": {
+      "n": 4349,
+      "pct_cases": 37.7,
+      "pct_units": 93.2
+    },
+    "below_50k": {
+      "n": 4012,
+      "pct_cases": 25.3,
+      "pct_units": 86.0
+    },
+    "median_population": 13220,
+    "n": 4664,
+    "xmin_attack_rate": {
+      "at_100k": 0.3,
+      "at_median_pop": 2.3,
+      "xmin": 300
+    }
+  },
   "national": {
     "alpha": 2.03,
     "alpha_max": 2.25,

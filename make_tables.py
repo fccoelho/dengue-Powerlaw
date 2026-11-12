@@ -205,8 +205,47 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
     alphas = [d["alpha"] for d in levels.values()]
     xmins = [d["xmin"] for d in levels.values()]
 
+    # Municipal size, for the resolution limit of the forecast. ``city_stats``
+    # sums the platform's seasonal totals per municipality and carries the latest
+    # population; it enters no fit, and the shares below exist so that the
+    # Discussion can state them as quantities the database re-derives rather than
+    # as numbers typed from a session.
+    cs = pd.read_sql(
+        "SELECT total_cases, population FROM city_stats "
+        "WHERE total_cases IS NOT NULL AND population > 0", con)
+
+    def _below(thr: float) -> dict:
+        """Share of municipalities and of cases under a population threshold."""
+        sel = cs["population"] < thr
+        return {
+            "n": int(sel.sum()),
+            "pct_units": round(100 * float(sel.mean()), 1),
+            "pct_cases": round(100 * float(
+                cs.loc[sel, "total_cases"].sum() / cs["total_cases"].sum()), 1),
+        }
+
+    pop = cs["population"].astype(float)
+    median_pop = float(pop.median())
+    x_min_mun = int(levels["S-mun"]["xmin"])
+    municipal_size = {
+        "n": int(len(cs)),
+        "median_population": int(round(median_pop)),
+        "below_50k": _below(50_000),
+        "below_100k": _below(100_000),
+        #: What the tail threshold costs in attack-rate terms, which is the
+        #: argument of the resolution-limit section: the same 300 cases are a
+        #: large fraction of a small municipality and a rounding error of a large
+        #: one, so a small unit enters the fitted tail only in its bad years.
+        "xmin_attack_rate": {
+            "xmin": x_min_mun,
+            "at_median_pop": round(100.0 * x_min_mun / median_pop, 1),
+            "at_100k": round(100.0 * x_min_mun / 100_000, 1),
+        },
+    }
+
     return {
         "source_db": db_path,
+        "municipal_size": municipal_size,
         "levels": levels,
         "total_fits": sum(v["n"] for v in levels.values()),
         "national": {
@@ -297,6 +336,7 @@ def claims(f: dict) -> list[dict]:
         f["xmin_extremes"],
     )
     C, R = f["coupling"], f["correlations"]
+    M = f["municipal_size"]
     return [
         {"name": "total fits", "want": _fmt(f["total_fits"]),
          "stale": ["47{,}494", "47,494", "48{,}681", "48,681"], "count": 2},
@@ -383,6 +423,39 @@ def claims(f: dict) -> list[dict]:
                  f"Spearman ${R['incidence']['spearman']:.3f}$; "
                  f"$n={_fmt(R['incidence']['n'])}$",
          "stale": ["Pearson $-0.136$"]},
+        # The resolution limit of the forecast. These are sizes, not fits, so
+        # they are the only claims here that do not come from the power-law
+        # tables; they come from ``city_stats`` and are what the Discussion
+        # rests on when it says the forecast is least accurate in small
+        # municipalities.
+        {"name": "municipal units with a season",
+         "want": f"Of the {_fmt(M['n'])} municipalities",
+         "stale": ["Of the 5{,}571 municipalities"]},
+        {"name": "share of municipalities below 100k",
+         "want": (f"{M['below_100k']['pct_units']:.1f}\\% have fewer than "
+                  "100{,}000 inhabitants"),
+         "stale": ["93.4\\% have fewer than"]},
+        {"name": "share of cases below 100k",
+         "want": f"{M['below_100k']['pct_cases']:.1f}\\% of the cases in the series",
+         "stale": ["37.9\\% of the cases in the series"]},
+        {"name": "municipalities below 50k",
+         "want": (f"{M['below_50k']['pct_units']:.1f}\\% have fewer than "
+                  f"50{{,}}000 and carry {M['below_50k']['pct_cases']:.1f}\\%"),
+         "stale": ["86.3\\% have fewer than"]},
+        {"name": "median municipal population",
+         "want": f"median municipality has {_fmt(M['median_population'])} inhabitants",
+         "stale": ["median municipality has 13{,}900 inhabitants"]},
+        {"name": "municipal xmin",
+         "want": f"$x_{{\\min}}={_fmt(M['xmin_attack_rate']['xmin'])}$ cases",
+         "stale": ["$x_{\\min}=295$ cases"]},
+        {"name": "xmin as an attack rate",
+         "want": (f"{M['xmin_attack_rate']['at_median_pop']:.1f}\\% in the median "
+                  "municipality"),
+         "stale": ["2.4\\% in the median municipality"]},
+        {"name": "xmin attack rate at 100k",
+         "want": (f"{M['xmin_attack_rate']['at_100k']:.1f}\\% in one of "
+                  "100{,}000 inhabitants"),
+         "stale": ["0.4\\% in one of 100{,}000 inhabitants"]},
     ]
 
 

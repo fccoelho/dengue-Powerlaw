@@ -76,3 +76,19 @@ def test_missing_module_is_not_a_violation(tmp_path):
 def test_repository_figure_module_passes():
     here = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
     assert vs.check_figure_sources(here) == []
+
+
+def test_the_design_step_runs_the_figure_check(tmp_path):
+    """The guard is worthless if the step the CLI runs never calls it.
+
+    ``check_figure_sources`` was defined and exercised here while
+    ``check_design`` -- the function ``verify_snapshot.main`` actually invokes --
+    did not call it, so the gate existed only for this file.
+    """
+    root = _root_with(tmp_path, """
+        from sklearn.ensemble import RandomForestRegressor
+
+        def panel():
+            return RandomForestRegressor(n_estimators=150)
+    """)
+    assert any("RandomForestRegressor" in p for p in vs.check_design(root))

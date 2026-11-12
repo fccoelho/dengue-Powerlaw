@@ -59,6 +59,17 @@ warnings.filterwarnings("ignore")
 OUT = HERE
 PANEL_CACHE = HERE / "_panel_city_BR.parquet"
 
+#: State abbreviation by the two-digit IBGE code, which is the leading part of
+#: every municipality geocode. Panels are labelled from the geocode itself, so a
+#: label cannot drift from the units it names; an unknown prefix becomes ``??``
+#: rather than being folded into a real state.
+UF_BY_CODE = {
+    11: "RO", 12: "AC", 13: "AM", 14: "RR", 15: "PA", 16: "AP", 17: "TO",
+    21: "MA", 22: "PI", 23: "CE", 24: "RN", 25: "PB", 26: "PE", 27: "AL",
+    28: "SE", 29: "BA", 31: "MG", 32: "ES", 33: "RJ", 35: "SP", 41: "PR",
+    42: "SC", 43: "RS", 50: "MS", 51: "MT", 52: "GO", 53: "DF",
+}
+
 #: The ablation artefacts written by ``run_ablation.py`` at the repository root.
 #: Figure 11 is a *view* of these files, not a recomputation: the numbers in the
 #: manuscript, in the CSV and in the figure are then the same numbers by
@@ -696,69 +707,183 @@ def _size_oof(origins=(2023, 2024, 2025), tau=0.5):
     return pd.DataFrame(rows)
 
 
-def fig10():
-    """Predicted against observed epidemic size, for the estimator the paper uses.
+def _uf_of(geocode) -> str:
+    """The state a municipality geocode belongs to.
 
-    One panel and one estimator: the spline-basis quantile regression at
-    tau = 0.5, which continues the boundary trend outside the observed range and
-    can therefore forecast a season larger than any in its training window. A
-    tree ensemble bounded by its training responses was drawn here previously;
-    it was removed because for a target whose tail lies beyond the training
-    support, a downward bias at the top is a property of the estimator and not
-    of the data.
+    Geocodes carry the IBGE state code in their leading two digits, in the
+    seven-digit form and in the six-digit form of older exports. An
+    unrecognised prefix returns ``"??"`` instead of being folded into a real
+    state, so a malformed key shows up in the panels rather than being absorbed
+    by one of them.
+    """
+    try:
+        code = str(int(geocode))
+    except (TypeError, ValueError):
+        return "??"
+    if len(code) < 6:
+        return "??"
+    return UF_BY_CODE.get(int(code[:2]), "??")
 
-    The dotted red line marks the largest annual total in the training window,
-    so it separates the seasons the training data covers from those it does
-    not; the share of test units beyond it is stated on the panel, since that
-    share is the whole reason the estimator had to be chosen for its ability to
-    extrapolate.
+
+def _ape_pct(y_true, y_pred):
+    """Absolute percentage error, in percent, of a strictly positive quantity."""
+    y_true = np.asarray(y_true, dtype=float)
+    y_pred = np.asarray(y_pred, dtype=float)
+    return np.abs(y_pred - y_true) / y_true * 100.0
+
+
+def _rank_states(d, min_units=20):
+    """States ordered by the median absolute percentage error of their units.
+
+    ``min_units`` is not cosmetic. A state with fifteen municipalities can reach
+    the top of a per-state ranking on one or two lucky forecasts, so states
+    thinner than this are excluded from the selection and stay visible in the
+    aggregate panel instead of being promoted to a panel of their own.
+    """
+    g = (d.groupby("uf")
+           .agg(n=("ape", "size"), median_ape=("ape", "median"))
+           .sort_values(["median_ape", "uf"]))
+    return g[g["n"] >= min_units]
+
+
+def _size_panel(ax, d, lims, train_max, title, legend=False):
+    """One predicted-against-observed panel on logarithmic axes."""
+    y_true = np.asarray(d["y_true"], dtype=float)
+    y_pred = np.asarray(d["y_pred"], dtype=float)
+    ax.scatter(y_true, y_pred, s=4, alpha=0.25, color="0.4")
+    ax.plot(lims, lims, "k--", lw=1, label="identity")
+    ax.fill_between(lims, [l / 10 for l in lims], [l * 10 for l in lims],
+                    alpha=0.10, color="0.3", label="10:1 / 1:10 band")
+    ax.axhline(train_max, color="#c62828", ls=":", lw=1.2,
+               label="largest training response")
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+    ax.set_xlim(lims)
+    ax.set_ylim(lims)
+    ax.set_title(title, fontsize=7.5)
+    if legend:
+        ax.legend(fontsize=6.5, loc="upper left", frameon=False)
+
+
+def _draw_size_panels(d, ranking, chosen, year, train_max, stem, out_dir=None):
+    """One aggregate panel above, one panel per selected state below.
+
+    Axes are shared across the panels, so a state whose points sit closer to the
+    identity line is visibly closer to it rather than merely on a tighter scale.
+    Returns the pixel shape of the PNG written, which the sidecar records and
+    the design gate compares against the committed image.
+    """
+    out_dir = Path(out_dir or OUT)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    lo = max(1e1, float(min(d["y_true"].min(), d["y_pred"].min())))
+    hi = 10 ** np.ceil(np.log10(float(max(d["y_true"].max(),
+                                          d["y_pred"].max()))))
+    if hi <= lo:  # a degenerate panel would give a singular log axis
+        hi = lo * 10.0
+    lims = [lo, hi]
+    ncol = len(chosen)
+
+    fig = plt.figure(figsize=(7.2, 6.2))
+    gs = fig.add_gridspec(2, ncol, height_ratios=[1.15, 1.0],
+                          hspace=0.45, wspace=0.20)
+    ax0 = fig.add_subplot(gs[0, :])
+    beyond = 100.0 * float((d["y_true"] > train_max).mean())
+    _size_panel(ax0, d, lims, train_max,
+                f"all municipalities, {year}: n={len(d):,}; "
+                f"{beyond:.1f}% of units above the largest training response",
+                legend=True)
+    ax0.set_xlabel("observed annual cases")
+    ax0.set_ylabel("predicted annual cases")
+
+    for k, uf in enumerate(chosen):
+        ax = fig.add_subplot(gs[1, k])
+        sub = d[d["uf"] == uf]
+        _size_panel(ax, sub, lims, train_max,
+                    f"{uf}: n={len(sub):,}, median APE "
+                    f"{ranking.loc[uf, 'median_ape']:.0f}%")
+        ax.set_xlabel("observed")
+
+    fig.savefig(out_dir / f"{stem}.pdf", bbox_inches="tight")
+    fig.savefig(out_dir / f"{stem}.png", bbox_inches="tight")
+    plt.close(fig)
+    height, width = plt.imread(out_dir / f"{stem}.png").shape[:2]
+    return [int(width), int(height)]
+
+
+def fig10(year=2025, n_states=4, min_units=20):
+    """Size forecast for one season: in aggregate, and in the sharpest states.
+
+    A scatter of every municipality of the country pools units that differ by
+    four orders of magnitude in population, and the pooling hides what the model
+    does where it does well: the accurate forecasts are a minority of the points
+    and they disappear among the rest. This splits the same forecast into one
+    aggregate panel and one panel per state, for the states where the forecast
+    is sharpest.
+
+    The states are selected on the statistic the panels display -- the median
+    absolute percentage error of their municipalities -- so the four panels are
+    the favourable end of the distribution of attainable skill and not a sample
+    of it. The aggregate panel is what carries average performance, the caption
+    says so, and the selection is declared here and in ``fig10_states.json``
+    together with the full ranking that produced it.
     """
     from run_ablation import fit_quantile_model
 
     df = _city_panel()
-    train_max = float(df[df["year"] < 2023]["total_cases"].max())
-
-    def _panel(ax, y_true, y_pred, title):
-        y_true = np.asarray(y_true, dtype=float)
-        y_pred = np.asarray(y_pred, dtype=float)
-        ok = np.isfinite(y_true) & np.isfinite(y_pred) & (y_true > 0) & (y_pred > 0)
-        ax.scatter(y_true[ok], y_pred[ok], s=4, alpha=0.25, color="0.4")
-        lims = [max(1e1, min(y_true[ok].min(), y_pred[ok].min())),
-                10 ** np.ceil(np.log10(max(y_true[ok].max(), y_pred[ok].max())))]
-        ax.plot(lims, lims, "k--", lw=1, label="identity")
-        ax.fill_between(lims, [l / 10 for l in lims], [l * 10 for l in lims],
-                        alpha=0.10, color="0.3", label="10:1 / 1:10 band")
-        ax.axhline(train_max, color="#c62828", ls=":", lw=1.2,
-                   label="largest training response")
-        ax.set_xscale("log")
-        ax.set_yscale("log")
-        ax.set_xlim(lims)
-        ax.set_ylim(lims)
-        ax.set_xlabel("observed annual cases")
-        ax.set_title(title, fontsize=8.5)
-        ax.legend(fontsize=6.5, loc="upper left")
-
-    # The panel drawn here has to be the paper's model, which is the full M3
-    # feature set: the caption says so and the figure is read as that model.
     use = _m3_features(df)
-    tr = df[df["year"] < 2023].dropna(subset=use + ["total_cases"])
-    te = df[df["year"].isin([2023, 2024, 2025])].dropna(
-        subset=use + ["total_cases"])
-    est = fit_quantile_model(tr[use], np.log1p(tr["total_cases"]), 0.5)
-    pred = np.expm1(est.predict(te[use]))
-    beyond = 100.0 * float((te["total_cases"] > train_max).mean())
+    train = df[df["year"] < year].dropna(subset=use + ["total_cases"])
+    test = df[df["year"] == year].dropna(subset=use + ["total_cases"])
+    if train.empty or test.empty:
+        raise SystemExit(f"the panel has no train/test split for {year}")
 
-    fig, ax = plt.subplots(figsize=(5.8, 4.6))
-    _panel(ax, te["total_cases"], pred,
-           "spline-basis quantile regression, $\\tau=0.5$\n"
-           f"origins 2023--2025, n={len(te):,}; "
-           f"{beyond:.1f}% of test units above the training maximum")
-    ax.set_ylabel("predicted")
+    est = fit_quantile_model(train[use], np.log1p(train["total_cases"]), 0.5)
+    pred = np.expm1(est.predict(test[use]))
+    train_max = float(train["total_cases"].max())
 
-    fig.tight_layout()
-    fig.savefig(OUT / "fig10_pred_vs_obs.pdf", bbox_inches="tight")
-    fig.savefig(OUT / "fig10_pred_vs_obs.png", bbox_inches="tight")
-    plt.close(fig)
+    d = pd.DataFrame({"geocode": test["geocode"].to_numpy(),
+                      "y_true": test["total_cases"].to_numpy(dtype=float),
+                      "y_pred": np.asarray(pred, dtype=float)})
+    d = d[np.isfinite(d["y_true"]) & np.isfinite(d["y_pred"])
+          & (d["y_true"] > 0) & (d["y_pred"] > 0)].copy()
+    d["uf"] = d["geocode"].map(_uf_of)
+    d["ape"] = _ape_pct(d["y_true"], d["y_pred"])
+
+    ranking = _rank_states(d, min_units=min_units)
+    chosen = list(ranking.index[:n_states])
+    if len(chosen) < n_states:
+        raise SystemExit(
+            f"only {len(chosen)} state(s) have {min_units} or more "
+            f"municipalities in {year}; lower min_units or n_states")
+
+    stem = "fig10_pred_vs_obs"
+    png_shape = _draw_size_panels(d, ranking, chosen, year, train_max, stem)
+
+    sidecar = {
+        "figure": stem,
+        "level": "city",
+        "year": int(year),
+        "tau": 0.5,
+        "estimator": "spline_quantile",
+        "n_units": int(len(d)),
+        "training_max": round(train_max, 1),
+        "selection_rule": (
+            f"states with at least {min_units} municipalities in {year}, "
+            "ordered by the median absolute percentage error of the forecast "
+            "these panels display; the best are drawn"
+        ),
+        "selected": [
+            {"uf": uf, "n": int(ranking.loc[uf, "n"]),
+             "median_ape": round(float(ranking.loc[uf, "median_ape"]), 2)}
+            for uf in chosen
+        ],
+        "ranking": [
+            {"uf": uf, "n": int(row["n"]),
+             "median_ape": round(float(row["median_ape"]), 2)}
+            for uf, row in ranking.iterrows()
+        ],
+        "png_shape": png_shape,
+    }
+    (OUT / "fig10_states.json").write_text(json.dumps(sidecar, indent=2) + "\n")
 
 
 def fig11(abl):
@@ -1053,7 +1178,8 @@ def fig14(oof):
 
     (a) absolute percentage error of the reported size forecast against unit
     population, one point per unit and origin, summarised by the median in
-    population bins; (b) standardised persistence residuals against a normal
+    population bins, with the 100,000-inhabitant threshold marked; (b)
+    standardised persistence residuals against a normal
     reference, which involves no fitted model at all. Panel (a) describes the
     same estimator fig 10 draws, so the figure cannot be read as evidence
     about a model the paper does not report.
@@ -1071,6 +1197,10 @@ def fig14(oof):
     med = d.groupby(pd.cut(np.log10(d["population"]), 12), observed=True)["ape"].median()
     ax1.plot([iv.mid for iv in med.index], med.values, "o-",
              color="#d62728", lw=1.4, label="median APE")
+    # The threshold the Discussion turns on, drawn rather than described: the
+    # reader can see where the median error bends instead of taking a number.
+    ax1.axvline(np.log10(1e5), color="k", ls="--", lw=1.0,
+                label="100,000 inhabitants")
     ax1.legend(fontsize=8)
     ax1.set_title("(a) APE vs population", fontsize=9)
 
@@ -1089,6 +1219,20 @@ def fig14(oof):
     ax2.set_xlim(-5, 5)
     ax2.legend(fontsize=8)
     ax2.set_title("(b) residuals vs normal reference", fontsize=9)
+
+    # The medians the threshold separates. Figure 14 is read from an artefact
+    # that carries aggregate losses only, so these are computed from the same
+    # row-level refit the panel is drawn from and written beside it; whoever
+    # quotes them quotes the run that drew the figure.
+    bands = {"threshold": 100_000.0}
+    for name, sel in (("below", d["population"] < 1e5),
+                      ("above", d["population"] >= 1e5)):
+        ape = d.loc[sel, "ape"]
+        bands[name] = {"n": int(sel.sum()),
+                       "median_ape": (round(float(ape.median()), 1)
+                                      if len(ape) else None)}
+    (OUT / "fig14_pop_bands.json").write_text(json.dumps(bands, indent=2) + "\n")
+
     fig.tight_layout()
     fig.savefig(OUT / "fig14_error_vs_pop.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig14_error_vs_pop.png", bbox_inches="tight")

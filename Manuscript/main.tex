@@ -576,7 +576,8 @@ Quantile models are fitted on the grid
 $\tau \in \{0.05, 0.10, \dots, 0.95\}$, which yields a full predictive
 distribution per unit and season rather than a point forecast, and all stochastic
 components were seeded identically across runs. Figure~\ref{fig:predobs} shows
-the resulting out-of-sample forecasts against the observed totals. The boundary
+the resulting out-of-sample forecasts for the most recent season, in aggregate
+and broken down by state. The boundary
 segment is what allows a forecast to be placed above the largest annual total in
 the training window, the region where the seasons of greatest concern lie.
 
@@ -1188,16 +1189,23 @@ rather than as a property of the fit.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig10_pred_vs_obs}
-\caption{Out-of-sample forecasts of epidemic size from the spline-basis quantile
-regression of Section~\ref{sec:regression} at $\tau=0.5$, predicted against
-observed annual cases on logarithmic axes, one point per unit and forecast origin.
-The identity line is dashed, the 10:1 and 1:10 bands are shaded, and the dotted
-red line marks the largest annual total in the training window, so that points
-above it are seasons larger than any on which the model was trained; the share of
-test units in that region is given on the panel. Because $\alpha \approx 2$, a
-handful of points in the upper right dominate any squared-error summary, which is
-why the primary loss in Table~\ref{tab:ablation_results} is the pinball loss
-rather than the root mean squared error.}
+\caption{Out-of-sample forecasts of epidemic size for 2025 from the spline-basis
+quantile regression of Section~\ref{sec:regression} at $\tau=0.5$, predicted
+against observed annual cases on logarithmic axes, one point per municipality.
+The upper panel pools every municipality of the country; the lower panels show
+the four states with the smallest median absolute percentage error over their
+municipalities, among the states with at least twenty municipalities in that
+season. The selection is made on the statistic the lower panels display, so they
+are the favourable end of the distribution of attainable skill and not a sample
+of it, and the upper panel is the one that carries average performance. Axes are
+shared across panels. The identity line is dashed, the 10:1 and 1:10 bands are
+shaded, and the dotted red line marks the largest annual total in the training
+window, so that points above it are seasons larger than any on which the model
+was trained; the share of municipalities in that region is given on the upper
+panel. Because $\alpha \approx 2$, a handful of points in the upper right
+dominate any squared-error summary, which is why the primary loss in
+Table~\ref{tab:ablation_results} is the pinball loss rather than the root mean
+squared error.}
 \label{fig:predobs}
 \end{figure}
 
@@ -1237,7 +1245,8 @@ median within population bins. The forecast is the median quantile ($\tau=0.5$) 
 the model whose ladder is given in Table~\ref{tab:ablation_results}. Errors are
 largest for the smallest municipalities, where case counts are low and a single
 imported case represents a large relative change, and they narrow but do not vanish
-at the top of the size distribution.}
+at the top of the size distribution. The dashed vertical line marks
+100{,}000 inhabitants, the threshold discussed in Section~\ref{sec:smallmunic}.}
 \label{fig:errors}
 \end{figure}
 
@@ -1370,6 +1379,44 @@ extreme season is, and does so with two parameters and no training data. These a
 different products for different decisions, and the second is the one a surveillance
 service can use before the season begins.
 
+\subsection{The resolution limit of the size forecast}
+\label{sec:smallmunic}
+
+The aggregate panel of Figure~\ref{fig:predobs} pools municipalities that differ
+by four orders of magnitude in population, and the pooling conceals a boundary
+that a user of the forecast meets at once. Of the 4{,}664 municipalities with at
+least one season in the platform's decomposition, 93.2\% have fewer than 100{,}000 inhabitants
+and together carry 37.7\% of the cases in the series; 86.0\% have fewer than 50{,}000 and carry 25.3\%.
+The median municipality has 13{,}220 inhabitants. The forecast is least accurate
+in that majority, and the reason is arithmetic rather than epidemiological.
+
+Three quantities set the scale. The first is the lower bound of the size
+distribution. The municipal power law is fitted above $x_{\min}=300$ cases
+(Table~\ref{tab:main}), so the tail this paper describes is the set of seasons
+above that threshold; 300 cases is an attack rate of 2.3\% in the median municipality
+and of 0.3\% in one of 100{,}000 inhabitants. A small municipality therefore
+enters the tail only in its exceptional seasons, which are precisely the seasons
+the forecast is asked about, and it contributes few such points, so that the
+exponent which would order its next season is estimated from a handful of
+observations.
+
+The second quantity is the noise of the target. The annual total of a small
+municipality is a small count, and a single imported case is a large relative
+change in it; this is why the error is largest at the left of
+Figure~\ref{fig:errors}. The third is that the effect is not linear in
+population and cannot be repaired by carrying population as a covariate. Where
+the exceedance label is referred to each municipality's own history, a
+population-only reference reaches a median area under the curve of $0.47$,
+indistinguishable from no skill, so the information that separates a strong
+season from a weak one at that level is not the size of the municipality.
+
+The practical consequence is a change of product rather than of model. Below the
+resolution limit the defensible output is the exceedance probability of
+Section~\ref{sec:classifier} and the interval implied by the quantile grid, not a
+point size; a point forecast there should be read as an order of magnitude. The
+aggregate panel of Figure~\ref{fig:predobs} measures that limit, and the four
+state panels show what the forecast achieves where the limit does not bind.
+
 \subsection{A reporting convention}
 
 The practical consequence of the descriptive half is a reporting convention, and it
@@ -1501,6 +1548,14 @@ are absorbed by unit-level effects; to the extent that they vary by season they
 constitute unmodelled heterogeneity that the scaling block may be inadvertently
 representing. This is a tenable explanation for the null reported here, and it is the
 first that we would test.
+
+\emph{The forecast has a resolution limit in population.} Below roughly
+100{,}000 inhabitants the annual total is a small count dominated by a few
+introductions, and no amount of covariate information recovers from it the size
+of the next season; the argument and the magnitudes are in
+Section~\ref{sec:smallmunic}. The four state panels of Figure~\ref{fig:predobs}
+are selected from the states where that limit does not bind, and they are
+therefore not a sample of national performance.
 
 \subsection{Implications for surveillance practice}
 
