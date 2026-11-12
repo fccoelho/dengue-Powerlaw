@@ -369,7 +369,7 @@ def claims(f: dict) -> list[dict]:
          "want": f"${_f(N['alpha_min'])}$ and ${_f(N['alpha_max'])}$",
          "stale": ["1.78 and 2.27"]},
         {"name": "S-nat alpha/IQR/xmin",
-         "want": f"$\\alpha={L['S-nat']['alpha']:.2f}$ (IQR "
+         "want": f"$\\alpha_S={L['S-nat']['alpha']:.2f}$ (IQR "
                  f"{L['S-nat']['iqr_low']:.2f}--{L['S-nat']['iqr_high']:.2f})",
          "stale": ["(IQR 1.92--2.11)"]},
         {"name": "national alpha min..max",
