@@ -18,7 +18,7 @@ All environments use `\includegraphics` **without an extension**, so either
 | `fig07_window_flip` | Results 3.1 | Left: density of $\alpha$ for `W-mun` vs `W-seas`. Right: verdict shares for `W-mun` vs `W-seas`. |
 | `fig08_alpha_stability` | Results 3.1 | (a) $\alpha$ by year, one line per state; (b) $\alpha$ vs $\log_{10}$ population with fitted slope and $r$. |
 | `fig09_exceedance` | Results 3.3 | Implied $\Pr(S\ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ vs empirical exceedance frequency, per national year. |
-| `fig10_pred_vs_obs` | Results 3.6 | Predicted vs observed annual cases, log--log, one point per unit-origin; identity line; 10:1 and 1:10 bands; dotted line at the largest training response. Two panels: random forest and the spline-basis quantile regression the ablation uses. |
+| `fig10_pred_vs_obs` | Results 3.6 | Predicted vs observed annual cases, log--log, one point per unit-origin; identity line; 10:1 and 1:10 bands; dotted line at the largest training response. Single panel, the spline-basis quantile regression at $\tau=0.5$, which is the estimator the ablation uses. |
 | `fig11_ablation_skill` | Results 3.6 | (a) Skill score vs M0 for epidemic size, M1/M2/M3; (b) pinball loss vs $\tau$ for M2 vs M3, with the range over origins. |
 | `fig12_roc_pr_calibration` | Results 3.5 | 2x2: ROC, PR, calibration, F1 vs threshold; out-of-fold predictions averaged over the five origins (not pooled); M0 dotted-dash reference, M2 solid, M3 dashed, population-only dotted. |
 | `fig13_importance` | Results 3.5 | Held-out permutation importance ($\Delta$ Brier), power-law block highlighted; joint block row plus per-origin stability of the three scaling features. |

@@ -706,19 +706,22 @@ def _regression_oof(origins=(2023, 2024, 2025)):
     return oof, pinball
 
 
-def fig10(oof):
-    """Predicted against observed epidemic size, two estimator classes.
+def fig10():
+    """Predicted against observed epidemic size, for the estimator the paper uses.
 
-    The two panels differ only in the estimator: a random forest, which cannot
-    produce a forecast above the largest response it was trained on, and the
-    spline-basis quantile regression that the ablation now uses, which
-    continues the boundary trend outside the observed range.
+    One panel and one estimator: the spline-basis quantile regression at
+    tau = 0.5, which continues the boundary trend outside the observed range and
+    can therefore forecast a season larger than any in its training window. A
+    tree ensemble bounded by its training responses was drawn here previously;
+    it was removed because for a target whose tail lies beyond the training
+    support, a downward bias at the top is a property of the estimator and not
+    of the data.
 
     The dotted red line marks the largest annual total in the training window,
     so it separates the seasons the training data covers from those it does
-    not. The manuscript shows the two panels side by side and justifies the
-    estimator by the requirement it has to meet, without asserting a general
-    claim about other estimator classes.
+    not; the share of test units beyond it is stated on the panel, since that
+    share is the whole reason the estimator had to be chosen for its ability to
+    extrapolate.
     """
     from run_ablation import (
         CLIMATE_BLOCK, COVARIATE_DUR, COVARIATE_PEAK, DEMO, EPI,
@@ -748,15 +751,6 @@ def fig10(oof):
         ax.set_title(title, fontsize=8.5)
         ax.legend(fontsize=6.5, loc="upper left")
 
-    fig, axes = plt.subplots(1, 2, figsize=(9.4, 4.2), sharey=True)
-
-    # (a) random forest, from the shared out-of-sample pass
-    d = oof[oof["model"] == "M3"]
-    _panel(axes[0], d["y_true"], d["y_pred"],
-           f"random forest (origins 2023\u20132025, n={len(d):,})")
-    axes[0].set_ylabel("predicted")
-
-    # (b) the estimator the ablation uses
     feats = (LAGGED_SIZE + COVARIATE_DUR + COVARIATE_PEAK + EPI + DEMO
              + list(CLIMATE_BLOCK) + SCALING_SIZE)
     use = [c for c in feats if c in df.columns and not df[c].isnull().all()]
@@ -766,9 +760,13 @@ def fig10(oof):
     est = fit_quantile_model(tr[use], np.log1p(tr["total_cases"]), 0.5)
     pred = np.expm1(est.predict(te[use]))
     beyond = 100.0 * float((te["total_cases"] > train_max).mean())
-    _panel(axes[1], te["total_cases"], pred,
-           "quantile regression, spline basis (can extrapolate)\n"
-           f"{beyond:.1f}% of test units lie above the training maximum")
+
+    fig, ax = plt.subplots(figsize=(5.8, 4.6))
+    _panel(ax, te["total_cases"], pred,
+           "spline-basis quantile regression, $\\tau=0.5$\n"
+           f"origins 2023--2025, n={len(te):,}; "
+           f"{beyond:.1f}% of test units above the training maximum")
+    ax.set_ylabel("predicted")
 
     fig.tight_layout()
     fig.savefig(OUT / "fig10_pred_vs_obs.pdf", bbox_inches="tight")
@@ -1208,11 +1206,13 @@ def main(which=None):
     }
     todo = which or list(everything)
 
-    # figs 10 and 14 share one out-of-sample pass, at CITY level. It is a
-    # separate experiment from the ablation and must stay that way: the
-    # artefact only carries aggregate losses, not row-level predictions, so it
-    # cannot drive a scatter of predictions.
-    need_oof = any(f in todo for f in ("fig10", "fig14"))
+    # fig 14 uses the city-level out-of-sample pass. It is a separate
+    # experiment from the ablation and must stay that way: the artefact only
+    # carries aggregate losses, not row-level predictions, so it cannot drive a
+    # scatter of predictions. NOTE: that pass is still fitted with a random
+    # forest (see _regression_oof), so fig14 panel (a) inherits the estimator
+    # removed from fig 10 and should be moved to the spline quantile model.
+    need_oof = "fig14" in todo
     oof = None
     if need_oof:
         t0 = time.time()
@@ -1242,9 +1242,7 @@ def main(which=None):
     for name in todo:
         t0 = time.time()
         print(f"[{name}] generating...", flush=True)
-        if name == "fig10":
-            everything[name](oof)
-        elif name == "fig11":
+        if name == "fig11":
             everything[name](abl)
         elif name in ("fig12", "fig13"):
             everything[name](clf)
