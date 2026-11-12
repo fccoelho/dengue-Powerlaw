@@ -597,16 +597,17 @@ def create_dashboard():
 
                 # --- Predicted vs Actual (log-log: sizes span three decades) ---
                 hover = []
-                for i, row in df_all.iterrows():
+                for pos in range(len(df_all)):
+                    row = df_all.iloc[pos]
                     txt = (
                         f"Year: {int(row['year'])} "
-                        f"({'Test' if is_test[i] else 'Train'})<br>"
+                        f"({'Test' if is_test[pos] else 'Train'})<br>"
                     )
                     if "city_name" in df_all.columns:
                         txt += f"City: {row['city_name']} ({int(row['geocode'])})"
                     elif "state" in df_all.columns:
                         txt += f"State: {row['state']}"
-                    e = rel_error.loc[i]
+                    e = rel_error.iloc[pos]
                     if np.isfinite(e):
                         txt += f"<br>Error: {e * 100:.1f}%"
                     hover.append(txt)
