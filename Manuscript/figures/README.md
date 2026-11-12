@@ -23,7 +23,7 @@ All environments use `\includegraphics` **without an extension**, so either
 | `fig12_roc_pr_calibration` | Results 3.5 | 2x2: ROC, PR, calibration, F1 vs threshold; out-of-fold predictions averaged over the five origins (not pooled); M0 dotted-dash reference, M2 solid, M3 dashed, population-only dotted. |
 | `fig13_importance` | Results 3.5 | Held-out permutation importance ($\Delta$ Brier), power-law block highlighted; joint block row plus per-origin stability of the three scaling features. |
 | `fig14_error_vs_pop` | Results 3.7 | (a) absolute percentage error of the median ($\tau=0.5$) spline-quantile size forecast vs municipal population, with the median within population bins and the 100,000-inhabitant threshold marked; (b) standardised persistence residuals for epidemic size vs N(0,1). Writes `fig14_pop_bands.json` with the median error either side of the threshold. |
-| `fig15_pred_map` | Results 3.7 | Choropleth of predicted probability of exceeding the 75th percentile, one forecast origin, quintile classes, using `muni_br.gpkg`. The classifier is the one the ablation reports. |
+| `fig15_pred_map` | Results 3.7 | Three panels for the record season, at the M3 rung: (a) choropleth of the predicted probability of exceeding the unit's own 75th percentile, quintile classes; (b) the realised outcome on the same municipalities; (c) observed share against mean prediction by predicted quintile. Grey = no forecast (fewer than five seasons of history). Uses `muni_br.gpkg` and writes `fig15_map.json` recording the origin, the rung and the pixel shape. |
 
 ## Where the numbers come from
 
@@ -35,10 +35,10 @@ All environments use `\includegraphics` **without an extension**, so either
 - Predictive panels: `fig10` and `fig14` refit the reported model
   (`run_ablation.fit_quantile_model`, spline quantile at the median) on the
   pooled city panel, because the ablation artefact holds aggregate losses and
-  not row-level predictions; `fig15` refits
-  `run_ablation.make_classifier`. `fig11`--`fig13` are *read* from
+  not row-level predictions. `fig11`--`fig13` and `fig15` are *read* from
   `ablation_results.csv` and `classifier_results*`, so they cannot disagree
-  with the tables.
+  with the tables; `fig15` in particular draws the out-of-fold predictions
+  rather than refitting a classifier of its own.
 - Population and geography: `parquet_cache/city_stats.parquet`,
   `parquet_cache/geography.parquet`, `muni_br.gpkg`.
 

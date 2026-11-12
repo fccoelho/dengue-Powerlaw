@@ -1,0 +1,17 @@
+{
+  "figure": "fig15_pred_map",
+  "level": "city",
+  "origin": 2024,
+  "origin_rule": "the forecast origin in which the largest share of municipalities exceeded the 75th percentile of their own history -- the record season -- rather than a fixed year, so that the figure follows the data instead of freezing on one origin",
+  "rung": "M3",
+  "n_units": 1484,
+  "panels": [
+    "predicted probability quintiles",
+    "realised outcome",
+    "agreement by predicted quintile"
+  ],
+  "png_shape": [
+    1308,
+    623
+  ]
+}

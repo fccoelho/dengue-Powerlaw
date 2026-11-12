@@ -84,6 +84,7 @@ FIGURE_SOURCES = (os.path.join("Manuscript", "figures", "generate_figures.py"),)
 #: the manifest, and no artefact knows how many panels it has.
 FIGURE_SIDECARS = (
     ("10", "fig10_pred_vs_obs", "fig10_states.json"),
+    ("15", "fig15_pred_map", "fig15_map.json"),
 )
 
 #: Constructors that cannot predict outside their training responses. They are
