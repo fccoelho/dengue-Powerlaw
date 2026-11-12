@@ -14,7 +14,9 @@ Five independent checks, because the repository has drifted in five ways:
    duration scaling descriptors that were removed with that aggregation level.
    A byte-identical artefact from a superseded design passes the manifest check
    and fails this one, which is the point: hashes cannot tell you that the
-   experiment changed shape.
+   experiment changed shape. The same question is asked of the figure module,
+   because the artefacts cannot answer it: a figure that refits on its own can
+   draw an estimator the artefacts never saw.
 4. **Orphan exports** -- ``parquet_cache/`` held Parquet exports of the same
    tables that no script read, so its row counts silently disagreed with the
    database (5,244 vs 5,247; 40,616 vs 41,635). Dead copies of the source of
@@ -69,6 +71,51 @@ FORBIDDEN_COLUMNS = ("prev_alpha_dur", "prev_xmin_dur")
 
 #: Targets the ablation may report.
 ALLOWED_TARGETS = {"total_cases"}
+
+#: Modules that draw the predictive figures.
+FIGURE_SOURCES = (os.path.join("Manuscript", "figures", "generate_figures.py"),)
+
+#: Constructors that cannot predict outside their training responses. They are
+#: legitimate comparison arms inside ``run_ablation.py``, which is why that file
+#: is not scanned; they have no business in a module that draws what the paper
+#: reports.
+SUPERSEDED_FIGURE_ESTIMATORS = (
+    "RandomForestRegressor", "RandomForestClassifier",
+    "GradientBoostingRegressor", "GradientBoostingClassifier",
+    "HistGradientBoosting", "ExtraTreesRegressor", "ExtraTreesClassifier",
+    "DecisionTreeRegressor", "LGBMRegressor", "LGBMClassifier",
+    "import lightgbm", "import xgboost", "xgb.",
+)
+
+
+def check_figure_sources(root: str = ".") -> list[str]:
+    """Refuse a figure module that fits an estimator the paper does not report.
+
+    The artefact checks above cannot see this one. They read what the ablation
+    wrote; a figure that plots a scatter of predictions refits on its own, so
+    the artefacts can declare the current estimator while the panel beside them
+    was drawn with an older one. That is how figure 13 kept a random forest for
+    two revisions after the estimator was dropped from the text: every gate was
+    answering a question about a file the figure never reads.
+    """
+    import re
+
+    problems = []
+    for rel in FIGURE_SOURCES:
+        path = os.path.join(root, rel)
+        if not os.path.exists(path):
+            continue
+        text = open(path, encoding="utf-8").read()
+        # Drop comments only: colour literals such as "\"#d62728\"" must survive.
+        code = re.sub(r"(?:^|\s+)#.*$", "", text, flags=re.MULTILINE)
+        found = sorted({n for n in SUPERSEDED_FIGURE_ESTIMATORS if n in code})
+        if found:
+            problems.append(
+                f"{rel} still fits {found}: a figure has to draw the estimator "
+                "the ablation reports (run_ablation.fit_quantile_model / "
+                "make_classifier), not one of its own"
+            )
+    return problems
 
 
 def check_design(root: str = ".") -> list[str]:

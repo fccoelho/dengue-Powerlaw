@@ -630,80 +630,70 @@ def fig09():
 
 
 # ---------------------------------------------------------------------------
-# shared: out-of-sample regression predictions for figs 10, 11, 14
+# shared: the reported model's feature set and its row-level predictions
 # ---------------------------------------------------------------------------
-def _regression_oof(origins=(2023, 2024, 2025)):
-    from predictive_model import train_predictive_models
-    from sklearn.ensemble import RandomForestRegressor
+def _m3_features(df):
+    """The feature set of the reported model, or an abort.
+
+    ``use`` drops whatever the panel does not carry, so a panel without the
+    climate extracts would draw M3-minus-climate under a label that says M3.
+    The ablation prevents that substitution with ``require_climate``; the two
+    figures that draw this model prevent it here, in one place.
+    """
+    from run_ablation import (
+        CLIMATE_BLOCK, COVARIATE_DUR, COVARIATE_PEAK, DEMO, EPI,
+        LAGGED_SIZE, SCALING_SIZE,
+    )
+
+    absent = [c for c in list(CLIMATE_BLOCK)
+              if c not in df.columns or df[c].isnull().all()]
+    if absent:
+        raise SystemExit(
+            "the reported model carries the climate block and this panel has "
+            f"none of it ({', '.join(absent)} absent).\n"
+            "  Those columns come from data/<geocode>.parquet (Infodengue weekly "
+            "tempmin/umidmin); build them with update_data.py. Without them the "
+            "figure would show a model its caption does not describe."
+        )
+    feats = (LAGGED_SIZE + COVARIATE_DUR + COVARIATE_PEAK + EPI + DEMO
+             + list(CLIMATE_BLOCK) + SCALING_SIZE)
+    return [c for c in feats if c in df.columns and not df[c].isnull().all()]
+
+
+def _size_oof(origins=(2023, 2024, 2025), tau=0.5):
+    """Out-of-sample size forecasts from the estimator the paper reports.
+
+    The ablation artefact carries aggregate losses, not row-level predictions,
+    so a figure that plots one point per unit has to refit. It refits the
+    reported model -- the spline-basis quantile regression at the median -- on
+    the full feature set, one fit per origin, and returns what a scatter of
+    predictions needs.
+    """
+    from run_ablation import fit_quantile_model
 
     df = _city_panel()
-    # Declared block, not a substring scan: a silent empty match would make M2
-    # a copy of M1 in this pass too. run_ablation owns the definition.
-    from run_ablation import CLIMATE_BLOCK
+    use = _m3_features(df)
+    if "population" in df.columns:
+        pop = df["population"]
+    elif "log_pop" in df.columns:
+        pop = np.exp(df["log_pop"])
+    else:
+        pop = pd.Series(np.nan, index=df.index)
 
-    climate = [c for c in CLIMATE_BLOCK if c in df.columns]
-    if not climate:
-        warnings.warn(
-            "figs 10/14: the panel carries none of the declared climate "
-            f"columns {CLIMATE_BLOCK}; the M2 block of this pass equals M1. "
-            "These figures do not report the ablation, so this does not "
-            "invalidate Table 4, but the M2 labels are not climate-controlled.",
-            stacklevel=2)
-    static = ["prev_log_pop"]
-    lags = ["prev_total_cases", "prev_ep_dur", "prev_peak_week", "prev_R0"]
-    scaling = ["prev_alpha_size", "prev_xmin_size", "prev_alpha_trend"]
-    blocks = {
-        "M1": lags,
-        "M2": lags + static + climate,
-        "M3": lags + static + climate + scaling,
-    }
     rows = []
-    pinball = {m: {} for m in ("M2", "M3")}
-    import lightgbm as lgb
-
     for origin in origins:
-        train = df[df["year"] < origin]
-        test = df[df["year"] == origin]
+        train = df[df["year"] < origin].dropna(subset=use + ["total_cases"])
+        test = df[df["year"] == origin].dropna(subset=use + ["total_cases"])
         if train.empty or test.empty:
             continue
-        for name, feats in blocks.items():
-            use = [f for f in feats if f in df.columns
-                   and not df[f].isnull().all()]
-            clean = train.dropna(subset=use + ["total_cases"])
-            model = RandomForestRegressor(
-                n_estimators=150, oob_score=True, random_state=42, n_jobs=-1
-            )
-            ytr = np.log1p(clean["total_cases"])
-            model.fit(clean[use], ytr)
-            preds_log = model.predict(test[use])
-            preds = np.expm1(preds_log)
-            tr_preds = np.expm1(model.predict(clean[use]))
-            bias = (np.expm1(ytr).mean() / tr_preds.mean()
-                    if tr_preds.mean() > 0 else 1.0)
-            for geo, yt, yp in zip(test["geocode"], test["total_cases"],
-                                   preds * bias):
-                rows.append({"origin": origin, "model": name, "geocode": geo,
-                             "target": "total_cases",
-                             "y_true": yt, "y_pred": yp,
-                             "population": test.loc[test['geocode'] == geo, 'population'].iloc[0]
-                             if 'population' in test.columns else np.nan})
-        # quantile models for the pinball curve (size only)
-        for name in ("M2", "M3"):
-            use = [f for f in blocks[name] if f in df.columns
-                   and not df[f].isnull().all()]
-            clean = train.dropna(subset=use + ["total_cases"])
-            for tau in (0.1, 0.25, 0.5, 0.75, 0.9):
-                qm = lgb.LGBMRegressor(
-                    objective="quantile", alpha=tau, n_estimators=200,
-                    learning_rate=0.05, num_leaves=16, random_state=42,
-                    verbose=-1, n_jobs=-1)
-                qm.fit(clean[use], np.log1p(clean["total_cases"]))
-                p = np.expm1(qm.predict(test[use]))
-                pinball[name].setdefault(tau, []).append(
-                    np.mean(np.maximum(tau * (test["total_cases"].values - p),
-                                       (tau - 1) * (test["total_cases"].values - p))))
-    oof = pd.DataFrame(rows)
-    return oof, pinball
+        est = fit_quantile_model(train[use], np.log1p(train["total_cases"]), tau)
+        pred = np.expm1(est.predict(test[use]))
+        for geo, yt, yp, pp in zip(test["geocode"].values,
+                                   test["total_cases"].values, pred,
+                                   pop.loc[test.index].values):
+            rows.append({"origin": origin, "geocode": geo, "y_true": yt,
+                         "y_pred": yp, "population": pp})
+    return pd.DataFrame(rows)
 
 
 def fig10():
@@ -723,10 +713,7 @@ def fig10():
     share is the whole reason the estimator had to be chosen for its ability to
     extrapolate.
     """
-    from run_ablation import (
-        CLIMATE_BLOCK, COVARIATE_DUR, COVARIATE_PEAK, DEMO, EPI,
-        LAGGED_SIZE, SCALING_SIZE, fit_quantile_model,
-    )
+    from run_ablation import fit_quantile_model
 
     df = _city_panel()
     train_max = float(df[df["year"] < 2023]["total_cases"].max())
@@ -752,25 +739,8 @@ def fig10():
         ax.legend(fontsize=6.5, loc="upper left")
 
     # The panel drawn here has to be the paper's model, which is the full M3
-    # feature set, because the caption says so and because the figure is read as
-    # that model. ``use`` below drops whatever is absent, so a panel without the
-    # climate extracts would draw M3-minus-climate under a caption describing
-    # M3 -- the same silent substitution that the ablation guards against with
-    # ``require_climate``. Abort instead.
-    absent = [c for c in list(CLIMATE_BLOCK)
-              if c not in df.columns or df[c].isnull().all()]
-    if absent:
-        raise SystemExit(
-            "fig10 draws the M3 model and the panel has no climate block "
-            f"({', '.join(absent)} absent).\n"
-            "  Those columns come from data/<geocode>.parquet (Infodengue weekly "
-            "tempmin/umidmin); build them with update_data.py. Without them the "
-            "figure would show a model the caption does not describe."
-        )
-
-    feats = (LAGGED_SIZE + COVARIATE_DUR + COVARIATE_PEAK + EPI + DEMO
-             + list(CLIMATE_BLOCK) + SCALING_SIZE)
-    use = [c for c in feats if c in df.columns and not df[c].isnull().all()]
+    # feature set: the caption says so and the figure is read as that model.
+    use = _m3_features(df)
     tr = df[df["year"] < 2023].dropna(subset=use + ["total_cases"])
     te = df[df["year"].isin([2023, 2024, 2025])].dropna(
         subset=use + ["total_cases"])
@@ -886,39 +856,6 @@ def fig11(abl):
 # ---------------------------------------------------------------------------
 # Fig 12 -- binary ROC / PR / calibration / F1(threshold), M2 vs M3
 # ---------------------------------------------------------------------------
-def _binary_oof(df, feature_cols, percentile=0.75, test_year=2024, n_splits=5):
-    import xgboost as xgb
-    from sklearn.impute import SimpleImputer
-    from temporal_split import year_forward_chain_folds
-
-    targets = ["total_cases"]
-    dfc = df.dropna(subset=feature_cols + targets).copy()
-    df_train = dfc[dfc["year"] < test_year]
-    cases = df_train["total_cases"].to_numpy(dtype=float)
-    years = df_train["year"].to_numpy()
-    threshold = np.percentile(cases, percentile * 100)
-    folds = year_forward_chain_folds(years, n_splits=n_splits, min_train_years=2)
-    y_true_all, y_prob_all = [], []
-    X = df_train[feature_cols].to_numpy(dtype=float)
-    for tr_idx, val_idx in folds:
-        fthr = np.percentile(cases[tr_idx], percentile * 100)
-        y_tr = (cases[tr_idx] > fthr).astype(int)
-        y_val = (cases[val_idx] > fthr).astype(int)
-        if len(np.unique(y_tr)) < 2:
-            continue
-        imp = SimpleImputer(strategy="median")
-        Xtr, Xva = imp.fit_transform(X[tr_idx]), imp.transform(X[val_idx])
-        pos_w = float(np.sum(y_tr == 0) / max(np.sum(y_tr == 1), 1))
-        clf = xgb.XGBClassifier(
-            n_estimators=300, max_depth=5, learning_rate=0.05,
-            scale_pos_weight=pos_w, eval_metric="logloss",
-            random_state=42, tree_method="hist", n_jobs=-1)
-        clf.fit(Xtr, y_tr)
-        y_true_all.append(y_val)
-        y_prob_all.append(clf.predict_proba(Xva)[:, 1])
-    return np.concatenate(y_true_all), np.concatenate(y_prob_all)
-
-
 def fig12(art):
     """ROC / PR / calibration / F1 of the rarity classifier, read from the artefact.
 
@@ -1112,34 +1049,39 @@ def fig13(art):
 
 
 def fig14(oof):
+    """Where the forecast's error sits, in population and in shape.
+
+    (a) absolute percentage error of the reported size forecast against unit
+    population, one point per unit and origin, summarised by the median in
+    population bins; (b) standardised persistence residuals against a normal
+    reference, which involves no fitted model at all. Panel (a) describes the
+    same estimator fig 10 draws, so the figure cannot be read as evidence
+    about a model the paper does not report.
+    """
     from scipy.stats import norm
 
-    d = oof[oof["model"] == "M3"].copy()
-    d = d[(d["y_true"] > 0) & (d["population"] > 0)]
+    d = oof[(oof["y_true"] > 0) & (oof["y_pred"] > 0) & (oof["population"] > 0)].copy()
     d["ape"] = np.abs(d["y_pred"] - d["y_true"]) / d["y_true"] * 100
+
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.0, 3.6))
     ax1.scatter(np.log10(d["population"]), d["ape"].clip(upper=500), s=4,
                 alpha=0.2, color="0.4")
     ax1.set_xlabel(r"$\log_{10}$ municipal population")
     ax1.set_ylabel("absolute percentage error (%)")
     med = d.groupby(pd.cut(np.log10(d["population"]), 12), observed=True)["ape"].median()
-    xs = [iv.mid for iv in med.index]
-    ax1.plot(xs, med.values, "o-", color="#d62728", lw=1.4, label="median APE")
+    ax1.plot([iv.mid for iv in med.index], med.values, "o-",
+             color="#d62728", lw=1.4, label="median APE")
     ax1.legend(fontsize=8)
     ax1.set_title("(a) APE vs population", fontsize=9)
 
     df = _city_panel()
-    # Epidemic size only: duration and peak timing are bounded by the length
-    # of the season and are covariates now, not targets.
-    targets = ["total_cases"]
-    for i, tgt in enumerate(targets):
-        prev = f"prev_{tgt}"
-        sub = df.dropna(subset=[prev, tgt])
-        resid = sub[tgt] - sub[prev]  # persistence residual
-        z = (resid - resid.mean()) / resid.std()
-        grid = np.linspace(-4, 4, 200)
-        ax2.hist(z, bins=60, density=True, alpha=0.4,
-                 color=COLORS[i], label=tgt)
+    # Epidemic size only: duration and peak timing are bounded by the length of
+    # the season and enter as covariates, not as targets.
+    prev, tgt = "prev_total_cases", "total_cases"
+    sub = df.dropna(subset=[prev, tgt])
+    resid = sub[tgt] - sub[prev]  # persistence residual
+    z = (resid - resid.mean()) / resid.std()
+    ax2.hist(z, bins=60, density=True, alpha=0.4, color=COLORS[0], label=tgt)
     xs = np.linspace(-4, 4, 200)
     ax2.plot(xs, norm.pdf(xs), "k-", lw=1.2, label="standard normal")
     ax2.set_xlabel("standardised persistence residual")
@@ -1223,20 +1165,16 @@ def main(which=None):
     }
     todo = which or list(everything)
 
-    # fig 14 uses the city-level out-of-sample pass. It is a separate
-    # experiment from the ablation and must stay that way: the artefact only
-    # carries aggregate losses, not row-level predictions, so it cannot drive a
-    # scatter of predictions. NOTE: that pass is still fitted with a random
-    # forest (see _regression_oof), so fig14 panel (a) inherits the estimator
-    # removed from fig 10 and should be moved to the spline quantile model.
-    need_oof = "fig14" in todo
+    # fig 14 needs row-level predictions, which the ablation artefact does not
+    # carry: it holds aggregate losses only. So this pass refits rather than
+    # reads the ladder, and it must refit the estimator the ladder reports.
     oof = None
-    if need_oof:
+    if "fig14" in todo:
         t0 = time.time()
-        print("retraining out-of-sample regression pass (origins 2023-2025, "
-              "city level, random forest) -- this is NOT the ablation...",
-              flush=True)
-        oof, _pinball_unused = _regression_oof()
+        print("refitting the reported model for the row-level panel of fig 14 "
+              "(origins 2023-2025, city level, spline quantile at tau=0.5); "
+              "this is NOT the ablation...", flush=True)
+        oof = _size_oof()
         print(f"  done in {time.time() - t0:.0f}s", flush=True)
 
     # fig 11 reads the ablation artefact written by run_ablation.py.

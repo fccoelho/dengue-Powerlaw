@@ -366,18 +366,18 @@ The dashboard will be available at `http://127.0.0.1:7860`.
 - `aggregate_city_stats.py`: builds the `city_stats` table (population, case totals) used for joins
 - `provenance.py`: snapshot manifest; SHA-256 of the database and of every derived artefact (`--write` freezes, `--check` raises on drift)
 - `make_tables.py`: emits `Manuscript/generated/tab_main.tex` and `facts.json` from the database; `--check` audits the prose against them
-- `verify_snapshot.py`: manifest + prose + orphan-export checks in one command; exit 1 on any drift
+- `verify_snapshot.py`: manifest, prose, design, orphan-export and ablation checks in one command; exit 1 on any drift. The design check also refuses a figure module that fits an estimator the ablation does not report
 
 ### Predictive layer
 - `run_ablation.py`: rolling-origin ablation ladder M0 to M3, state and city; writes `ablation_results.csv` / `ablation_city.csv`
-- `run_classifier.py`: out-of-fold rarity classifier feeding Figures 12 and 13
+- `run_classifier.py`: out-of-fold rarity classifier feeding the classifier figure and its importance panel
 - `temporal_split.py`, `predictive_model.py`: shared panel construction and model definitions
 - `binary_classifier.py`, `binary_viz_utils.py`: classifier helpers and plotting
 
 ### Manuscript
 - `Manuscript/main.tex`: manuscript source; Table 1 is `\input{generated/tab_main}`
-- `Manuscript/figures/generate_figures.py`: all 15 figures, or a subset (`python Manuscript/figures/generate_figures.py 2 4 6`)
-- `Manuscript/verification/`: result verification scripts and SQL
+- `Manuscript/figures/generate_figures.py`: all 14 figures, or a subset (`python Manuscript/figures/generate_figures.py 2 4 6`). Panels that plot one point per unit refit the reported estimator (`_m3_features` refuses a panel without the climate block)
+- `Manuscript/verification/`: result verification scripts and SQL. `verify_predictive.py` audits every predictive-layer number against the committed ablation and classifier artefacts, two-sided: `STALE` when the artefact supports a value the text dropped, `DRIFT` when the text quotes a value the artefact no longer produces
 - `report/`, `slides/`, `slides_beamer/`: presentation material
 
 ### Dashboard and shared utilities

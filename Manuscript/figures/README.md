@@ -22,7 +22,7 @@ All environments use `\includegraphics` **without an extension**, so either
 | `fig11_ablation_skill` | Results 3.6 | (a) Skill score vs M0 for epidemic size, M1/M2/M3; (b) pinball loss vs $\tau$ for M2 vs M3, with the range over origins. |
 | `fig12_roc_pr_calibration` | Results 3.5 | 2x2: ROC, PR, calibration, F1 vs threshold; out-of-fold predictions averaged over the five origins (not pooled); M0 dotted-dash reference, M2 solid, M3 dashed, population-only dotted. |
 | `fig13_importance` | Results 3.5 | Held-out permutation importance ($\Delta$ Brier), power-law block highlighted; joint block row plus per-origin stability of the three scaling features. |
-| `fig14_error_vs_pop` | Results 3.7 | (a) absolute percentage error vs population; (b) standardised persistence residuals for epidemic size vs N(0,1). |
+| `fig14_error_vs_pop` | Results 3.7 | (a) absolute percentage error of the median ($\tau=0.5$) spline-quantile size forecast vs municipal population, with the median within population bins; (b) standardised persistence residuals for epidemic size vs N(0,1). |
 | `fig15_pred_map` | Results 3.7 | Choropleth of predicted probability of exceeding the 75th percentile, one forecast origin, quintile classes, using `muni_br.gpkg`. The classifier is the one the ablation reports. |
 
 ## Where the numbers come from
@@ -32,9 +32,13 @@ All environments use `\includegraphics` **without an extension**, so either
   (`powerlaw_fits`, `powerlaw_fits_yearly`, `powerlaw_fits_total_cases`,
   `episcanner_state_fits`, `episcanner_fits`). Queries in
   `Manuscript/verification/verify_tables.sql` reproduce Table 2 exactly.
-- Predictive panels (fig10--fig15): outputs of `predictive_model.py` and
-  `binary_classifier.py`, as exposed in `dashboard.py`
-  (tabs *Predictive* and *Predicting Large Epidemics*).
+- Predictive panels: `fig10` and `fig14` refit the reported model
+  (`run_ablation.fit_quantile_model`, spline quantile at the median) on the
+  pooled city panel, because the ablation artefact holds aggregate losses and
+  not row-level predictions; `fig15` refits
+  `run_ablation.make_classifier`. `fig11`--`fig13` are *read* from
+  `ablation_results.csv` and `classifier_results*`, so they cannot disagree
+  with the tables.
 - Population and geography: `parquet_cache/city_stats.parquet`,
   `parquet_cache/geography.parquet`, `muni_br.gpkg`.
 
@@ -47,8 +51,8 @@ All environments use `\includegraphics` **without an extension**, so either
 
 ## Note on the ablation figures
 
-`fig10`--`fig15` and `tab:ablation_results` are the only parts of the
-manuscript whose numbers are not yet in the database. They require the
-rolling-origin ablation runs described in Methods 2.11 (rungs M0--M3,
-origins 2021--2025). Everything else in the paper is already reproducible from
-`powerlaw_results.db`.
+`fig11`--`fig13` are views of committed artefacts and are never recomputed
+here. `fig10`, `fig14` and `fig15` do refit, because the artefacts carry
+aggregate losses only; they fit the same estimators the ablation reports, in
+one place (`_m3_features`), which aborts rather than draw a model without the
+climate block.
