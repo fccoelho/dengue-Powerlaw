@@ -450,6 +450,16 @@ def fig04():
 # Fig 05 -- xmin diagnostic: alpha vs xmin by level
 # ---------------------------------------------------------------------------
 def fig05():
+    """The identification diagnostic: lower bound against estimated exponent.
+
+    The legend sits in the lower-right corner, not the upper left. Measured in
+    axes coordinates, the upper-left third holds 25.6% of the 50,391 points and
+    the lower-right third holds 0.03% -- 13 points, and 5 under the legend box
+    itself against 5,279 before. At x_min > 10^3, where the corner falls, the
+    size constructions are few and their exponents sit above 1.8, so the corner
+    is free by the data as well as by the shaded band, which occupies the left
+    edge together with its label.
+    """
     data = _level_alpha()
     fig, ax = plt.subplots(figsize=(7.0, 3.6))
     ax.axvspan(0.5, 5.5, color="0.9", zorder=0)
@@ -462,7 +472,7 @@ def fig05():
     ax.set_xscale("log")
     ax.set_xlabel(r"selected lower bound $x_{\min}$")
     ax.set_ylabel(r"estimated $\alpha$")
-    ax.legend(fontsize=6.5, ncol=2, loc="upper left")
+    ax.legend(fontsize=6.5, ncol=2, loc="lower right")
     fig.tight_layout()
     fig.savefig(OUT / "fig05_xmin_diagnostic.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig05_xmin_diagnostic.png", bbox_inches="tight")

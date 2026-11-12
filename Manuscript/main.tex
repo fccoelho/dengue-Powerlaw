@@ -577,7 +577,7 @@ $\tau \in \{0.05, 0.10, \dots, 0.95\}$, which yields a full predictive
 distribution per unit and season rather than a point forecast, and all stochastic
 components were seeded identically across runs. Figure~\ref{fig:predobs} shows
 the resulting out-of-sample forecasts for the most recent season, in aggregate
-and broken down by state. The boundary
+and broken down by state, over the municipal panel. The boundary
 segment is what allows a forecast to be placed above the largest annual total in
 the training window, the region where the seasons of greatest concern lie.
 
@@ -790,76 +790,104 @@ different windows, and \lvl{S-state} and \lvl{S-nat} the same variable at differ
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig02_alpha_by_level}
-\caption{Distribution of the estimated exponent $\alpha$ at each construction.
-Boxes give the median and interquartile range across fits, whiskers extend to
-1.5 times the interquartile range, and the dashed line marks $\alpha=2$. The two
-weekly constructions and the three size constructions each fit a single variable,
-so that the movement of the box within a group is the movement of the
-construction and not of the object. Sizes concentrate near $\alpha \approx 2$
+\caption{Distribution of the estimated power-law exponent $\alpha$ across fits, by
+construction. The exponent is that of the discrete law $p(x)\propto x^{-\alpha}$
+fitted above a lower bound $x_{\min}$ (Section~\ref{sec:estimation}), so that a
+larger $\alpha$ describes a lighter tail; $\alpha=2$ marks the boundary below
+which the second moment of the fitted law diverges. Boxes give the median and
+interquartile range across fits, whiskers extend to 1.5 times the interquartile
+range, and the dashed line marks $\alpha=2$. The two weekly constructions,
+\lvl{W-mun} (weekly counts of one municipality over its full series) and
+\lvl{W-seas} (the same counts partitioned into single seasons), and the three
+size constructions, \lvl{S-mun} (the annual totals of one municipality across
+seasons), \lvl{S-state} (the municipalities of one state in one season) and
+\lvl{S-nat} (the municipalities of the country in one season), each fit a single
+variable, so that the movement of the box within a group is the movement of the
+construction and not of the object. Sizes concentrate near $\alpha\approx2$
 throughout, with the weekly constructions producing the widest dispersion because
 most of their fits describe the bulk rather than a tail.}
 \label{fig:alpha}
 \end{figure}
 
 Two features disqualify the weekly constructions as a basis for a scaling claim,
-and both are visible without a further experiment. Where the estimated lower
-bound falls within the bulk, the fitted law describes the whole distribution and
-the language of tails is vacuous: 77\% of \lvl{W-mun} and 81\% of \lvl{W-seas} fits
-have $x_{\min} \le 5$, so that the model is estimated on counts of one and two
-cases. Second, the verdict changes with the window: pooling the same weekly
-counts over a decade instead of a single season reduces the proportion of fits
-favouring a power law from 77\% to 23\% and raises the proportion significantly
-favouring the exponential from 3\% to 22\%. No transmission parameter differs
+and both are visible without a further experiment. The first is the position of
+the estimated lower bound: where it falls within the bulk, the fitted law
+describes the whole distribution and the language of tails is vacuous, since 77\% of \lvl{W-mun} and 81\% of \lvl{W-seas} fits
+have $x_{\min} \le 5$ and the model is then estimated on counts of one and two
+cases. The second is that the verdict changes with the window: pooling the same
+weekly counts over a decade instead of a single season reduces the proportion of
+fits favouring a power law from 77\% to 23\% and raises the proportion
+significantly favouring the exponential from 3\% to 22\%. No transmission parameter differs
 between those two numbers (Figure~\ref{fig:window}). The corresponding
 consequence for individual fits is shown in Figure~\ref{fig:examples}.
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig03_verdict_by_level}
-\caption{Model comparison by construction. For each construction, the proportion
-of fits in which the power law is preferred ($R>0$), the proportion in which it
-is preferred \emph{and} significant at $p<0.05$, and the proportion in which the
-exponential is significant ($R<0$ and $p<0.05$). Constructions are ordered from
-those on individual series (left) to the cross-sectional ones (right). The two
-weekly constructions produce apparent power-law support that the $x_{\min}$
-diagnostic removes; the size constructions are the only ones whose support
-survives both criteria.}
+\caption{Model comparison by construction. $R$ is the normalised log-likelihood ratio
+between the power-law and the exponential fit, positive where the power law is
+preferred and negative where the exponential is, and $p$ is the significance
+level attached to its sign (Section~\ref{sec:comparison}); $x_{\min}$ is the
+lower bound above which the law is fitted. For each construction the bars give
+the proportion of fits in which the power law is preferred ($R>0$), the
+proportion in which it is preferred \emph{and} significant at $p<0.05$, and the
+proportion in which the exponential is significant ($R<0$ and $p<0.05$).
+Constructions are ordered from those on individual series (left) to the
+cross-sectional ones (right). The two weekly constructions produce apparent
+power-law support that the lower-bound diagnostic removes
+(Figure~\ref{fig:xmin}), since there $x_{\min}$ falls inside the bulk of the
+counts and the law is asked to describe the whole distribution rather than a
+tail; at the size constructions, where $x_{\min}$ lies two to three orders of
+magnitude above the bulk, the support is both significant and tail-informative.}
 \label{fig:verdicts}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig05_xmin_diagnostic}
-\caption{Identification diagnostic. Estimated exponent $\alpha$ against the
-selected lower bound $x_{\min}$ on a logarithmic scale, one point per fit,
-coloured by construction. The shaded band marks $x_{\min} \le 5$, where the
-fitted power law is asked to describe the bulk of the distribution rather than a
-tail. The two weekly constructions lie almost entirely inside that band, whereas
-the size constructions lie two to three orders of magnitude to its right.}
+\caption{Identification diagnostic. Estimated power-law exponent $\alpha$, of the discrete
+law $p(x)\propto x^{-\alpha}$ fitted above a lower bound, against the selected
+lower bound $x_{\min}$, the threshold above which the law is fitted, on a
+logarithmic scale; one point per fit, coloured by construction, the legend giving
+each construction and the variable it fits. The shaded band marks
+$x_{\min}\le5$ cases, where the fitted power law is asked to describe the bulk of
+the distribution rather than a tail. The two weekly constructions lie almost
+entirely inside that band, whereas the size constructions lie two to three orders
+of magnitude to its right.}
 \label{fig:xmin}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig06_example_fits}
-\caption{Individual fits at three constructions, each with the power law (solid)
-and the exponential alternative (dashed) superimposed. (a) Weekly counts of a
-small municipality, where the selected $x_{\min}$ falls to 2 and the power law is
-fitted to the entire distribution; (b) weekly counts of a large state capital;
-(c) a state-year cross-section of epidemic sizes, where $x_{\min}$ lies in the
-hundreds of cases. All three are produced by the same estimator applied to
-different objects, and only the third describes a tail.}
+\caption{Individual fits at three constructions, each with the power law (solid), the
+exponential alternative (dashed) and the empirical distribution (grey)
+superimposed. (a) Weekly counts of a small municipality, where the selected lower
+bound $x_{\min}$ --- the threshold above which the power law is fitted --- falls
+to 2 cases and the law is fitted to the entire distribution; (b) weekly counts of
+a large state capital; (c) a state-year cross-section of epidemic sizes, where
+$x_{\min}$ lies in the hundreds of cases. The titles give the normalised
+log-likelihood ratio $R$ between the two alternatives, positive where the power
+law is preferred, and its significance level $p$. All three are produced by the
+same estimator applied to different objects, and only the third describes a
+tail.}
 \label{fig:examples}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig07_window_flip}
-\caption{The window reverses the verdict on identical data. Left, density of the
-estimated exponent from the full municipal series (\lvl{W-mun}) and from the same series
-partitioned into single seasons (\lvl{W-seas}). Right, the corresponding verdicts: the
-share of fits favouring the power law falls from 77\% to 23\%, while the share
-significantly favouring the exponential rises from 3\% to 22\%.}
+\caption{The window reverses the verdict on identical data. Left, density of the estimated
+power-law exponent $\alpha$, of the discrete law $p(x)\propto x^{-\alpha}$ fitted
+above the lower bound $x_{\min}$, from the full municipal series (\lvl{W-mun})
+and from the same series partitioned into single seasons (\lvl{W-seas}); the
+dashed line marks $\alpha=2$, below which the second moment of the fitted law
+diverges. Right, the corresponding verdicts: the share of fits favouring the
+power law falls from 77\% to 23\%, and the share significantly favouring the
+exponential rises from 3\% to 22\%, a fit counting as significantly favouring the
+exponential when $R<0$ and $p<0.05$ in the normalised log-likelihood comparison
+of Section~\ref{sec:comparison}, where $R$ is that ratio and $p$ its significance
+level.}
 \label{fig:window}
 \end{figure}
 
@@ -895,12 +923,17 @@ decades above $x_{\min}$.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=0.78\textwidth]{figures/fig04_size_ccdf}
-\caption{Empirical complementary cumulative distribution of epidemic size at the
-national cross-section, pooled over the 16 seasons, with the fitted power law and
-the exponential alternative superimposed. The empirical curve is close to linear
-on logarithmic axes over two decades above $x_{\min}=730$ cases, which is the
-visual form of the claim used in the remainder of the paper, and the exponential
-alternative bends away from it over the same region.}
+\caption{Empirical complementary cumulative distribution of epidemic size at the national
+cross-section --- the annual totals of all municipalities, pooled over the 16
+seasons --- with the fitted power law and the exponential alternative superimposed
+on logarithmic axes. Both curves are evaluated at the parameters of the fit to the
+pooled sample, whose exponent $\alpha$ and lower bound $x_{\min}$ --- the threshold
+above which the law is fitted --- are given in the legend. That pair is not the
+median of the sixteen per-season fits reported in the text: pooling the seasons
+yields a single sample, with its own lower bound, and the two are not
+interchangeable. The empirical curve is close to linear over two decades above
+$x_{\min}$, which is the visual form of the claim used in the remainder of the
+paper, and the exponential alternative bends away from it over the same region.}
 \label{fig:ccdf}
 \end{figure}
 
@@ -964,10 +997,13 @@ predictions about the ablation of Section~\ref{sec:prediction}.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig08_alpha_stability}
-\caption{Stability of the exponent. (a) Estimated $\alpha$ for epidemic size by
-season, one line per state, at the state cross-section: the lines are flat, and
-the spread between states is far smaller than the season-to-season variation in
-case counts. (b) $\alpha$ against $\log_{10}$ municipal population, which shows no
+\caption{Stability of the exponent. (a) Estimated power-law exponent $\alpha$, of the
+discrete law $p(x)\propto x^{-\alpha}$ fitted above the lower bound $x_{\min}$,
+for epidemic size by season, one line per state, at the state-year
+cross-section: the lines are flat, and the spread between states is far smaller
+than the season-to-season variation in case counts. (b) Estimated $\alpha$ of the
+weekly municipal construction against $\log_{10}$ municipal population, a
+different construction and a different object from panel (a), which shows no
 association (Pearson $r=-0.043$, Spearman $-0.048$, $n=5{,}264$). Panel (a) is
 the empirical reason the exponent can serve as a compact descriptor of a season:
 it varies slowly along exactly the axis in which the observables do not.}
@@ -1002,15 +1038,19 @@ and which a subsequent season can falsify.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig09_exceedance}
-\caption{The fitted power law as a probabilistic statement about exceedance. For
-each national cross-section, curves give
-$\Pr(S \ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ evaluated at the fitted
-$(\alpha, x_{\min})$, and points give the empirical exceedance frequency of the
-same cross-section. Agreement across two decades of epidemic size is what
-licenses the use of $(\alpha, x_{\min})$ as a compact statement about a
-municipality's risk of an extreme season. Where the curves separate from the
-points in the extreme upper tail, the sample is too small to distinguish model
-error from sampling noise, and those regions are marked.}
+\caption{The fitted power law as a probabilistic statement about exceedance. Epidemic size
+$S$ is the annual total of a municipality and $s$ a size threshold; the curves
+give, for three national cross-sections (2016, 2019 and 2024),
+$\Pr(S\ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ evaluated at the fitted
+exponent $\alpha$ and lower bound $x_{\min}$, where $\zeta$ is the Hurwitz zeta
+function that normalises the discrete law, rescaled by the empirical fraction of the cross-section at or
+above $x_{\min}$ so that curve and points share an unconditional scale. The
+points give the empirical exceedance frequency of the same cross-section.
+Agreement across two decades of epidemic size is what licenses the use of
+$(\alpha,x_{\min})$ as a compact statement about a municipality's risk of an
+extreme season. In the extreme upper tail, drawn as crosses for the highest 5\%
+of each cross-section, the sample is too small to distinguish model error from
+sampling noise, and those regions are marked rather than interpreted.}
 \label{fig:exceed}
 \end{figure}
 
@@ -1119,32 +1159,42 @@ Section~\ref{sec:coupling} seen from a third direction.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig12_roc_pr_calibration}
-\caption{Classification of large seasons at municipal level. (a) ROC curves;
-(b) precision--recall curves, the more informative summary when the positive
-class is the minority; (c) calibration of the predicted probability of exceeding
-the 75th percentile; (d) $F_1$ as a function of the decision threshold, with the
-Youden point marked. All curves are computed out of fold and averaged over the
-five forecast origins rather than pooled across them: pooling is not neutral here,
-because the base rate ranges from $0.21$ to $0.70$ between origins and a
-prediction that knows only the calendar season reaches a pooled area under the
-curve of $0.60$ while having no within-origin discrimination at all. Solid lines
-denote M2, without scaling descriptors, dashed lines M3, with them, the dash-dot
-curve the no-skill M0 reference and the dotted grey curve the population-only
-reference.}
+\caption{Classification of large seasons at municipal level. The event classified is a
+season exceeding the 75th percentile of the municipality's own earlier seasons,
+so the positive class is the minority one. (a) Receiver operating characteristic
+curves, true positive against false positive rate, whose area is the
+discrimination summary quoted in the text; (b) precision--recall curves, the more
+informative summary when the positive class is the minority; (c) calibration of
+the predicted probability of the event, in deciles within origin; (d) $F_1$, the
+harmonic mean of precision and recall, as a function of the decision threshold,
+with the threshold chosen by Youden's $J$ statistic marked. All curves are
+computed out of fold and averaged over the five forecast origins rather than
+pooled across them: pooling is not neutral here, because the base rate ranges
+from $0.21$ to $0.70$ between origins and a prediction that knows only the
+calendar season reaches a pooled area under the curve of $0.60$ while having no
+within-origin discrimination at all. Solid lines denote M2, the rung carrying the
+lagged, epidemiological, demographic and climate blocks without the scaling
+descriptors, dashed lines M3, which adds them, the dash-dot curve the no-skill M0
+reference and the dotted grey curve a population-only reference.}
 \label{fig:roc}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig13_importance}
-\caption{What the classifier uses. Held-out permutation importance, measured as
-the increase in the Brier score when a predictor is permuted, so that a negative
-value means the predictor is detrimental. Panel (a) ranks the individual
-predictors, with the power-law block in red; panel (b) tracks the three scaling
-descriptors across forecast origins. The joint bar is the scaling block permuted
-as a single unit: permuting one column while its correlated partners remain in
-place understates a collinear block, and $\alpha_{t-1}$ and $x_{\min,t-1}$ are
-rank-correlated at $0.64$ within units.}
+\caption{What the classifier uses. Held-out permutation importance, measured as the
+increase in the Brier score --- the mean squared error of the predicted
+probabilities, so that lower is better --- when a predictor is permuted, so that a
+negative value means the model is better with the predictor than without it.
+Panel (a) ranks the individual predictors, with the block of scaling descriptors
+in red: $\alpha$ is the power-law exponent, $x_{\min}$ the lower bound above
+which the law is fitted, $\dot\alpha$ the least-squares slope of $\alpha$ over
+the seasons before $t$, and the subscript $t-1$ marks the value measured in the
+previous season. Panel (b) tracks the three scaling descriptors across forecast
+origins. The joint bar is the scaling block permuted as a single unit: permuting
+one column while its correlated partners remain in place understates a collinear
+block, and $\alpha_{t-1}$ and $x_{\min,t-1}$ are rank-correlated at $0.64$ within
+units.}
 \label{fig:importance}
 \end{figure}
 
@@ -1157,7 +1207,10 @@ answer is negative, and the reason is the coupling measured in
 Section~\ref{sec:coupling}.
 
 Table~\ref{tab:ablation_results} reports the ladder over the five origins at state
-level. Against calibrated persistence, the lagged-descriptor rung M1 carries
+level. The two figures that follow are not the municipal counterpart of that
+table: Figures~\ref{fig:predobs} and~\ref{fig:errors} refit the same specification
+on the municipal panel, and no municipal ladder for size is reported here. Against
+calibrated persistence, the lagged-descriptor rung M1 carries
 essentially no skill for size (median skill $0.30$, range $-0.06$ to $0.86$, positive in
 3 of 5 origins and with an interval excluding zero in 2 of 5), and
 successive rungs do not improve on it: M2 has median $0.12$ and M3 $0.15$. The
@@ -1235,22 +1288,25 @@ rather than as a property of the fit.
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig10_pred_vs_obs}
-\caption{Out-of-sample forecasts of epidemic size for 2025 from the spline-basis
-quantile regression of Section~\ref{sec:regression} at $\tau=0.5$, predicted
-against observed annual cases on logarithmic axes, one point per municipality.
-The upper panel pools every municipality of the country; the lower panels show
-the four states with the smallest median absolute percentage error over their
-municipalities, among the states with at least twenty municipalities in that
-season. The selection is made on the statistic the lower panels display, so they
-are the favourable end of the distribution of attainable skill and not a sample
-of it, and the upper panel is the one that carries average performance. Axes are
-shared across panels. The identity line is dashed, the 10:1 and 1:10 bands are
-shaded, and the dotted red line marks the largest annual total in the training
-window, so that points above it are seasons larger than any on which the model
-was trained; the share of municipalities in that region is given on the upper
-panel. Because $\alpha \approx 2$, a handful of points in the upper right
-dominate any squared-error summary, which is why the primary loss in
-Table~\ref{tab:ablation_results} is the pinball loss rather than the root mean
+\caption{Out-of-sample forecasts of epidemic size for 2025 at municipal level, from the
+spline-basis quantile regression of Section~\ref{sec:regression} refitted on the
+municipal panel, at the median quantile $\tau=0.5$, where $\tau$ is the quantile
+level of the forecast and the forecast is therefore the conditional median of
+annual cases; predicted against observed annual cases on logarithmic axes, one
+point per municipality. The upper panel pools every municipality of the country;
+the lower panels show the four states with the smallest median absolute
+percentage error over their municipalities, among the states with at least twenty
+municipalities in that season. The selection is made on the statistic the lower
+panels display, so they are the favourable end of the distribution of attainable
+skill and not a sample of it, and the upper panel is the one that carries average
+performance. Axes are shared across panels. The identity line is dashed, the 10:1
+and 1:10 bands are shaded, and the dotted red line marks the largest annual total
+in the training window, so that points above it are seasons larger than any on
+which the model was trained; the share of municipalities in that region is given
+on the upper panel. Because $\alpha\approx2$, where $\alpha$ is the power-law
+exponent, a handful of points in the upper right dominate any squared-error
+summary, which is why the primary loss of the size ladder
+(Table~\ref{tab:ablation_results}) is the pinball loss rather than the root mean
 squared error.}
 \label{fig:predobs}
 \end{figure}
@@ -1258,20 +1314,24 @@ squared error.}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig11_ablation_skill}
-\caption{The ablation ladder for the size target. (a) Skill score relative to the
-calibrated persistence benchmark (M0) at the primary loss, the pinball loss at
-$\tau=0.5$; bar height is the median over the five forecast origins and each dot is
-a single origin. The step from M2 to M3 isolates the contribution of the scaling
-descriptors. (b) The quantity on which the decision rule turns,
-$100\,(L_{M2}-L_{M3})/L_{M2}$, against $\tau$: a gain confined to high $\tau$ would
-indicate that the scaling information concerns extreme seasons specifically, which
-is what a heavy-tail description should deliver, so that negative values here are
-the opposite of the intended effect. Lines are medians over origins and the band is
+\caption{The ablation ladder for the size target, estimated at state level. (a) Skill score
+relative to the calibrated persistence benchmark (M0) at the primary loss, the
+pinball loss at $\tau=0.5$, where $\tau$ is the quantile level of the forecast
+and the pinball loss the asymmetric absolute loss that the $\tau$-quantile
+minimises; bar height is the median over the five forecast origins and each dot
+is a single origin. The rungs M1 to M3 each add one block of predictors to
+the previous one, and the step from M2 to M3 isolates the contribution of the
+scaling descriptors. (b) The quantity on which the decision rule turns,
+$100\,(L_{M2}-L_{M3})/L_{M2}$, where $L$ is the pinball loss of the rung named by
+its subscript, against $\tau$: a gain confined to high $\tau$ would indicate that
+the scaling information concerns extreme seasons specifically, which is what a
+heavy-tail description should deliver, so that negative values here are the
+opposite of the intended effect. Lines are medians over origins and the band is
 the range across origins. At $\tau=0.95$ the median differential is $+4.9\%$ and
-positive in 4 of 5 origins, so that the panel shows an absence of signal
-rather than a gain: the intervals exclude zero in only 2 of 5 and point in
-opposite directions. Skill scores carry no interval of their own, the
-unit-bootstrap interval belonging to the paired differential.}
+positive in 4 of 5 origins, so that the panel shows an absence of signal rather
+than a gain: the intervals exclude zero in only 2 of 5 and point in opposite
+directions. Skill scores carry no interval of their own, the unit-bootstrap
+interval belonging to the paired differential.}
 \label{fig:ablation}
 \end{figure}
 
@@ -1285,34 +1345,46 @@ surveillance service would read (Figure~\ref{fig:map}).
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig14_error_vs_pop}
-\caption{Forecast error against population size. Absolute percentage error of the
-size forecast by unit population, one point per unit and forecast origin, with the
-median within population bins. The forecast is the median quantile ($\tau=0.5$) of
-the model whose ladder is given in Table~\ref{tab:ablation_results}. Errors are
-largest for the smallest municipalities, where case counts are low and a single
-imported case represents a large relative change, and they narrow but do not vanish
-at the top of the size distribution. The dashed vertical line marks
-100{,}000 inhabitants, the threshold discussed in Section~\ref{sec:smallmunic}.}
+\caption{Forecast error against population size, at municipal level. Panel (a): absolute
+percentage error of the size forecast by unit population, one point per unit and
+forecast origin, with the median within population bins and the
+100{,}000-inhabitant threshold marked, the threshold discussed in
+Section~\ref{sec:smallmunic}. The forecast is the median quantile --- $\tau=0.5$,
+the quantile level of the forecast --- of the estimator of
+Section~\ref{sec:regression} refitted on the municipal panel; the absolute
+percentage error of an observed size $S_t$ and its forecast $\hat S_t$ is
+$100\,|S_t-\hat S_t|/S_t$. Errors are largest for the smallest municipalities,
+where case counts are low and a single imported case represents a large relative
+change, and they narrow but do not vanish at the top of the size distribution.
+Panel (b): the standardised residual of plain persistence, that is, of the
+previous season's total $S_{t-1}$ taken as the forecast of $S_t$, against a
+standard normal reference. That panel involves no fitted model at all and gives
+the distribution the forecast has to cope with. The ladder of
+Table~\ref{tab:ablation_results} is reported at state level, so neither panel is
+the municipal counterpart of that table: no municipal ladder for size is
+reported here.}
 \label{fig:errors}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig15_pred_map}
-\caption{The forecast read as a risk map, for the record season and the M3 rung
-of Table~\ref{tab:exceed}. Panel (a) classes each municipality by the predicted
-probability that its season exceeds the 75th percentile of its own history, in
-quintiles of that probability; panel (b) gives the realisation of the same
-event. Panel (c) confronts the two by quintile of the prediction: bars are the
-mean predicted probability, dots the observed share, and the dotted and dashed
-rules their overall means. The ranking survives --- the observed share rises
-from $0.51$ in the lowest quintile to $0.82$ in the fourth and settles at $0.80$
-in the fifth --- but the level does not: the prediction sits between $0.15$ and
-$0.27$ below the observed share in every quintile, with an overall mean of
-$0.47$ against an observed $0.70$. A reader who took the classes as frequencies
-would therefore under-alert everywhere. Municipalities without the five seasons
-of history needed to define their own threshold carry no forecast and are drawn
-in grey.}
+\caption{The forecast read as a risk map, for the record season and the M3 rung of
+Table~\ref{tab:exceed}. Panel (a) classes each municipality by the predicted
+probability that its season exceeds the 75th percentile of its own history --- the
+event defined in Section~\ref{sec:classifier}, a season larger than all but a
+quarter of that municipality's earlier seasons --- in quintiles of that
+probability, so that each class holds a fifth of the municipalities. Panel (b)
+gives the realisation of the same event. Panel (c) confronts the two by quintile
+of the prediction: bars are the mean predicted probability, dots the observed
+share, and the dotted and dashed rules their overall means. The ranking survives
+--- the observed share rises from $0.51$ in the lowest quintile to $0.82$ in the
+fourth and settles at $0.80$ in the fifth --- but the level does not: the
+prediction sits between $0.15$ and $0.27$ below the observed share in every
+quintile, with an overall mean of $0.47$ against an observed $0.70$. A reader who
+took the classes as frequencies would therefore under-alert everywhere.
+Municipalities without the five seasons of history needed to define their own
+threshold carry no forecast and are drawn in grey.}
 \label{fig:map}
 \end{figure}
 
