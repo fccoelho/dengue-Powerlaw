@@ -20,8 +20,11 @@ from __future__ import annotations
 import argparse
 import json
 import os
+import re
 import sqlite3
 import sys
+
+from study_window import SEASON_YEARS
 
 DB_DEFAULT = "powerlaw_results.db"
 GEN_DIR = os.path.join("Manuscript", "generated")
@@ -193,6 +196,22 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
     st = pd.read_sql(SQL_BY_KEY["S-state"], con).dropna(subset=["alpha", "xmin"])
     a_lo, a_hi = float(nat["alpha"].min()), float(nat["alpha"].max())
 
+    # The manuscript counts these cross-sections, so the database and the
+    # declared window have to agree. Without this the two can part company in
+    # silence: a rebuild that loses a year moves every national fact by one
+    # rank of the sample, and the prose gate is the only thing that would
+    # notice -- after the number has already been written into the text.
+    observed = sorted({int(y) for y in nat["year"]})
+    if observed != list(SEASON_YEARS):
+        missing = sorted(set(SEASON_YEARS) - set(observed))
+        extra = sorted(set(observed) - set(SEASON_YEARS))
+        raise ValueError(
+            f"national cross-sections {observed} disagree with the declared "
+            f"window {SEASON_YEARS} (missing {missing}, unexpected {extra}). "
+            "Either restore the data for the missing years, or change "
+            "study_window.py and re-run fit_episcanner_pl.py -- both, not one."
+        )
+
     # Exceedance above k*x_min, from Equation (2) of the manuscript:
     #     P(S >= s) = zeta(alpha, s) / zeta(alpha, x_min),  s = k * x_min
     # with zeta the Hurwitz (generalised) zeta function -- the same expression
@@ -255,6 +274,9 @@ def compute_facts(db_path: str = DB_DEFAULT) -> dict:
             "alpha_max": round(a_hi, 2),
             "xmin": int(round(float(nat["xmin"].median()))),
             "alpha_sd": round(float(nat["alpha"].std(ddof=1)), 3),
+            "year_first": int(nat["year"].min()),
+            "year_last": int(nat["year"].max()),
+            "years_declared": list(SEASON_YEARS),
         },
         "state": {
             "n": int(len(st)),
@@ -345,6 +367,13 @@ def claims(f: dict) -> list[dict]:
                    "the seven aggregation levels"]},
         {"name": "national cross-sections", "want": f"{N['n']} of {N['n']}",
          "stale": ["in 15 of 15 national cross-sections"]},
+        # The window the fits were run over, which the reader is told in
+        # Methods. It is the one statement the row count alone cannot check:
+        # the database could agree with "16 of 16" and still have run over
+        # 1995--2010.
+        {"name": "national year window",
+         "want": f"{N['n']} years, {N['year_first']} to {N['year_last']}",
+         "stale": ["15 years, 2011 to 2025", "2011 to 2025"]},
         {"name": "state-years", "want": _fmt(S["n"]),
          "stale": ["across 330 state-years", "of 330 state-years",
                    "330 state-year fits, significant"]},
@@ -464,6 +493,11 @@ def audit_prose(tex_path: str, f: dict) -> dict:
     if not os.path.exists(tex_path):
         return {"error": f"{tex_path} not found", "stale": [], "missing": [], "ok": []}
     tex = open(tex_path, encoding="utf-8", errors="replace").read()
+    # Collapse whitespace before matching. The manuscript is reflowed between
+    # drafts, so a window such as "2011 to 2026" is one line in one version
+    # and two in the next; a claim that only survives the original line breaks
+    # is not a check but a coincidence.
+    tex = re.sub(r"\s+", " ", tex)
     out = {"stale": [], "missing": [], "ok": []}
     for c in claims(f):
         found = [s for s in c["stale"] if s in tex]
@@ -493,7 +527,11 @@ def main(argv=None) -> int:
     if not os.path.exists(a.db):
         print(f"database not found: {a.db}", file=sys.stderr)
         return 2
-    f = compute_facts(a.db)
+    try:
+        f = compute_facts(a.db)
+    except ValueError as exc:
+        print(f"cannot derive the facts: {exc}", file=sys.stderr)
+        return 2
 
     if a.dump:
         print(f"{'level':<26}{'n':>8}{'alpha':>7}{'IQR':>14}{'xmin':>7}{'PLp':>5}{'PLs':>5}{'EXPs':>6}")
