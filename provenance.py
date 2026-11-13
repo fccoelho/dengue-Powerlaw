@@ -55,6 +55,15 @@ TRACKED_ARTIFACTS = [
     "classifier_results_metrics.csv",
     "classifier_results_importance.csv",
     "classifier_results.meta.json",
+    # The survival reading. Same argument as the state-exceedance table above:
+    # the prose now quotes numbers that no single table in the manuscript
+    # contains, so the files they come from have to belong to the snapshot. A
+    # stale copy from an earlier panel is then a named failure rather than a
+    # paragraph nobody can check.
+    "analysis/survival/exceedance_within_season.csv",
+    "analysis/survival/exceedance_transport.csv",
+    "analysis/survival/duration_models.csv",
+    "analysis/survival/duration_summary.json",
 ]
 
 
