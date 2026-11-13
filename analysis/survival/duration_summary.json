@@ -1,0 +1,32 @@
+{
+  "n_units": 28470,
+  "n_seasons": 16,
+  "censored_share": 0.060835967685282766,
+  "censoring": true,
+  "km_median_duration": 27.0,
+  "mean_duration": 27.97221636810678,
+  "weibull_shape": 2.7667645457938166,
+  "weibull_shape_ci": [
+    2.7408093343598736,
+    2.7927197572277596
+  ],
+  "exponential_rejected": true,
+  "logrank_p": 7.932414766974816e-06,
+  "logrank_by": "total_cases tercile",
+  "cox": [
+    {
+      "term": "log_cases",
+      "hazard_ratio": 1.0057500993885045,
+      "ci_low": 0.9890869928395526,
+      "ci_high": 1.0226939285855874,
+      "p": 0.5011699588507863
+    },
+    {
+      "term": "season",
+      "hazard_ratio": 0.970681678570034,
+      "ci_low": 0.9682420275043322,
+      "ci_high": 0.9731274767530405,
+      "p": 7.980722386368661e-119
+    }
+  ]
+}
