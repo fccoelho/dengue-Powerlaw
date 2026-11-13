@@ -1,0 +1,148 @@
+{
+  "figure": "fig10_pred_vs_obs",
+  "level": "city",
+  "year": 2025,
+  "tau": 0.5,
+  "estimator": "spline_quantile",
+  "n_units": 2373,
+  "training_max": 1225797.7,
+  "selection_rule": "states with at least 20 municipalities in 2025, ordered by the median absolute percentage error of the forecast these panels display; the best are drawn",
+  "selected": [
+    {
+      "uf": "RN",
+      "n": 22,
+      "median_ape": 29.3
+    },
+    {
+      "uf": "TO",
+      "n": 23,
+      "median_ape": 33.04
+    },
+    {
+      "uf": "RO",
+      "n": 26,
+      "median_ape": 43.66
+    },
+    {
+      "uf": "MS",
+      "n": 74,
+      "median_ape": 47.24
+    }
+  ],
+  "ranking": [
+    {
+      "uf": "RN",
+      "n": 22,
+      "median_ape": 29.3
+    },
+    {
+      "uf": "TO",
+      "n": 23,
+      "median_ape": 33.04
+    },
+    {
+      "uf": "RO",
+      "n": 26,
+      "median_ape": 43.66
+    },
+    {
+      "uf": "MS",
+      "n": 74,
+      "median_ape": 47.24
+    },
+    {
+      "uf": "SP",
+      "n": 571,
+      "median_ape": 48.7
+    },
+    {
+      "uf": "GO",
+      "n": 150,
+      "median_ape": 49.47
+    },
+    {
+      "uf": "CE",
+      "n": 48,
+      "median_ape": 50.83
+    },
+    {
+      "uf": "ES",
+      "n": 63,
+      "median_ape": 52.71
+    },
+    {
+      "uf": "AM",
+      "n": 27,
+      "median_ape": 53.58
+    },
+    {
+      "uf": "PI",
+      "n": 22,
+      "median_ape": 55.06
+    },
+    {
+      "uf": "MT",
+      "n": 100,
+      "median_ape": 55.8
+    },
+    {
+      "uf": "AL",
+      "n": 26,
+      "median_ape": 58.97
+    },
+    {
+      "uf": "PA",
+      "n": 70,
+      "median_ape": 59.11
+    },
+    {
+      "uf": "PR",
+      "n": 253,
+      "median_ape": 61.2
+    },
+    {
+      "uf": "PB",
+      "n": 31,
+      "median_ape": 65.24
+    },
+    {
+      "uf": "SC",
+      "n": 72,
+      "median_ape": 66.62
+    },
+    {
+      "uf": "PE",
+      "n": 66,
+      "median_ape": 71.42
+    },
+    {
+      "uf": "RS",
+      "n": 76,
+      "median_ape": 77.29
+    },
+    {
+      "uf": "MA",
+      "n": 32,
+      "median_ape": 83.39
+    },
+    {
+      "uf": "BA",
+      "n": 116,
+      "median_ape": 85.01
+    },
+    {
+      "uf": "MG",
+      "n": 391,
+      "median_ape": 90.96
+    },
+    {
+      "uf": "RJ",
+      "n": 74,
+      "median_ape": 139.43
+    }
+  ],
+  "png_shape": [
+    962,
+    834
+  ]
+}
