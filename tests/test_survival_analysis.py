@@ -101,10 +101,50 @@ def test_departure_has_power_against_a_wrong_xmin():
     assert wrong["departure_in_bands"] > 5.0
 
 
-def test_integer_counts_refuses_a_continuous_series():
-    sa._integer_counts([1.0, 2.0, 3.0])  # exact integers are fine
+def test_positive_sizes_accepts_an_off_lattice_series():
+    """Fractional sizes pass through unmoved, and the offset is reported.
+
+    ``total_cases`` is an EpiScanner ensemble estimate, so it is not integer
+    valued. Rounding it would place a unit on one side or the other of a lattice
+    point; refusing it would drop the whole panel. Both were once the behaviour
+    here. The contract is now: keep the value, report the distance.
+    """
+    raw = np.array([1.0, 2.5, 379.2703933])
+    out = sa._positive_sizes(raw)
+    np.testing.assert_allclose(out, raw)
+
+    off = sa._lattice_offset(out)
+    assert off["share_off_lattice"] == pytest.approx(2 / 3)
+    assert off["lattice_offset_max"] == pytest.approx(0.5)
+
     with pytest.raises(ValueError):
-        sa._integer_counts([1.0, 2.5, 3.0])
+        sa._positive_sizes([1.0, 0.0, 3.0])
+
+
+def test_empirical_ccdf_does_not_truncate_the_sizes():
+    """A float cast to int truncates towards zero; the CCDF must not do that.
+
+    ``379.99 -> 379`` would merge two distinct sizes into one lattice point and
+    silently change the risk set.
+    """
+    values, emp, at_risk = sa.empirical_ccdf([5.0, 5.9])
+    np.testing.assert_allclose(values, [5.0, 5.9])
+    np.testing.assert_allclose(emp, [1.0, 0.5])
+    np.testing.assert_allclose(at_risk, [2, 1])
+
+
+def test_departure_reports_lattice_sensitivity():
+    """Snapping to the lattice must be measured, not assumed harmless."""
+    s = _discrete_pareto(2.026, 730, 3000, seed=11).astype(float)
+    rng = np.random.default_rng(5)
+    off = s + rng.uniform(-0.45, 0.45, size=s.size)
+
+    d = sa._departure(off, 2.026, 730)
+    assert d is not None
+    assert d["departure_in_bands_lattice"] is not None
+    assert d["lattice_offset_max"] <= 0.5
+    # The fractional part must not move the verdict.
+    assert abs(d["departure_in_bands"] - d["departure_in_bands_lattice"]) < 0.5
 
 
 if __name__ == "__main__":

@@ -41,6 +41,16 @@ description, not a risk instrument. The manuscript's own coupling result
 (alpha and x_min rank-correlated at 0.89) predicts that the pair travels better
 than either parameter alone; this script measures whether it does.
 
+**What the sizes are.** EpiScanner reports ``total_cases`` as an ensemble
+estimate, not a notified count: the panel is fractional, and so is the fitted
+``x_min``. The fit was made with ``discrete=True`` regardless (see
+``fitpl.fit_pl_total_cases``), so the comparison is written in the discrete
+vocabulary throughout. At this bound the two readings are numerically
+indistinguishable -- the Hurwitz zeta and the continuous Pareto differ by 2.6e-7
+at ``x_min`` and 6e-4 at ten times it -- so nothing below turns on the choice,
+but the departure is recomputed on lattice-snapped sizes as a standing check
+rather than the question being settled by assertion.
+
 **Duration.** The manuscript dropped duration as a scaling object because a
 season is bounded above by the length of the year, so a scale-free law cannot
 apply a priori. That argument is right, and it is not an argument against
@@ -167,23 +177,54 @@ def load_national_fits(db_path=DB_PATH):
     return df
 
 
-def _integer_counts(values, what="total_cases"):
-    """Return the counts as int64, refusing non-integer input.
+def _positive_sizes(values, what="total_cases"):
+    """Return the sizes as float64, refusing non-finite and non-positive values.
 
-    The fits were made with ``discrete=True`` and the zeta survival function is
-    defined on integers. Silently rounding a continuous series would compare the
-    data to a different object than the one that produced alpha.
+    ``total_cases`` is **not** a notified case count. EpiScanner publishes it as
+    an ensemble estimate, so the panel is fractional -- 379.2703933 -- and so is
+    the fitted ``xmin`` (641.027874, 7753.372993). An earlier version of this
+    function tried to round the series to integers and, failing that, refused to
+    run. Both halves of that were wrong.
+
+    *Rounding* is wrong because it is decided at the tie: casting 379.9999 to an
+    integer truncates to 379, which moves the unit to the other side of a
+    lattice point and changes the risk set by one observation.
+
+    *Refusing* is wrong because the comparison is legitimate. The fitted curve is
+    ``zeta(alpha, s) / zeta(alpha, x_min)``, where ``zeta`` is the **Hurwitz**
+    zeta, defined for every real ``s > 0``. Evaluating it off the integer lattice
+    is not an abuse of the formula; the lattice enters only through the
+    normalising constant, which sits at ``x_min``.
+
+    What remains is a magnitude worth reporting rather than a stop. The distance
+    to the nearest integer travels in ``_lattice_offset``, so that "the lattice
+    is stretched by 0.3 cases on a bound of 730" is visible instead of assumed.
     """
     arr = np.asarray(values, dtype=float)
     arr = arr[np.isfinite(arr)]
-    if arr.size and not np.allclose(arr, np.round(arr), atol=1e-9):
-        examples = arr[~np.isclose(arr, np.round(arr), atol=1e-9)][:5]
+    if arr.size and (arr <= 0).any():
         raise ValueError(
-            f"{what} is not integer-valued (examples: {examples}). The zeta "
-            "survival function and the discrete fit both assume integer "
-            "counts; the comparison would not be to the same distribution."
+            f"{what} carries {int((arr <= 0).sum())} non-positive value(s); a "
+            "power-law tail lives on the positive axis, and a non-positive size "
+            "cannot enter a risk set."
         )
-    return np.round(arr).astype(np.int64)
+    return arr
+
+
+def _lattice_offset(values):
+    """How far the sizes sit from the integer lattice, as a diagnostic."""
+    arr = np.asarray(values, dtype=float)
+    if not arr.size:
+        return dict(n=0, lattice_offset_mean=float("nan"),
+                    lattice_offset_max=float("nan"),
+                    share_off_lattice=float("nan"))
+    off = np.abs(arr - np.round(arr))
+    return dict(
+        n=int(arr.size),
+        lattice_offset_mean=float(off.mean()),
+        lattice_offset_max=float(off.max()),
+        share_off_lattice=float((off > 1e-9).mean()),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -196,7 +237,7 @@ def empirical_ccdf(s):
     point the product-limit estimator equals this count ratio exactly, so it is
     written directly -- there is no approximation to audit.
     """
-    s = np.sort(np.asarray(s, dtype=np.int64))
+    s = np.sort(np.asarray(s, dtype=float))
     values, counts = np.unique(s, return_counts=True)
     at_risk = s.size - np.cumsum(counts) + counts
     return values, at_risk / s.size, at_risk
@@ -240,6 +281,19 @@ def _departure(sizes, alpha, xmin, delta=DKW_DELTA):
         return None
     dev = float(np.abs(emp[keep] - theo[keep]).max())
     eps = dkw_epsilon(kept.size, delta)
+
+    # Does the fractional part of the sizes matter? Redo the departure with the
+    # sizes snapped onto the lattice. Agreement closes the question for this
+    # season; divergence means the fit is describing points that are not counts.
+    snapped = np.round(kept)
+    lattice = None
+    if not np.array_equal(snapped, kept):
+        v2, e2, a2 = empirical_ccdf(snapped)
+        t2 = pareto_ccdf(v2, alpha, xmin)
+        k2 = (a2 >= MIN_AT_RISK) & (v2 >= xmin)
+        if k2.sum() >= 3:
+            lattice = float(np.abs(e2[k2] - t2[k2]).max()) / eps
+
     return dict(
         n_units=int(sizes.size),
         n_above_xmin=int(kept.size),
@@ -247,7 +301,9 @@ def _departure(sizes, alpha, xmin, delta=DKW_DELTA):
         max_abs_departure=dev,
         dkw_eps=eps,
         departure_in_bands=dev / eps,
+        departure_in_bands_lattice=lattice,
         n_grid_points=int(keep.sum()),
+        **_lattice_offset(kept),
     )
 
 
@@ -291,7 +347,7 @@ def exceedance_tables(panel, fits):
         block = panel.loc[panel["year"] == year, "total_cases"]
         if block.empty:
             continue
-        sizes = _integer_counts(block)
+        sizes = _positive_sizes(block)
         alpha, xmin = float(fits.loc[year, "alpha"]), float(fits.loc[year, "xmin"])
         result = _departure(sizes, alpha, xmin)
         if result is None:
@@ -302,7 +358,7 @@ def exceedance_tables(panel, fits):
     if POOLED_YEAR in fits.index:
         block = panel.loc[panel["year"].isin(SEASON_YEARS), "total_cases"]
         if not block.empty:
-            sizes = _integer_counts(block)
+            sizes = _positive_sizes(block)
             alpha = float(fits.loc[POOLED_YEAR, "alpha"])
             xmin = float(fits.loc[POOLED_YEAR, "xmin"])
             result = _departure(sizes, alpha, xmin)
@@ -316,7 +372,7 @@ def exceedance_tables(panel, fits):
         block = panel.loc[panel["year"] == y1, "total_cases"]
         if block.empty:
             continue
-        sizes = _integer_counts(block)
+        sizes = _positive_sizes(block)
 
         alpha0 = float(fits.loc[y0, "alpha"])
         xmin0 = float(fits.loc[y0, "xmin"])
@@ -362,7 +418,7 @@ def plot_exceedance(panel, fits, within, transport, out_dir=OUT_DIR):
     block = (panel.loc[panel["year"].isin(SEASON_YEARS), "total_cases"]
              if target == POOLED_YEAR
              else panel.loc[panel["year"] == target, "total_cases"])
-    sizes = _integer_counts(block)
+    sizes = _positive_sizes(block)
     alpha = float(fits.loc[target, "alpha"])
     xmin = float(fits.loc[target, "xmin"])
     kept = sizes[sizes >= xmin]
