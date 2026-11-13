@@ -15,6 +15,7 @@ import sqlite3
 import asyncio
 from concurrent.futures import ThreadPoolExecutor
 import duckdb
+from study_window import SEASON_YEARS
 
 dotenv.load_dotenv()
 
@@ -760,7 +761,9 @@ class FitPL:
             If None, processes all 27 Brazilian states.
         years : list of int, optional
             List of years to include in the analysis.
-            If None, uses range(2011, current_year+1).
+            If None, uses ``study_window.SEASON_YEARS``. Not a clock-dependent
+            range: the window the manuscript reports has to be the window the
+            code writes, whichever month it is run in.
 
         Returns
         -------
@@ -790,7 +793,7 @@ class FitPL:
         if states is None:
             states = STATES
         if years is None:
-            years = list(range(2011, date.today().year + 1))
+            years = list(SEASON_YEARS)
 
         min_year = min(years)
         max_year = max(years)

@@ -167,6 +167,13 @@ def prepare_lagged_data(region="BR", target_year=None, level="state"):
     """
     
     # 1. Fetch all available data
+    #
+    # Deliberately NOT ``study_window.WEEKLY_YEARS``. This window decides which
+    # (predictor season, target season) pairs the panel contains, so extending it
+    # to 2026 adds a validation origin and moves every number in Tables 3 and 4
+    # and in the ablation figures. Extending it is a re-run of run_ablation.py
+    # plus a refresh of the artefacts, not a constant bump, so the panel stays
+    # pinned to the origins the manuscript reports.
     years = list(range(2010, 2026)) 
     ensure_episcanner_files(region, years)
     

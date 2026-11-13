@@ -223,7 +223,8 @@ The estimation follows the methodology proposed by Clauset et al. (2009):
 - **Distributional Comparison**: Likelihood ratio tests (Vuong's test) are performed to compare the power law fit against alternative heavy-tailed and non-scaling distributions, specifically the exponential distribution, to validate the scale-invariant hypothesis.
 
 ### 2. Longitudinal Scaling Trends
-To capture the temporal evolution of epidemic dynamics, the framework performs **Yearly Power Law Fitting**. This allows for the characterization of the "scaling trajectory" of individual cities over a 15-year span (2010–2025). 
+To capture the temporal evolution of epidemic dynamics, the framework performs **Yearly Power Law Fitting**. This allows for the characterization of the "scaling trajectory" of individual cities over the 2010–2026 span of the platform
+snapshot. 
 - **Alpha Dynamics**: The variation in $\alpha$ over time serves as a proxy for changes in the regularity and intensity of transmission across successive seasons.
 - **Trend Analysis**: OLS regression on yearly $\alpha$ values identifies long-term shifts in the structural behavior of outbreaks within specific geographic nodes.
 
