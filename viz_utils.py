@@ -26,6 +26,7 @@ from data_utils import (
     fetch_episcanner,
     get_combined_indicator_data,
 )
+from study_window import WEEKLY_YEARS
 
 
 def _get_centroid_lat_lon(gdf, as_list=False):
@@ -57,7 +58,7 @@ def plot_combined_episcanner_fit(region, metric="total_cases"):
     metric_label = "Size (cases)" if metric == "total_cases" else "Duration (weeks)"
 
     # 1. Fetch data for all available years
-    years = list(range(2011, 2026))
+    years = list(WEEKLY_YEARS)
 
     # Ensure files exist
     ensure_episcanner_files(region, years)
@@ -347,7 +348,7 @@ def plot_episcanner_dispersion_alpha(region, metric="total_cases"):
 
     metric_label = "Size (cases)" if metric == "total_cases" else "Duration (weeks)"
 
-    years = list(range(2011, 2026))
+    years = list(WEEKLY_YEARS)
     ensure_episcanner_files(region, years)
     combined_df = get_duckdb_episcanner_data(region, years, columns=f"year, {metric}")
 

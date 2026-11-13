@@ -8,7 +8,7 @@ Epidemic duration (``ep_dur``) is deliberately *not* fitted. A season is
 bounded above by the length of the year, so a scale-free law cannot apply to
 duration a priori, and the fits confirmed it the only way they could: the
 estimated exponent ran into the estimator's ceiling and the exponential won
-in 15 of 15 national cross-sections. A near-constant exponent recovered from
+in every national cross-section. A near-constant exponent recovered from
 every independent cross-section is not a universality result, it is evidence
 that the model was asked the wrong question. Duration and peak timing remain
 in the analysis as ordinary *covariates* of epidemic size, which is where
@@ -28,6 +28,7 @@ import powerlaw
 import os
 import dotenv
 from fitpl import fetch_episcanner
+from study_window import POOLED_YEAR, SEASON_YEARS
 
 dotenv.load_dotenv()
 
@@ -37,7 +38,10 @@ STATES = [
     "MT", "MS", "MG", "PA", "PB", "PR", "PE", "PI", "RJ", "RN", 
     "RS", "RO", "RR", "SC", "SP", "SE", "TO"
 ]
-YEARS = list(range(2011, 2026))
+#: Season years that carry a cross-section. Declared in ``study_window`` so that
+#: this script, the dashboard helpers and the table generator cannot drift apart
+#: again: they used to hold five copies of the same off-by-one.
+YEARS = SEASON_YEARS
 
 #: The fitted descriptors. Adding a metric here is a claim that the variable
 #: has unbounded support and a plausible scale-free regime; it is not a
@@ -142,6 +146,30 @@ def report_stale_ep_dur(db_path=DB_PATH):
         )
 
 
+def prune_out_of_window(cursor, years=YEARS):
+    """Delete fits whose year falls outside the declared window.
+
+    ``INSERT OR REPLACE`` overwrites the rows a run produces and leaves every
+    other row alone, so a cross-section written by an earlier run outlives the
+    range that produced it. That is how this database came to hold a 2026 season
+    that the script, which stopped at 2025, could never have written: the
+    manuscript counted 16 national cross-sections and a clean rebuild produced
+    15. Deleting here makes one run equal one database, which is the only
+    property that lets a reader check the manuscript by re-running the code.
+    """
+    keep = sorted(set(years) | {POOLED_YEAR})
+    marks = ",".join("?" * len(keep))
+    for table in ("episcanner_state_fits", "episcanner_fits"):
+        before = cursor.execute(f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        cursor.execute(
+            f"DELETE FROM {table} WHERE year NOT IN ({marks})", tuple(keep))
+        removed = before - cursor.execute(
+            f"SELECT COUNT(*) FROM {table}").fetchone()[0]
+        if removed:
+            print(f"[prune] {table}: removed {removed} fits outside "
+                  f"{years[0]}..{years[-1]}")
+
+
 def main():
     init_db()
     
@@ -219,6 +247,7 @@ def main():
                     ''', (metric, 0, alpha, xmin, xmax, R, p))
                     print(f"National combined {metric} fit (All Years): alpha={alpha:.2f}")
         
+        prune_out_of_window(cursor)
         conn.commit()
 
     print("\nFinished.")

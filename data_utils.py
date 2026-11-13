@@ -12,6 +12,7 @@ from scipy import stats
 import duckdb
 import glob
 import os
+from study_window import WEEKLY_YEARS
 
 GEO_STATE_MAP = {
     11: "RO",
@@ -168,7 +169,7 @@ def get_episcanner_fit_results(
 def ensure_episcanner_files(region, years=None):
     """Ensures that parquet files exist for the given region and years. Fetches if missing."""
     if years is None:
-        years = list(range(2011, 2026))
+        years = list(WEEKLY_YEARS)
 
     states = [region] if region != "BR" else list(GEO_STATE_MAP.values())
 
@@ -185,7 +186,7 @@ def ensure_episcanner_files(region, years=None):
 def get_duckdb_episcanner_data(region, years=None, columns="*"):
     """Aggregates Episcanner data using DuckDB."""
     if years is None:
-        years = list(range(2011, 2026))
+        years = list(WEEKLY_YEARS)
 
     con = None
     try:
