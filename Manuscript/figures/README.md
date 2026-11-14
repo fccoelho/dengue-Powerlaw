@@ -1,9 +1,10 @@
 # Figure specifications
 
-The manuscript (`main.tex`) contains 14 `figure` environments with final
+The manuscript (`main.tex`) contains 16 `figure` environments with final
 captions and labels. Both renderings of each figure are committed in this
-directory, as `.pdf` and as `.png`; regenerate them with
-`generate_figures.py` after a data update.
+directory, as `.pdf` and as `.png`; regenerate `fig02`--`fig15` with
+`generate_figures.py` and `fig16`--`fig17` with `survival_analysis.py` after a
+data update.
 
 All environments use `\includegraphics` **without an extension**, so either
 `.pdf` (preferred for vector plots) or `.png` at >= 300 dpi will resolve.
@@ -24,6 +25,8 @@ All environments use `\includegraphics` **without an extension**, so either
 | `fig13_importance` | Results 3.6 | Held-out permutation importance ($\Delta$ Brier), power-law block highlighted; joint block row plus per-origin stability of the three scaling features. |
 | `fig14_error_vs_pop` | Results 3.8 | (a) absolute percentage error of the median ($\tau=0.5$) spline-quantile size forecast vs municipal population, with the median within population bins and the 100,000-inhabitant threshold marked; (b) standardised persistence residuals for epidemic size vs N(0,1). Writes `fig14_pop_bands.json` with the median error either side of the threshold. |
 | `fig15_pred_map` | Results 3.8 | Three panels for the record season, at the M3 rung: (a) choropleth of the predicted probability of exceeding the unit's own 75th percentile, quintile classes; (b) the realised outcome on the same municipalities; (c) observed share against mean prediction by predicted quintile. Grey = no forecast (fewer than five seasons of history). Uses `muni_br.gpkg` and writes `fig15_map.json` recording the origin, the rung and the pixel shape. |
+| `fig16_survival_exceedance` | Results 3.5 | (a) pooled cross-section (16 seasons fitted together): empirical exceedance frequency as a Kaplan--Meier step against the fitted $\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$, on log--log axes, with the 95\% simultaneous DKW band around the empirical curve and $x_{\min}$ marked. (b) Out-of-season transport: departure of $(\alpha_t,x_{\min,t})$ applied to season $t+1$, in band units and log scale, against the departure of a pair refitted inside the target season. Written by `survival_analysis.py`, not by `generate_figures.py`. |
+| `fig17_survival_duration` | Results 3.5 | (a) Kaplan--Meier duration by epidemic-size tercile, with the fitted Weibull overlaid; (b) $\Delta$AIC per parametric family, labelled. Written by `survival_analysis.py`. |
 
 ## Where the numbers come from
 
@@ -39,6 +42,11 @@ All environments use `\includegraphics` **without an extension**, so either
   `ablation_results.csv` and `classifier_results*`, so they cannot disagree
   with the tables; `fig15` in particular draws the out-of-fold predictions
   rather than refitting a classifier of its own.
+- Survival panels: `fig16`--`fig17` are written by `survival_analysis.py` from
+  the EpiScanner panel (`data/episcanner_*.parquet`) and the national fits in
+  `powerlaw_results.db`, and its tables are what Section 3.5 quotes. They are the
+  only two figures the manuscript includes that this directory's generator does
+  not produce.
 - Population and geography: `parquet_cache/city_stats.parquet`,
   `parquet_cache/geography.parquet`, `muni_br.gpkg`.
 

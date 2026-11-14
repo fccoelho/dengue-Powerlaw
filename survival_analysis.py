@@ -98,6 +98,14 @@ from study_window import LAST_SEASON_YEAR, POOLED_YEAR, SEASON_YEARS
 PANEL_COLUMNS = ["geocode", "year", "total_cases", "ep_dur"]
 
 OUT_DIR = Path("analysis") / "survival"
+
+#: The manuscript includes its figures from ``Manuscript/figures``, without a file
+#: extension, exactly as ``generate_figures.py`` writes them. The two plots this
+#: script produces are cited in Section 3.5, so they are written there under the
+#: manuscript's naming; ``analysis/survival`` keeps the tables and the summary,
+#: which are what ``make_tables.py`` audits. Writing them anywhere else would
+#: leave the included files unreachable from the script that generates them.
+FIG_DIR = Path("Manuscript") / "figures"
 DB_PATH = "powerlaw_results.db"
 
 #: Family-wise confidence level for the DKW band.
@@ -406,7 +414,7 @@ def exceedance_tables(panel, fits):
     return pd.DataFrame(within), pd.DataFrame(transport)
 
 
-def plot_exceedance(panel, fits, within, transport, out_dir=OUT_DIR):
+def plot_exceedance(panel, fits, within, transport, fig_dir=FIG_DIR):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -463,10 +471,11 @@ def plot_exceedance(panel, fits, within, transport, out_dir=OUT_DIR):
         ax.set_axis_off()
 
     fig.tight_layout()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    fig_dir = Path(fig_dir)
+    fig_dir.mkdir(parents=True, exist_ok=True)
     for suffix in ("png", "pdf"):
-        fig.savefig(out_dir / f"fig_survival_exceedance.{suffix}", bbox_inches="tight")
+        fig.savefig(fig_dir / f"fig16_survival_exceedance.{suffix}",
+                    bbox_inches="tight")
     plt.close(fig)
 
 
@@ -581,7 +590,7 @@ def duration_tables(panel, censor_last=True):
     return models, summary, d, fitted
 
 
-def plot_duration(d, fitted, models, summary, out_dir=OUT_DIR):
+def plot_duration(d, fitted, models, summary, fig_dir=FIG_DIR):
     import matplotlib
 
     matplotlib.use("Agg")
@@ -619,17 +628,18 @@ def plot_duration(d, fitted, models, summary, out_dir=OUT_DIR):
     ax.set_ylim(bottom=-0.5)
 
     fig.tight_layout()
-    out_dir = Path(out_dir)
-    out_dir.mkdir(parents=True, exist_ok=True)
+    fig_dir = Path(fig_dir)
+    fig_dir.mkdir(parents=True, exist_ok=True)
     for suffix in ("png", "pdf"):
-        fig.savefig(out_dir / f"fig_survival_duration.{suffix}", bbox_inches="tight")
+        fig.savefig(fig_dir / f"fig17_survival_duration.{suffix}",
+                    bbox_inches="tight")
     plt.close(fig)
 
 
 # ---------------------------------------------------------------------------
 # cli
 # ---------------------------------------------------------------------------
-def run_exceedance(panel, fits, out_dir):
+def run_exceedance(panel, fits, out_dir, fig_dir=FIG_DIR):
     within, transport = exceedance_tables(panel, fits)
     out_dir.mkdir(parents=True, exist_ok=True)
     within.to_csv(out_dir / "exceedance_within_season.csv", index=False)
@@ -671,11 +681,11 @@ def run_exceedance(panel, fits, out_dir):
         print(f"\n{inside} of {len(transport)} consecutive pairs transport inside "
               "the band")
 
-    plot_exceedance(panel, fits, within, transport, out_dir)
+    plot_exceedance(panel, fits, within, transport, fig_dir)
     return within, transport
 
 
-def run_duration(panel, out_dir, censor_last=True):
+def run_duration(panel, out_dir, censor_last=True, fig_dir=FIG_DIR):
     models, summary, d, fitted = duration_tables(panel, censor_last=censor_last)
     out_dir.mkdir(parents=True, exist_ok=True)
     tag = "" if censor_last else "_nocensor"
@@ -699,7 +709,7 @@ def run_duration(panel, out_dir, censor_last=True):
         print(f"  Cox {row['term']:<10} HR {row['hazard_ratio']:.3f} "
               f"[{row['ci_low']:.3f}, {row['ci_high']:.3f}]  p={row['p']:.3g}")
 
-    plot_duration(d, fitted, models, summary, out_dir)
+    plot_duration(d, fitted, models, summary, fig_dir)
     return models, summary
 
 
@@ -710,23 +720,27 @@ def main(argv=None):
     parser.add_argument("--db", default=DB_PATH)
     parser.add_argument("--data-glob", default="data/episcanner_*.parquet")
     parser.add_argument("--out", default=str(OUT_DIR))
+    parser.add_argument("--fig-dir", default=str(FIG_DIR),
+                        help="where the two manuscript figures are written")
     parser.add_argument("--no-censor", action="store_true",
                         help="treat the last season's durations as observed")
     args = parser.parse_args(argv)
 
     panel = load_city_panel(pattern=args.data_glob)
     out_dir = Path(args.out)
+    fig_dir = Path(args.fig_dir)
     print(f"[load] {len(panel):,} municipality-seasons, "
           f"{panel['year'].nunique()} seasons, "
           f"{panel['geocode'].nunique():,} municipalities")
 
     if args.part in ("exceedance", "all"):
         fits = load_national_fits(args.db)
-        run_exceedance(panel, fits, out_dir)
+        run_exceedance(panel, fits, out_dir, fig_dir)
     if args.part in ("duration", "all"):
-        run_duration(panel, out_dir, censor_last=not args.no_censor)
+        run_duration(panel, out_dir, censor_last=not args.no_censor,
+                     fig_dir=fig_dir)
 
-    print(f"\nwritten to {out_dir}/")
+    print(f"\nwritten to {out_dir}/ and {fig_dir}/")
     return 0
 
 

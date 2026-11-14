@@ -576,10 +576,12 @@ def survival_facts(root: str = ".") -> dict | None:
 def survival_claims(root: str = ".") -> list[dict]:
     """Prose statements about Section~\\ref{sec:survivalres}.
 
-    Same contract as ``claims``: the string that should appear, paired with
-    literals from earlier drafts that must not. The stale entries are the values
-    produced before the size axis was established to be off-lattice, so a
-    regression to that run is caught by name.
+    Same contract as ``claims`` -- the string that should appear, and optionally
+    literals from earlier drafts that must not -- except that ``stale`` is
+    omitted here. These quantities enter the manuscript with the section that
+    audits them, so there is no earlier draft whose values could be named; the
+    check is that each stated number is still derived. ``audit_prose`` treats
+    the key as optional and validates the key set instead.
     """
     f = survival_facts(root)
     if f is None:
@@ -653,6 +655,14 @@ def _spell(n: int) -> str:
     return words.get(int(n), str(int(n)))
 
 
+#: Keys a claim may carry. ``stale`` is optional -- see ``survival_claims``.
+#: Validated rather than assumed: reading ``c["stale"]`` unconditionally turned
+#: the first run of the survival block into a KeyError, and reading it with a
+#: bare ``.get`` would let a misspelled key pass as a claim with nothing to
+#: check.
+CLAIM_KEYS = frozenset({"name", "want", "stale", "count"})
+
+
 def audit_prose(tex_path: str, f: dict) -> dict:
     """Report stale literals still present and wanted strings still absent."""
     if not os.path.exists(tex_path):
@@ -668,7 +678,12 @@ def audit_prose(tex_path: str, f: dict) -> dict:
     # prose the same way, and until now nothing checked them. Skipped, not
     # failed, when the artefacts are absent.
     for c in claims(f) + survival_claims():
-        found = [s for s in c["stale"] if s in tex]
+        unknown = set(c) - CLAIM_KEYS
+        if unknown:
+            raise ValueError(
+                f"claim {c.get('name', '<unnamed>')!r} carries unknown key(s) "
+                f"{sorted(unknown)}; allowed are {sorted(CLAIM_KEYS)}")
+        found = [s for s in c.get("stale", []) if s in tex]
         n = tex.count(c["want"])
         # A value that is merely *present* is not enough: if the manuscript is
         # supposed to state it twice and states it once, one site was missed.

@@ -59,5 +59,7 @@ powerlaw_results.db.bak*
 # fig01 (aggregation schematic) was dropped by PR #10 and must stay deleted
 Manuscript/figures/fig01_aggregation_levels.*
 
-# survival_analysis.py diagnostics: regenerated, never cited by the manuscript
+# survival_analysis.py tables and summary: regenerated, and committed anyway
+# because snapshot_manifest.json hashes them. Its two figures ARE cited (Section
+# 3.5) and are written to Manuscript/figures, which is not ignored.
 analysis/
