@@ -1186,7 +1186,7 @@ frequency of the same pooled sample by 1.78 bands, more than twice the largest
 departure observed in any individual season. A mixture of 16 seasons is therefore
 not a power law even though each of its components is, which is the sharpest form
 of the statement that $\alpha_S$ is a property of a season and not a constant of
-the disease.
+the disease. Figure~\ref{fig:survival-exceed}(a) draws that comparison.
 
 Across seasons the verdict splits by level. Of the 15 consecutive pairs, 14 carry
 enough municipalities above the fitted bound to be evaluated at all; in 5 of those
@@ -1200,7 +1200,31 @@ curve implies a median share of 1.0\% where the following season delivers 0.24\%
 overstates the observed share in 12 of the 14 pairs, and meets six seasons in
 which the observed share is exactly zero. The shape of the curve belongs to the
 cross-section that produced it; the further out the threshold, the more the
-transported curve promises and the less the next season delivers.
+transported curve promises and the less the next season delivers. Figure~\ref{fig:survival-exceed}(b) plots the whole sequence against the gap a pair re-fitted inside the target season achieves, which separates the cost of carrying the parameters over from the floor that any curve faces in its own data.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig16_survival_exceedance}
+\caption{The fitted law read as a survival curve, and what survives of it one
+season later. Panel (a) pools the 16 seasons and plots the empirical exceedance
+frequency $\Pr(S\ge s)$ as a Kaplan--Meier step against the fitted curve
+$\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ of Equation~\eqref{eq:exceed}, both on
+log--log axes and both conditioned on $s\ge x_{\min}$, the dotted vertical line.
+The grey envelope is the 95\,\% simultaneous band of the empirical curve by the
+Dvoretzky--Kiefer--Wolfowitz inequality, which needs no assumption about the tail
+and whose half-width depends only on the number of municipalities above the
+bound; the band is drawn around the data, not around the fit, so it is the fit
+that is on trial. The pooled fit leaves that band by 1.78 half-widths, where no
+individual season exceeds 0.79. Panel (b) carries the pair
+$(\alpha_t,x_{\min,t})$ of each season into season $t+1$ without refitting and
+plots, in half-widths of the band, the largest gap between the resulting curve
+and the exceedance frequency of the season it is applied to (circles). Squares
+give the same gap for a pair fitted inside the target season, which is the floor
+any fit faces in its own data rather than a standard the transported pair could
+meet. The dotted line at one is the edge of the band, and the vertical axis is
+logarithmic because the worst pair overshoots it fivefold.}
+\label{fig:survival-exceed}
+\end{figure}
 
 Duration, examined as a time to event, does not behave as a scale-free quantity.
 Across 28{,}470 municipality-seasons the median season lasts 27 weeks, 6.1\% of
@@ -1217,7 +1241,27 @@ to matter at the resolution of these data. The hazard does
 fall with calendar season ($0.971$ per season, $0.968$--$0.973$), so seasons
 lengthen over the period; we do not read that as epidemiological change, since the
 final season is truncated at the data cut-off and the series is nowcast-adjusted,
-and a longer low-count tail is what both would produce.
+and a longer low-count tail is what both would produce. Figure~\ref{fig:survival-duration} shows both halves of that verdict: the duration curves by size tercile, and the family comparison that rejects the memoryless case.
+
+\begin{figure}[htbp]
+\centering
+\includegraphics[width=\textwidth]{figures/fig17_survival_duration}
+\caption{Season duration as a time-to-event outcome. Panel (a) gives the
+Kaplan--Meier estimate of the probability that a season is still running after
+$t$ weeks, for the three terciles of epidemic size, and overlays the fitted
+Weibull survival curve. The three empirical curves lie almost on top of one
+another, which is the graphical form of the Cox result reported in the text: size
+moves the hazard of a season ending by an amount that is negligible at this
+resolution. The Weibull shape exceeds one, so the hazard rises with the time
+already elapsed instead of staying flat as the exponential requires. Panel (b) is
+the AIC comparison behind that rejection, labelled with the gap in AIC units
+against the best family of the set: the exponential sits at the foot of the
+ladder and the generalised gamma at the top, so no single simple family describes
+the distribution. That is why duration enters the paper as a covariate of size
+and not as a power law. Durations of the final season are censored at the data
+cut-off.}
+\label{fig:survival-duration}
+\end{figure}
 
 \subsection{Predicting the probability of a large season}
 \label{sec:classresults}
