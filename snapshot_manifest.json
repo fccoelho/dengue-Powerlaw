@@ -1,6 +1,6 @@
 {
   "manifest_version": 1,
-  "written_utc": "2026-11-12T18:46:54+00:00",
+  "written_utc": "2026-11-13T18:35:03+00:00",
   "database": {
     "path": "powerlaw_results.db",
     "sha256": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
@@ -88,7 +88,7 @@
   },
   "artifacts": {
     "powerlaw_results.db": "682b16476194582f4e433a31736a5b8377ad8578f4273a4ac5d4c1c6909959c7",
-    "Manuscript/main.tex": "9ce86490a8b5324d0c2b14f0ee6316936cbcd6d29efd5ae87cb9afd860191e3c",
+    "Manuscript/main.tex": "03bc2a9f8b41ab4e282bdd696e5506854c89f91405301d4e6509a5be85a92187",
     "Manuscript/generated/facts.json": "5687ffff3fab1c6b93f89080d653e7bf446db8e44b0741915aa0171af4c8a34e",
     "Manuscript/generated/tab_main.tex": "4332fbb93c23d3216a7ef2eff7582e4ae7b2cc3c47231ffec012c5dc82b6a8e3",
     "Manuscript/generated/tab_ablation.tex": "7c097d99a734210bfedc85bf8d0ce98831edd2955a43cfa2c04828da25a8e52c",
@@ -103,6 +103,10 @@
     "classifier_results.parquet": "899dd983efd45d0978f9d4354dce6422957215004cf651039a516e95b5ba44e6",
     "classifier_results_metrics.csv": "ce8b915593b7b071e72127e54b24498399d161b743062dfaa23f730c97f0b92a",
     "classifier_results_importance.csv": "efae74c323f33eb91b3022853fd635003f56aa01726266358fed9a833f25fe2a",
-    "classifier_results.meta.json": "d4593e798cc7d6ff5d6249f9f6a181b153607eccf2c2b7b5fd53871e545067ff"
+    "classifier_results.meta.json": "d4593e798cc7d6ff5d6249f9f6a181b153607eccf2c2b7b5fd53871e545067ff",
+    "analysis/survival/exceedance_within_season.csv": "ed9e7424bb1f9f242f147efc768e2dea03ec469f8755c53fbfaec888b2caa077",
+    "analysis/survival/exceedance_transport.csv": "c6c5ffd1039df7a6b2296f2ef2b67e9c69146c9dca4f126d0849e70e86ec3887",
+    "analysis/survival/duration_models.csv": "a455a57f8e7a4cc767416061d16a319d6d6416c229098aa99bf817ae4ce9d970",
+    "analysis/survival/duration_summary.json": "660b3ed63a969322ba83ab20ebc23c4d8ec2883525cba8f0924741e91a9dc349"
   }
 }
