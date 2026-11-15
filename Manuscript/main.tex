@@ -122,25 +122,16 @@ municipality, its annual epidemic totals, the set of epidemic sizes across
 municipalities within one season, and these are different random variables
 with different supports. We fit the same estimator to the same surveillance data
 under five constructions, obtaining two exponents rather than one, $\alpha_W$ for
-the weekly count and $\alpha_S$ for the epidemic size, and report each together
+the weekly case count and $\alpha_S$ for the epidemic size (total cases in a season), and report each together
 with the diagnostic ($x_{\min}$) that makes it interpretable. Epidemic size, the quantity
-surveillance services act on, is the construction that survives. Epidemic
-duration and peak timing are not submitted to that test: both are bounded by the
-length of the season, so a scale-free law cannot hold for them a priori, and the
-test would return a verdict about the estimator rather than about the epidemic.
+surveillance services act on, is the most useful of the two. Other Epidemic metris, such as
+duration and peak timing are not power-law distributed, as both are bounded by the
+length of the season, and thus do not present a heavy tail.
 
-Second, \emph{what does the fitted pair provide?} If $(\alpha, x_{\min})$ is a
-risk curve, it should reproduce the empirical frequency of large seasons. We test
-that directly against the same cross-sections.
+Second, \emph{what do the power-law parameters provide?} If the pair $(\alpha, x_{\min})$ is used to define a risk curve, it should reproduce the empirical frequency of large seasons. We test that directly against the same cross-sections.
 
-Third, \emph{does the tail improve forecasts?} We pose the question in the two
-forms in which it could plausibly succeed: as a classification of whether a
-municipality will exceed its own historical upper quartile, which is the risk
-statement itself; and as a quantile regression of epidemic size. Epidemic
-duration and peak timing enter not as objects of a scaling claim but as ordinary
-predictors, available before the season, which may or may not be informative.
-The evaluation uses a rolling-origin design, a four-rung ablation ladder and a
-decision rule fixed in advance.
+Third, \emph{does the tail improve forecasts?} We pose this question in the two forms in which it could plausibly succeed: as a classification of whether a municipality will exceed its own historical upper quartile, which is the risk statement itself; and as a quantile regression of epidemic size.
+The evaluation uses a rolling-origin design, a four-rung ablation ladder and a decision rule fixed in advance.
 
 \subsection{Contributions}
 
