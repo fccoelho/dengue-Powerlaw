@@ -137,10 +137,9 @@ The evaluation uses a rolling-origin design, a four-rung ablation ladder and a d
 
 \begin{enumerate}
 
-\item \textbf{A size exponent, with the test that says when it means
-something.} The same surveillance series, grouped in five aggregation levels
-(Table~\ref{tab:levels}), does not give the same answer. The two weekly
-groupings fail as power laws: the fitted lower bound collapses to five cases or
+\item \textbf{An epidemic size power-law exponent, and a criterion for usefulness} The same incidence series, grouped in five aggregation levels
+(Table~\ref{tab:levels}), show that weekly case
+counts are not well described by power-laws: the fitted lower bound collapses to five cases or
 fewer in 77\% of \lvl{W-mun} and 81\% of \lvl{W-seas}, so the law describes the
 bulk rather than a tail (Section~\ref{sec:verdicts}). Epidemic size behaves
 differently: the power law is preferred to an exponential in 16 of 16 national
@@ -157,7 +156,7 @@ seasons over two decades (Sections~\ref{sec:bridge} and~\ref{sec:riskmodel}). A
 point forecast does not say how likely a season is to pass a stated threshold;
 the curve does.
 
-\item \textbf{The pair measures how large a season was, not why.} Within a
+\item \textbf{Power-law parameters are not predictive} Within a
 state, $\alpha_S$ and $\log_{10}x_{\min}$ are rank-correlated at
 $0.64$ (median over 24 states), and at $0.89$ across national seasons, whereas
 data simulated with $\alpha_S$ held fixed recover no such association
@@ -166,36 +165,18 @@ magnitude, and $\alpha_S$ is not a signal independent of lagged incidence, which
 is what a predictor in its own right would have to be
 (Section~\ref{sec:coupling}). This is the mechanism behind item~4.
 
-\item \textbf{An out-of-sample answer, and why it is narrow.} The answer
-comes from the ablation ladder of Section~\ref{sec:ablation}. At municipal
-level, lagged descriptors beat
-calibrated persistence on the Brier score in 4 of 5 forecast origins --- the only
-contrast in this study that satisfies the pre-specified rule --- and raise
-discrimination from $0.50$ to $0.58$, reaching $0.65$ with the full ladder. At
-state level the same contrast does not satisfy that rule: 2 of 5 origins have an
-interval excluding zero, against the 3 required, because each origin is a
-bootstrap over only 23 to 25 units and the interval is wider than the effect it
-is asked to resolve (Section~\ref{sec:classresults}). The scaling block adds
-nothing at either level: its interval excludes zero in 1 of 5 municipal origins
-for exceedance and 0 of 5 state origins for size, and at $\tau=0.95$ it leaves
-the upper quantile of the size forecast where it was
-(Section~\ref{sec:prediction}). The scaling description is justified as a risk
-statement and not as a predictor.
+\item \textbf{A size-class classifier that works at municipal scale.} Last season's
+descriptors raise AUC from $0.50$ to $0.58$ ($0.65$ with every term) and beat the
+historical-rate baseline in 4 of 5 forecast years, the only contrast in the study to
+satisfy the pre-specified rule. At state scale the same contrast reaches 2 of 5 and
+fails it (Section~\ref{sec:ablation}).
 
-\item \textbf{A survival reading that says how far the curve can be carried.}
-Read as a hazard, Equation~\eqref{eq:hazard} turns the same curve into a survival
-function, and the tests that follow are what bound its use
-(Section~\ref{sec:survival}). Inside the season that produced the fit, the law
-reproduces the observed exceedance (Section~\ref{sec:survivalres}). Carried into
-the next season it travels part of the way: the level at ten times the bound
-survives the transfer, with a median absolute error of 1.6 percentage points,
-while the level at a hundred times the bound does not, delivering $0.24\%$ where
-the curve implies $1.0\%$. Pooled, the 16 seasons are rejected as a single power
-law by 1.78 bands, although no season alone is. Duration, treated as a time to
-event, has an increasing hazard (Weibull shape $2.77$) and no dependence on
-season size (hazard ratio $1.006$, $p=0.50$), the empirical counterpart of
-leaving it out of the scaling claim.
-
+\item \textbf{A risk curve with a horizon.} Each season's parameters describes its own
+cross-section, and the pooled cross-section is rejected. Transported to the next
+season it holds to $10x_{\min}$ (median error 1.6~pp) and breaks by $100x_{\min}$
+(1.0\% predicted against 0.24\% observed). The companion survival analysis returns
+the opposite hazard shape, Weibull $2.77$ and size-independent ($p=0.50$), so the
+law does not extend to season duration (\eqref{eq:hazard}; Section~\ref{sec:survivalres}).
 \end{enumerate}
 
 \section{Methods}
@@ -214,27 +195,17 @@ series were projected onto a common epidemiological week ending on Sunday. Weeks
 without a reported case are retained in the series but excluded from
 distributional fits, since the power-law family is defined on positive support.
 
-Descriptors of each epidemic season were obtained from the platform's seasonal
-decomposition, which partitions a municipal series into epidemic episodes and
-reports, for each episode, its total number of cases, its duration in weeks and
-the week in which it peaked. These descriptors are available for 16 years, 2011
-to 2026, the last of them bounded by the data cut-off of 22 January 2026; the
-fit pooled over all years is reported separately and is excluded from every year
-count, so that each national cross-section corresponds to one calendar season.
-Only epidemic size is fitted as a power law; duration and peak timing enter the
-analysis as predictors of size.
+Descriptors of each epidemic season were obtained from the platform's seasonal decomposition, which partitions a municipal series into epidemic episodes and reports, for each episode, its total number of cases, its duration in weeks and the week in which it peaked~\citep{araujo2025large}.
+These descriptors are available for 16 years, 2011 to 2026, the last of them bounded by the data cut-off of 22 January 2026; the fit pooled over all years is reported separately and is excluded from every year count, so that each national cross-section corresponds to one calendar season.
+Only epidemic size is fitted as a power law; duration and peak timing enter the analysis as predictors of size.
 
-Municipal population figures are the estimates distributed with the platform
-(5{,}571 municipalities, one record with a zero entry excluded). Population enters
-no power-law fit; it is used to compute the descriptive correlations of
-Section~\ref{sec:coupling} and, as $\log_{10}$ population, as one predictor in
-the forecasting models of Section~\ref{sec:targets}.
+Municipal population figures are the estimates distributed with the platform (5{,}571 municipalities, one record with a zero entry excluded).
+Population enters no power-law fit; it is used to compute the descriptive correlations of Section~\ref{sec:coupling} and, as $\log_{10}$ population, as one predictor in the forecasting models of Section~\ref{sec:targets}.
 
 \subsection{Definitions and notation}
 \label{sec:definitions}
 
-Several quantities recur throughout the paper, and their meaning is fixed here
-once and for all. Table~\ref{tab:notation} collects the notation.
+Several quantities recur throughout the paper, and their meaning is fixed here. Table~\ref{tab:notation} collects the notation.
 
 \emph{Weekly count.} Let $c_{i,w}$ denote the estimated number of dengue cases
 in municipality $i$ during epidemiological week $w$. It is the primitive
@@ -328,34 +299,17 @@ M0--M3 & rungs of the ablation ladder\\
 \subsection{Five aggregation levels}
 \label{sec:levels}
 
-The unit of analysis is the sample of positive observations passed to the
-estimator. Table~\ref{tab:levels} defines the five aggregation levels used; each is
-a construction in the sense of Section~\ref{sec:definitions}, and the two terms are
-used interchangeably.
-Two variables are fitted, both derived from the same municipal series: the weekly
-count $c_{i,w}$ at constructions \lvl{W-mun} and \lvl{W-seas}, and the epidemic size $S_{i,t}$ at
-constructions \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat}. Within each group the constructions differ only in
-the dimension along which the variable is pooled, which is what allows a
-contrast between two of them to be read as the effect of that dimension alone.
+The unit of analysis is the sample of positive observations passed to the estimator.
+Table~\ref{tab:levels} defines the five aggregation levels used; each is a construction in the sense of Section~\ref{sec:definitions}, and the two terms are used interchangeably.
+Two variables are fitted, both derived from the same municipal series: the weekly case count $c_{i,w}$ at constructions \lvl{W-mun} and \lvl{W-seas}, and the epidemic size $S_{i,t}$ at constructions \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat}. Within each group the constructions differ only in the dimension along which the variable is pooled, which is what allows a contrast between two of them to be read as the effect of that dimension alone.
 
-The paper therefore estimates two exponents, not one: $\alpha_W$ for the weekly
-count and $\alpha_S$ for the epidemic size. They are close in value --- the
-median across the five constructions spans $1.95$ to $2.08$, and the two groups
-overlap inside that span --- and the near-agreement is why the distinction has to
-be carried by the notation rather than by the number. An $\alpha_W$ of $1.95$ and
-an $\alpha_S$ of $2.08$ differ by $0.13$ in the exponent and by a factor of $150$
-in the lower bound (Section~\ref{sec:size}), and only the second describes the
-risk of a large season.
+The paper therefore estimates two exponents, not one: $\alpha_W$ for the weekly case count and $\alpha_S$ for the epidemic size.
+They are close in value, the median across the five constructions spans $1.95$ to $2.08$, and the two groups overlap inside that span, and the near-agreement is why the distinction has to be carried by the notation rather than by the number.
+An $\alpha_W$ of $1.95$ and an $\alpha_S$ of $2.08$ differ by $0.13$ in the exponent and by a factor of $150$ in the lower bound (Section~\ref{sec:size}), and only the second describes the risk of a large season.
 
-Every handle is read as a variable and a scope. The initial letter names the
-fitted variable --- \emph{W} for the weekly count, \emph{S} for the epidemic size
---- and the remainder names the scope over which observations are pooled:
-\emph{mun} for a single municipality, \emph{seas} for a single season of a single
-municipality, \emph{state} for the municipalities of one state in one season, and
-\emph{nat} for the municipalities of the country in one season. The handles name
-constructions and are not random variables: only $c_{i,w}$ and $S_{i,t}$ enter the
-likelihood. They are used throughout for the five constructions and also label the
-panels of Figures~\ref{fig:alpha}, \ref{fig:verdicts} and \ref{fig:xmin}.
+Every handle is read as a variable and a scope. The initial letter names the fitted variable, \emph{W} for the weekly count, \emph{S} for the epidemic size, and the remainder names the scope over which observations are pooled: \emph{mun} for a single municipality, \emph{seas} for a single season of a single municipality, \emph{state} for the municipalities of one state in one season, and \emph{nat} for the municipalities of the country in one season.
+The handles name constructions and are not random variables: only $c_{i,w}$ and $S_{i,t}$ enter the likelihood.
+They are used throughout for the five constructions and also label the panels of Figures~\ref{fig:alpha}, \ref{fig:verdicts} and \ref{fig:xmin}.
 
 \begin{table}[htbp]
 \centering
@@ -380,37 +334,17 @@ Handle & Fitted variable & Sampling unit & Pooling & Fits\\
 \end{tabular}
 \end{table}
 
-A construction is fixed by two independent decisions. The first selects the
-variable that enters the likelihood: the weekly count $c_{i,w}$ as observed, or
-the season total $S_{i,t}$, obtained by summing the weeks of the epidemic episode
-delimited by the seasonal decomposition described in Section~\ref{sec:data}. The
-second selects the sample over which that variable is pooled: the weeks of one
-municipality, taken over the complete series or over a single season; the seasons
-of one municipality; or the municipalities of one state or of the whole country
-within a single season. The five constructions of Table~\ref{tab:levels} are the
-combinations in use, not the full crossing of the two decisions; a pairing
-omitted from the table, such as the weekly counts of a national cross-section, is
-one that no contrast in this paper requires.
+A construction is fixed by two independent decisions. The first selects the variable that enters the likelihood: the weekly count $c_{i,w}$ as observed, or the season total $S_{i,t}$, obtained by summing the weeks of the epidemic episode delimited by the seasonal decomposition described in Section~\ref{sec:data}.
+The second selects the sample over which that variable is pooled: the weeks of one municipality, taken over the complete series or over a single season; the seasons of one municipality; or the municipalities of one state or of the whole country within a single season. The five constructions of Table~\ref{tab:levels} are the combinations in use, not the full crossing of the two decisions; a pairing omitted from the table, such as the weekly counts of a national cross-section, is one that no contrast in this paper requires.
 
-Formally, let $\mathcal{M}$ be the set of municipalities and
-$\mathcal{M}_s\subseteq\mathcal{M}$ those of state $s$, $\mathcal{W}$ the
-epidemiological weeks of the study period and $\mathcal{W}_t\subset\mathcal{W}$
-those of season $t$ (Section~\ref{sec:definitions}), and
-$\mathcal{E}_{i,t}\subseteq\mathcal{W}_t$ the weeks that the seasonal
-decomposition assigns to the epidemic episode of $i$ in $t$; write
-$\mathcal{T}_i=\{t:\mathcal{E}_{i,t}\neq\varnothing\}$ for the seasons in which
-$i$ has an identified episode. The size variable sums the weeks of the episode and
+Formally, let $\mathcal{M}$ be the set of municipalities and $\mathcal{M}_s\subseteq\mathcal{M}$ those of state $s$, $\mathcal{W}$ the epidemiological weeks of the study period and $\mathcal{W}_t\subset\mathcal{W}$ those of season $t$ (Section~\ref{sec:definitions}), and $\mathcal{E}_{i,t}\subseteq\mathcal{W}_t$ the weeks that the seasonal decomposition assigns to the epidemic episode of $i$ in $t$; write $\mathcal{T}_i=\{t:\mathcal{E}_{i,t}\neq\varnothing\}$ for the seasons in which $i$ has an identified episode. The size variable sums the weeks of the episode and
 not those of the calendar year,
 %
 \[
 S_{i,t}=\sum_{w\in\mathcal{E}_{i,t}}c_{i,w},\qquad t\in\mathcal{T}_i,
 \]
 %
-so that $S_{i,t}\le\sum_{w\in\mathcal{W}_t}c_{i,w}$, with equality only when every
-notified case of the season falls inside the episode, and $S_{i,t}$ does not exist
-for $t\notin\mathcal{T}_i$. A municipality without an identified episode therefore
-contributes no value to any size construction, whereas its weeks still enter both
-weekly ones once the count is positive (Section~\ref{sec:data}).
+so that $S_{i,t}\le\sum_{w\in\mathcal{W}_t}c_{i,w}$, with equality only when every notified case of the season falls inside the episode, and $S_{i,t}$ does not exist for $t\notin\mathcal{T}_i$. A municipality without an identified episode therefore contributes no value to any size construction, whereas its weeks still enter both weekly ones once the count is positive (Section~\ref{sec:data}).
 
 The five samples those two decisions produce are
 %
@@ -422,55 +356,28 @@ The five samples those two decisions produce are
 \mathcal{D}_{\text{S-nat}}(t)     &= \{S_{i,t} : i\in\mathcal{M},\ t\in\mathcal{T}_i\},
 \end{align*}
 %
-where $i$ is a municipality, $s$ a state and $t$ a season; the first two fit the
-weekly count and the last three the epidemic size. Each sample is estimated on its
-own, so that every row of Table~\ref{tab:levels} carries its own $\alpha$ and
-its own $x_{\min}$, and no parameter is shared between constructions.
+where $i$ is a municipality, $s$ a state and $t$ a season; the first two fit the weekly count and the last three the epidemic size. Each sample is estimated on its own, so that every row of Table~\ref{tab:levels} carries its own $\alpha$ and $x_{\min}$, and no parameter is shared between constructions.
 
-A sample enters the estimator only if it holds at least ten positive values, a floor
-applied identically at the five constructions; samples below it are discarded rather
-than fitted, which is one reason the fit counts of Table~\ref{tab:levels} differ from
-the number of units the data hold. The floor binds unevenly. At \lvl{S-mun} it leaves
-out municipalities whose history is too short to define a distribution; at
-\lvl{S-state} it leaves out a state-season in which fewer than ten municipalities
-have an identified episode, so a state with fewer than ten municipalities
-contributes to no state-year fit, and the Federal District, a single municipality,
-appears in the pooled sample alone.
+A sample enters the estimator only if it holds at least ten positive values, a floor applied identically at the five constructions; samples below it are discarded rather than fitted, which is one reason the fit counts of Table~\ref{tab:levels} differ from the number of units the data hold.
+The floor binds unevenly.
+At \lvl{S-mun} it leaves out municipalities whose history is too short to define a distribution; at \lvl{S-state} it leaves out a state-season in which fewer than ten municipalities have an identified episode, so a state with fewer than ten municipalities contributes to no state-year fit, and the Federal District, a single municipality, appears in the pooled sample alone.
 
-Two further samples pool across seasons as well, keeping the spatial scope fixed;
-they are stored under the sentinel year $0$ and excluded from every count of
-seasons:
+Two further samples pool across seasons as well, keeping the spatial scope fixed; they are stored under the sentinel year $0$ and excluded from every count of seasons:
 %
 \begin{align*}
 \mathcal{D}_{\text{S-state}}(s,\cdot) &= \{S_{i,t}: i\in\mathcal{M}_s,\ t\in\mathcal{T}_i\},\\
 \mathcal{D}_{\text{S-nat}}(\cdot)     &= \{S_{i,t}: i\in\mathcal{M},\ t\in\mathcal{T}_i\}.
 \end{align*}
 %
-At \lvl{S-nat} every season clears the floor, so its pooled sample is the multiset
-union of the national cross-sections. At \lvl{S-state} it is not the union of the
-per-season samples: the floor removes state-seasons from the fits of
-\lvl{S-state} and removes nothing from the pooled sample, which therefore holds
-observations that no state-year fit has seen. The pooled national sample is the one
-behind the departure from the fitted law reported in
-Section~\ref{sec:survivalres}.
+At \lvl{S-nat} every season clears the floor, so its pooled sample is the multiset union of the national cross-sections.
+At \lvl{S-state} it is not the union of the per-season samples: the floor removes state-seasons from the fits of \lvl{S-state} and removes nothing from the pooled sample, which therefore holds observations that no state-year fit has seen.
+The pooled national sample is the one behind the departure from the fitted law reported in Section~\ref{sec:survivalres}.
 
-Constructions \lvl{W-mun} and \lvl{W-seas} differ only in the temporal window over which the weekly
-counts are pooled: \lvl{W-mun} uses the complete available series of a municipality
-(January 2010 to January 2026), whereas \lvl{W-seas} restricts the sample to a single
-season, of at most 53 weeks. Their sample sizes differ by roughly an order of
-magnitude, which is why the comparison between them is made on shares rather than
-on counts.
+Constructions \lvl{W-mun} and \lvl{W-seas} differ only in the temporal window over which the weekly case counts are pooled: \lvl{W-mun} uses the complete available series of a municipality (January 2010 to January 2026), whereas \lvl{W-seas} restricts the sample to a single season, of at most 53 weeks. Their sample sizes differ by roughly an order of magnitude, which is why the comparison between them is made on shares rather than on counts.
 
-Constructions \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat} fit the same variable, $S_{i,t}$, and differ only in
-the dimension of pooling. \lvl{S-mun} pools the seasons of one municipality and is
-therefore a statement about how a single municipality's epidemic sizes vary over
-time; a municipality enters this construction only if at least ten seasons are
-available. \lvl{S-state} and \lvl{S-nat} pool municipalities within a period, at state and national
-scope respectively, and are therefore statements about how sizes vary across
-space in a given season. This nesting is deliberate: each contrast reported in
-Section~\ref{sec:results} is a single step within one of the two groups, so that a
-difference in the inferred regime is attributable to the construction rather than
-to a change of data source, period or variable.
+Constructions \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat} fit the same variable, $S_{i,t}$, and differ only in the dimension of pooling. \lvl{S-mun} pools the seasons of one municipality and is therefore a statement about how a single municipality's epidemic sizes vary over time; a municipality enters this construction only if at least ten seasons are available.
+\lvl{S-state} and \lvl{S-nat} pool municipalities within a period, at state and national scope respectively, and are therefore statements about how sizes vary across space in a given season.
+This nesting is deliberate: each contrast reported in Section~\ref{sec:results} is a single step within one of the two groups, so that a difference in the inferred regime is attributable to the construction rather than to a change of data source, period or variable.
 
 \subsection{Discrete power-law estimation}
 \label{sec:estimation}
@@ -1346,9 +1253,9 @@ the natural place to look for value in the scaling descriptors, since a tail
 exponent is by construction a statement about upper-tail probabilities.
 
 We posed the question at the two levels where it is asked operationally. At state
-level (Table~\ref{tab:exceed}) the lagged seasonal descriptors --- which include
+level (Table~\ref{tab:exceed}) the lagged seasonal descriptors, which include
 the previous season's duration and peak timing as ordinary covariates, alongside
-size, $R_0$ and population --- move the Brier score in the expected direction: a
+size, $R_0$ and population, move the Brier score in the expected direction: a
 median of $+0.126$, positive in 4 of 5 origins and reaching $+0.212$. The
 intervals exclude zero in only 2 of the 5 origins, against the 3 that the rule requires, so the rung fails the rule at state level: each origin is a
 bootstrap over 23 to 25 units and the median interval is $0.26$ wide, wider than
@@ -1456,8 +1363,8 @@ reference and the dotted grey curve a population-only reference.}
 \centering
 \includegraphics[width=\textwidth]{figures/fig13_importance}
 \caption{What the classifier uses. Held-out permutation importance, measured as the
-increase in the Brier score --- the mean squared error of the predicted
-probabilities, so that lower is better --- when a predictor is permuted, so that a
+increase in the Brier score, the mean squared error of the predicted
+probabilities, so that lower is better, when a predictor is permuted, so that a
 negative value means the model is better with the predictor than without it.
 Panel (a) ranks the individual predictors, with the block of scaling descriptors
 in red: $\alpha_S$ is the size exponent, $x_{\min}$ the lower bound above
