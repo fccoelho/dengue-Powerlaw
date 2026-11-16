@@ -10,6 +10,14 @@ database and of every derived artifact, plus the database inventory. Any
 artifact whose bytes no longer match the manifest was produced by a different
 run and must be regenerated, not trusted.
 
+Prose is the exception, and it is hashed apart (``PROSE_ARTIFACTS``). Editing
+a sentence is not a stale artifact, and the only remedy a hash offers --
+re-freezing -- is the command that would launder a real mismatch. So the
+manuscript is reported, never policed, and its numbers are audited by
+``make_tables.py --check`` instead. ``--write`` runs that audit before it
+records anything: the manifest holds a digest, not a verdict, so the verdict
+has to be taken at the moment of freezing.
+
 Typical use::
 
     from provenance import assert_snapshot
@@ -30,12 +38,33 @@ import sys
 from datetime import datetime, timezone
 
 MANIFEST_NAME = "snapshot_manifest.json"
-MANIFEST_VERSION = 1
+#: 2 moved ``Manuscript/main.tex`` out of ``artifacts`` into ``prose``. A
+#: version-1 manifest is still read, routed by path, so upgrading this module
+#: does not by itself report drift.
+MANIFEST_VERSION = 2
 
-#: Artifacts the manuscript is built from, relative to the repo root.
+#: Manuscript audited by ``--write`` before it freezes anything.
+GATE_TEX = os.path.join("Manuscript", "main.tex")
+
+#: Tracked files that no script produces: the manuscript text itself.
+#:
+#: They are hashed and reported, never policed. "Regenerate, do not trust"
+#: assumes a producer, and prose has none: editing a sentence is not a stale
+#: artifact. Policing it made every draft change a DRIFT report whose only
+#: available remedy was ``--write`` -- and step 10 of the README runs that
+#: before step 11 verifies anything, so the habit it taught was free to hide a
+#: genuine mismatch. The digest is still recorded, so the snapshot keeps saying
+#: which text stood in front of which database at freeze time; it just stops
+#: calling an edit a defect.
+PROSE_ARTIFACTS = [
+    "Manuscript/main.tex",
+]
+
+#: Artifacts the manuscript is built from, relative to the repo root. Every
+#: entry is produced by a script, which is what makes regenerating it an
+#: available response to drift.
 TRACKED_ARTIFACTS = [
     "powerlaw_results.db",
-    "Manuscript/main.tex",
     "Manuscript/generated/facts.json",
     "Manuscript/generated/tab_main.tex",
     "Manuscript/generated/tab_ablation.tex",
@@ -112,8 +141,13 @@ def build_manifest(db_path: str = "powerlaw_results.db", root: str = ".") -> dic
             "sha256": sha256_file(os.path.join(root, db_path)),
             "inventory": db_inventory(os.path.join(root, db_path)),
         },
+        "prose": {
+            rel: sha256_file(os.path.join(root, rel)) for rel in PROSE_ARTIFACTS
+        },
         "artifacts": {
-            rel: sha256_file(os.path.join(root, rel)) for rel in TRACKED_ARTIFACTS
+            rel: sha256_file(os.path.join(root, rel))
+            for rel in TRACKED_ARTIFACTS
+            if rel not in PROSE_ARTIFACTS
         },
     }
 
@@ -142,18 +176,28 @@ def compare(manifest: dict, root: str = ".") -> dict:
     """Classify every tracked artifact against the manifest.
 
     Returns ``{"db": ..., "changed": [...], "missing": [...],
-    "untracked": [...], "ok": [...]}``. A changed *input* (the database) is
-    fatal; a changed *output* is regenerable, but only if it is regenerated.
+    "untracked": [...], "ok": [...], "prose": {rel: state}}``. A changed
+    *input* (the database) is fatal; a changed *output* is regenerable, but
+    only if it is regenerated. A changed *prose* file is neither, so it is
+    reported in ``prose`` and never makes the snapshot drift.
     """
     db_rel = manifest["database"]["path"]
     db_now = sha256_file(os.path.join(root, db_rel))
     rep = {"db": "ok" if db_now == manifest["database"]["sha256"] else "changed",
-           "changed": [], "missing": [], "ok": [], "untracked": []}
+           "changed": [], "missing": [], "ok": [], "untracked": [], "prose": {}}
     if rep["db"] != "ok":
         rep["changed"].append(db_rel)
-    for rel, recorded in manifest["artifacts"].items():
+    # Route by path, not by the section a manifest happened to store it in: a
+    # version-1 manifest still lists the prose under ``artifacts``, and reading
+    # the code upgrade as drift would defeat the point of tolerating it.
+    recorded_all = dict(manifest["artifacts"])
+    recorded_all.update(manifest.get("prose") or {})
+    for rel, recorded in recorded_all.items():
         now = sha256_file(os.path.join(root, rel))
-        if now == "missing":
+        if rel in PROSE_ARTIFACTS:
+            rep["prose"][rel] = ("missing" if now == "missing"
+                                 else "ok" if now == recorded else "changed")
+        elif now == "missing":
             rep["missing"].append(rel)
         elif recorded == "missing":
             rep["untracked"].append(rel)
@@ -175,12 +219,49 @@ def assert_snapshot(db_path: str = "powerlaw_results.db", root: str = ".") -> di
             f"tables (`python make_tables.py`) or re-freeze deliberately "
             f"(`python provenance.py --write`)."
         )
+    absent = [rel for rel, state in rep["prose"].items() if state == "missing"]
+    if absent:
+        raise SnapshotDrift(
+            "prose recorded in the snapshot is not on disk: " + ", ".join(absent)
+            + ". An edit is not drift, but a manuscript that disappeared is, and"
+              " the digest is the only thing that notices."
+        )
     if rep["changed"] or rep["missing"]:
         raise SnapshotDrift(
             "artifacts out of step with the database: "
             + ", ".join(rep["changed"] + rep["missing"])
         )
     return rep
+
+
+def claim_gate(db_path: str = "powerlaw_results.db", tex_path: str = GATE_TEX,
+               root: str = ".") -> tuple[bool, str]:
+    """Re-derive the manuscript's numbers from the database: (passed, summary).
+
+    Freezing is the only moment at which "this prose was checked against this
+    database" can be recorded at all, because the manifest stores a digest and
+    not a verdict. So the verdict is taken here, before the digest is written.
+
+    Deliberately not a subprocess: the audit is two library calls, and a
+    failure to import them has to fail *closed*. An `except: pass` around a
+    missing module is how a gate stops being one.
+    """
+    try:
+        import make_tables
+    except Exception as e:  # noqa: BLE001 -- refuse to freeze unchecked
+        return False, f"cannot import make_tables ({e}); nothing was audited"
+    try:
+        facts = make_tables.compute_facts(os.path.join(root, db_path))
+    except Exception as e:  # noqa: BLE001 -- a gate that cannot run is not green
+        return False, f"cannot derive the facts from {db_path}: {e}"
+    audit = make_tables.audit_prose(os.path.join(root, tex_path), facts)
+    if audit.get("error"):
+        return False, audit["error"]
+    bad = audit["stale"] + audit["missing"]
+    if bad:
+        named = ", ".join(entry["name"] for entry in bad)
+        return False, f"{len(bad)} claim(s) disagree with {db_path}: {named}"
+    return True, f"{len(audit['ok'])} claims verified against {db_path}"
 
 
 def main(argv=None) -> int:
@@ -192,9 +273,18 @@ def main(argv=None) -> int:
     ap.add_argument("--allow-missing", action="store_true",
                     help="with --write: freeze even when a tracked artefact is "
                          "absent. Do not use for a manuscript build")
+    ap.add_argument("--force", action="store_true",
+                    help="with --write: freeze even when the manuscript fails "
+                         "the claim audit. Do not use for a manuscript build")
+    ap.add_argument("--tex", default=GATE_TEX,
+                    help="manuscript audited by --write")
     g.add_argument("--check", action="store_true", help="verify against manifest")
     g.add_argument("--inventory", action="store_true", help="print table counts")
     a = ap.parse_args(argv)
+
+    if (a.allow_missing or a.force) and not a.write:
+        print("--allow-missing and --force only apply to --write", file=sys.stderr)
+        return 2
 
     if a.inventory:
         inv = db_inventory(os.path.join(a.root, a.db))
@@ -217,6 +307,16 @@ def main(argv=None) -> int:
             print("Rebuild it (make_ablation_tables.py --sources names the "
                   "command), or pass --allow-missing.", file=sys.stderr)
             return 1
+        passed, summary = claim_gate(a.db, a.tex, a.root)
+        if not passed and not a.force:
+            print("refusing to freeze: the manuscript is not in step with the "
+                  "database", file=sys.stderr)
+            print(f"  {summary}", file=sys.stderr)
+            print("Run `python make_tables.py --check` for the full list and fix "
+                  "the prose, or pass --force to record a snapshot you know is "
+                  "inconsistent.", file=sys.stderr)
+            return 1
+        print(f"claim gate: {'OK' if passed else 'FAILED (forced)'} -- {summary}")
         man = write_manifest(a.db, a.root)
         print(f"frozen {MANIFEST_NAME}")
         print(f"  db sha256 {man['database']['sha256'][:16]}...")
@@ -230,6 +330,11 @@ def main(argv=None) -> int:
         print(f"DRIFT: {e}", file=sys.stderr)
         return 1
     print(f"snapshot OK ({len(rep['ok'])} artifacts match)")
+    for rel, state in sorted(rep["prose"].items()):
+        print(f"  prose {rel}: " + (
+            "unchanged since the freeze" if state == "ok"
+            else "edited since the freeze -- not drift; `python make_tables.py"
+                 " --check` is what audits it"))
     return 0
 
 
