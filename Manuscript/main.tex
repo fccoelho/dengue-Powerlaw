@@ -135,50 +135,66 @@ The evaluation uses a rolling-origin design, a four-rung ablation ladder and a d
 
 \subsection{Contributions}
 
-
 \begin{enumerate}
-\item \textbf{A robust exponent for epidemic size, reported with the diagnostic
-that makes it interpretable.} Under five constructions (table \ref{tab:levels}) of the same surveillance
-series, the two weekly distributions of cases show how to use $x_{\min}$ as a diagnostic: it
-collapses to five cases or fewer in 77\% of multi-year municipal distributions (\lvl{W-mun}) and in 81\% of the within season (\lvl{W-seas}) fits, this means that the power law is estimated on counts of one and two.
-The epidemic size estimates do not collapse, and they agree: the power law is preferred in 16
-of 16 national cross-sections (years) and in 96\% of 353 state-year cross-sections, with
-median exponents of $2.03$ and $1.98$ and median lower bounds of 730 and 169
-cases respectively. Reporting $x_{\min}$ along with every exponent is what separates
-the fits that describe a tail from those that describe the bulk of the data.
 
-\item \textbf{The fitted pair as a calibrated risk curve.} Equation
-\eqref{eq:exceed} maps $(\alpha, x_{\min})$ to $\Pr(S \ge s)$ for every $s$, and
-the national fits reproduce the observed exceedance frequency over two decades of
-epidemic size. This is a decision-relevant output that a point forecast does not
-provide, and it is obtained from two parameters.
+\item \textbf{A size exponent, with the test that says when it means
+something.} The same surveillance series, grouped in five aggregation levels
+(Table~\ref{tab:levels}), does not give the same answer. The two weekly
+groupings fail as power laws: the fitted lower bound collapses to five cases or
+fewer in 77\% of \lvl{W-mun} and 81\% of \lvl{W-seas}, so the law describes the
+bulk rather than a tail (Section~\ref{sec:verdicts}). Epidemic size behaves
+differently: the power law is preferred to an exponential in 16 of 16 national
+seasons and in 96\% of 353 state-seasons, with median exponents of $2.03$ and
+$1.98$ and median lower bounds of 730 and 169 cases (Section~\ref{sec:size}). The
+rule that separates the two cases is a reporting one: an exponent describes a
+tail only when $x_{\min}$ is stated beside it (Section~\ref{sec:diagnostic}).
 
-\item \textbf{A measured coupling that identifies what the size exponent
-represents.} Within units, $\alpha_S$ and $\log_{10} x_{\min}$ are rank-correlated
-at $0.64$ (median over 24 states) and at $0.89$ across national cross-sections,
-whereas a simulation with $\alpha_S$ held fixed recovers no such association.
-The pair is therefore a low-variance summary of seasonal magnitude: informative
-about size, but not independent of lagged incidence, which a reading of
-$\alpha_S$ as an independent predictor would require.
+\item \textbf{Two parameters that turn into a probability.} Equation
+\eqref{eq:exceed} maps $(\alpha_S, x_{\min})$ onto $\Pr(S\ge s)$ for any level
+$s$, which makes the fitted pair a risk curve rather than a description of the
+data it came from, and the curve reproduces the observed frequency of extreme
+seasons over two decades (Sections~\ref{sec:bridge} and~\ref{sec:riskmodel}). A
+point forecast does not say how likely a season is to pass a stated threshold;
+the curve does.
 
-\item \textbf{An out-of-sample answer in the form in which the question can be
-answered.} The probability of a large season is predictable where the panel is
-large enough to resolve it: lagged descriptors improve the Brier score over
-calibrated persistence in 4 of the 5 municipal forecast origins, the only
-contrast in this study to satisfy the pre-specified rule, whereas at state level
-the same rung fails on 23 to 25 units per origin. The scaling block adds no
-incremental skill to either task --- 0 of 5 origins for size, 1 of 5
-for municipal exceedance --- and leaves the upper quantile of the size forecast
-where it was. The scaling description is thus justified as a risk statement and
-not as a predictor.
-\item \textbf{A survival reading that bounds how far the risk curve travels.}
-Read as a hazard, the fitted law reproduces the exceedance frequency inside the
-season that produced it, and its portability to the next season is partial and
-characterisable: the level at ten times the bound survives the transfer, the level
-at a hundred times it does not, and the 16 seasons pooled are rejected as a single
-power law although no season alone is. Duration, examined as a time to event, has
-an increasing hazard and no dependence on season size, the empirical counterpart
-of excluding it from the scaling claim.
+\item \textbf{The pair measures how large a season was, not why.} Within a
+state, $\alpha_S$ and $\log_{10}x_{\min}$ are rank-correlated at
+$0.64$ (median over 24 states), and at $0.89$ across national seasons, whereas
+data simulated with $\alpha_S$ held fixed recover no such association
+(Table~\ref{tab:coupling}). The pair is thus a stable summary of seasonal
+magnitude, and $\alpha_S$ is not a signal independent of lagged incidence, which
+is what a predictor in its own right would have to be
+(Section~\ref{sec:coupling}). This is the mechanism behind item~4.
+
+\item \textbf{An out-of-sample answer, and why it is narrow.} The answer
+comes from the ablation ladder of Section~\ref{sec:ablation}. At municipal
+level, lagged descriptors beat
+calibrated persistence on the Brier score in 4 of 5 forecast origins --- the only
+contrast in this study that satisfies the pre-specified rule --- and raise
+discrimination from $0.50$ to $0.58$, reaching $0.65$ with the full ladder. At
+state level the same contrast does not satisfy that rule: 2 of 5 origins have an
+interval excluding zero, against the 3 required, because each origin is a
+bootstrap over only 23 to 25 units and the interval is wider than the effect it
+is asked to resolve (Section~\ref{sec:classresults}). The scaling block adds
+nothing at either level: its interval excludes zero in 1 of 5 municipal origins
+for exceedance and 0 of 5 state origins for size, and at $\tau=0.95$ it leaves
+the upper quantile of the size forecast where it was
+(Section~\ref{sec:prediction}). The scaling description is justified as a risk
+statement and not as a predictor.
+
+\item \textbf{A survival reading that says how far the curve can be carried.}
+Read as a hazard, Equation~\eqref{eq:hazard} turns the same curve into a survival
+function, and the tests that follow are what bound its use
+(Section~\ref{sec:survival}). Inside the season that produced the fit, the law
+reproduces the observed exceedance (Section~\ref{sec:survivalres}). Carried into
+the next season it travels part of the way: the level at ten times the bound
+survives the transfer, with a median absolute error of 1.6 percentage points,
+while the level at a hundred times the bound does not, delivering $0.24\%$ where
+the curve implies $1.0\%$. Pooled, the 16 seasons are rejected as a single power
+law by 1.78 bands, although no season alone is. Duration, treated as a time to
+event, has an increasing hazard (Weibull shape $2.77$) and no dependence on
+season size (hazard ratio $1.006$, $p=0.50$), the empirical counterpart of
+leaving it out of the scaling claim.
 
 \end{enumerate}
 
