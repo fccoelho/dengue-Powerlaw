@@ -293,7 +293,10 @@ def main(argv=None) -> int:
 
     facts = make_tables.compute_facts(os.path.join(a.root, a.db))
     audit = make_tables.audit_prose(os.path.join(a.root, a.tex), facts)
-    if audit["stale"] or audit["missing"]:
+    if audit.get("error"):
+        failed = True
+        print(f"[2/5] prose         UNAUDITABLE: {audit['error']}", file=sys.stderr)
+    elif audit["stale"] or audit["missing"]:
         failed = True
         print(f"[2/5] prose         STALE ({facts['total_fits']:,} fits in db)", file=sys.stderr)
         for s in audit["stale"]:

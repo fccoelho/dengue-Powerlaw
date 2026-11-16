@@ -732,6 +732,13 @@ def main(argv=None) -> int:
 
     audit = audit_prose(a.tex, f)
     if a.check:
+        # "No claims verified" is not "no claims violated": a manuscript whose
+        # path is wrong used to report itself in step with the database, which
+        # matters more now that the manifest hashes prose instead of policing
+        # it. A gate that cannot read its input has not passed.
+        if audit.get("error"):
+            print(f"cannot audit {a.tex}: {audit['error']}", file=sys.stderr)
+            return 2
         for s in audit["stale"]:
             print(f"STALE   {s['name']}: found {s['found']}, want {s['want']!r}", file=sys.stderr)
         for m in audit["missing"]:

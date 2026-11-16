@@ -86,7 +86,7 @@ python make_ablation_tables.py
 # 9. regenerate every figure (or a subset: ... 2 4 6)
 python Manuscript/figures/generate_figures.py
 
-# 10. freeze the new state as THE snapshot
+# 10. freeze the new state as THE snapshot (it refuses if the prose is stale)
 python provenance.py --write
 
 # 11. prove the repository is internally consistent
@@ -202,6 +202,8 @@ merely agrees with it today.
 | symptom | cause | fix |
 | --- | --- | --- |
 | `DRIFT: ... changed since the snapshot was frozen` | `powerlaw_results.db` was re-fitted but the tables were not regenerated | run steps 6--8 above, or `python make_tables.py` then `python provenance.py --write` if the new database is the intended one |
+| `refusing to freeze: the manuscript is not in step with the database` | step 10 was reached before the prose was updated for the new artefacts | run `python make_tables.py --check`, fix the claims it names, then re-freeze; `--force` records the mismatch on purpose |
+| `prose Manuscript/main.tex: edited since the freeze` | you edited the manuscript. The snapshot records the prose but does not police it, because a hash cannot tell an edit from a defect | nothing to fix: `python make_tables.py --check` is what audits the numbers |
 | `[2/5] prose STALE` lists a value with the wrong occurrence count | a number appears twice in `main.tex` and only one site was updated | grep for the stale literal; both sites must change together |
 | `[5/5] ablation INCOMPLETE` names a source as absent | the artefact that should back a quoted number does not exist (e.g. the state-level exceedance run was never committed) | run the command in the message; do not edit the prose to match the gap |
 | `[5/5] ablation STALE` names a contrast | the artefact was regenerated and the prose still carries the old median, or the reverse | re-run `make_ablation_tables.py` first: the tables fix themselves. Then update the prose the message names |
@@ -365,7 +367,7 @@ The dashboard will be available at `http://127.0.0.1:7860`.
 - `fitpl.py`: `FitPL` class; Mosqlimate/Infodengue fetching, parquet caching and every power-law fit
 - `fit_episcanner_pl.py`: state- and national-level Episcanner metric fits
 - `aggregate_city_stats.py`: builds the `city_stats` table (population, case totals) used for joins
-- `provenance.py`: snapshot manifest; SHA-256 of the database and of every derived artefact (`--write` freezes, `--check` raises on drift)
+- `provenance.py`: snapshot manifest; SHA-256 of the database and of every derived artefact (`--write` freezes, `--check` raises on drift). The manuscript is hashed apart and never policed -- editing a sentence is not a stale artefact -- so `--write` runs the claim audit before it records anything
 - `make_tables.py`: emits `Manuscript/generated/tab_main.tex` and `facts.json` from the database; `--check` audits the prose against them
 - `verify_snapshot.py`: manifest, prose, design, orphan-export and ablation checks in one command; exit 1 on any drift. The design check also refuses a figure module that fits an estimator the ablation does not report
 
