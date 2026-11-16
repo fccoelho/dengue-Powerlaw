@@ -280,8 +280,8 @@ in weeks and $P_{i,t}$ the epidemiological week of its maximum.
 \small
 \setlength{\tabcolsep}{5pt}
 \caption{Notation. The first group defines the observed quantities, the second
-the parameters of the fitted law, and the third the design of the predictive
-evaluation.}
+the sets over which those quantities are pooled, the third the parameters of the
+fitted law, and the fourth the design of the predictive evaluation.}
 \label{tab:notation}
 \begin{tabular}{@{}ll@{}}
 \toprule
@@ -292,6 +292,11 @@ $t$ & season, indexed by calendar year\\
 $S_{i,t}$ & epidemic size: total cases of the episode of $i$ in $t$\\
 $D_{i,t}$, $P_{i,t}$ & duration (weeks) and peak week of that episode\\
 $R_{0,t}$ & effective reproduction number reported for season $t$\\
+\midrule
+$\mathcal{M}$, $\mathcal{M}_s$ & municipalities, and the municipalities of state $s$\\
+$\mathcal{W}$, $\mathcal{W}_t$ & epidemiological weeks of the window, and of season $t$\\
+$\mathcal{E}_{i,t}$, $\mathcal{T}_i$ & weeks of the episode of $i$ in $t$; seasons with an episode\\
+$\mathcal{D}$ & sample fitted at a construction (Section~\ref{sec:levels})\\
 \midrule
 $\alpha$ & power-law exponent of the law $p(x)\propto x^{-\alpha}$\\
 $\alpha_W$, $\alpha_S$ & that exponent for the weekly count and for epidemic size\\
@@ -370,6 +375,68 @@ within a single season. The five constructions of Table~\ref{tab:levels} are the
 combinations in use, not the full crossing of the two decisions; a pairing
 omitted from the table, such as the weekly counts of a national cross-section, is
 one that no contrast in this paper requires.
+
+Formally, let $\mathcal{M}$ be the set of municipalities and
+$\mathcal{M}_s\subseteq\mathcal{M}$ those of state $s$, $\mathcal{W}$ the
+epidemiological weeks of the study period and $\mathcal{W}_t\subset\mathcal{W}$
+those of season $t$ (Section~\ref{sec:definitions}), and
+$\mathcal{E}_{i,t}\subseteq\mathcal{W}_t$ the weeks that the seasonal
+decomposition assigns to the epidemic episode of $i$ in $t$; write
+$\mathcal{T}_i=\{t:\mathcal{E}_{i,t}\neq\varnothing\}$ for the seasons in which
+$i$ has an identified episode. The size variable sums the weeks of the episode and
+not those of the calendar year,
+%
+\[
+S_{i,t}=\sum_{w\in\mathcal{E}_{i,t}}c_{i,w},\qquad t\in\mathcal{T}_i,
+\]
+%
+so that $S_{i,t}\le\sum_{w\in\mathcal{W}_t}c_{i,w}$, with equality only when every
+notified case of the season falls inside the episode, and $S_{i,t}$ does not exist
+for $t\notin\mathcal{T}_i$. A municipality without an identified episode therefore
+contributes no value to any size construction, whereas its weeks still enter both
+weekly ones once the count is positive (Section~\ref{sec:data}).
+
+The five samples those two decisions produce are
+%
+\begin{align*}
+\mathcal{D}_{\text{W-mun}}(i)     &= \{c_{i,w} : w\in\mathcal{W},\ c_{i,w}\ge 1\},\\
+\mathcal{D}_{\text{W-seas}}(i,t)  &= \{c_{i,w} : w\in\mathcal{W}_t,\ c_{i,w}\ge 1\};\\[2pt]
+\mathcal{D}_{\text{S-mun}}(i)     &= \{S_{i,t} : t\in\mathcal{T}_i\},\\
+\mathcal{D}_{\text{S-state}}(s,t) &= \{S_{i,t} : i\in\mathcal{M}_s,\ t\in\mathcal{T}_i\},\\
+\mathcal{D}_{\text{S-nat}}(t)     &= \{S_{i,t} : i\in\mathcal{M},\ t\in\mathcal{T}_i\},
+\end{align*}
+%
+where $i$ is a municipality, $s$ a state and $t$ a season; the first two fit the
+weekly count and the last three the epidemic size. Each sample is estimated on its
+own, so that every row of Table~\ref{tab:levels} carries its own $\alpha$ and
+its own $x_{\min}$, and no parameter is shared between constructions.
+
+A sample enters the estimator only if it holds at least ten positive values, a floor
+applied identically at the five constructions; samples below it are discarded rather
+than fitted, which is one reason the fit counts of Table~\ref{tab:levels} differ from
+the number of units the data hold. The floor binds unevenly. At \lvl{S-mun} it leaves
+out municipalities whose history is too short to define a distribution; at
+\lvl{S-state} it leaves out a state-season in which fewer than ten municipalities
+have an identified episode, so a state with fewer than ten municipalities
+contributes to no state-year fit, and the Federal District, a single municipality,
+appears in the pooled sample alone.
+
+Two further samples pool across seasons as well, keeping the spatial scope fixed;
+they are stored under the sentinel year $0$ and excluded from every count of
+seasons:
+%
+\begin{align*}
+\mathcal{D}_{\text{S-state}}(s,\cdot) &= \{S_{i,t}: i\in\mathcal{M}_s,\ t\in\mathcal{T}_i\},\\
+\mathcal{D}_{\text{S-nat}}(\cdot)     &= \{S_{i,t}: i\in\mathcal{M},\ t\in\mathcal{T}_i\}.
+\end{align*}
+%
+At \lvl{S-nat} every season clears the floor, so its pooled sample is the multiset
+union of the national cross-sections. At \lvl{S-state} it is not the union of the
+per-season samples: the floor removes state-seasons from the fits of
+\lvl{S-state} and removes nothing from the pooled sample, which therefore holds
+observations that no state-year fit has seen. The pooled national sample is the one
+behind the departure from the fitted law reported in
+Section~\ref{sec:survivalres}.
 
 Constructions \lvl{W-mun} and \lvl{W-seas} differ only in the temporal window over which the weekly
 counts are pooled: \lvl{W-mun} uses the complete available series of a municipality
