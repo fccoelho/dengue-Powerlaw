@@ -69,7 +69,22 @@ Manuscript/figures/fig02_alpha_by_level.*
 # fig07_alpha_by_construction. Ignored so a stale copy cannot be committed back.
 Manuscript/figures/fig07_window_flip.*
 
-# survival_analysis.py tables and summary: regenerated, and committed anyway
-# because snapshot_manifest.json hashes them. Its two figures ARE cited (Section
-# 3.5) and are written to Manuscript/figures, which is not ignored.
+# fig08 (stability of the two exponents) was dropped: panel (a) redrew the standard
+# deviation of alpha_S that Section 3.3 states two sentences earlier, and panel (b)
+# the correlation whose three numbers the next paragraph gives. It carried no fact
+# the text did not. Ignored so a stale copy cannot be committed back.
+Manuscript/figures/fig08_alpha_stability.*
+
+# fig16 and fig17 (the survival reading: DKW band, out-of-season transport,
+# duration as a time-to-event outcome) were dropped with the section they served.
+# The transport survives as one paragraph of Section 3.4 and is quoted from the
+# table below; the duration analysis is gone from the paper. regeneration of these
+# two figures by survival_analysis.py must not come back into the manuscript.
+Manuscript/figures/fig16_survival_exceedance.*
+Manuscript/figures/fig17_survival_duration.*
+
+# survival_analysis.py tables: regenerated, and committed anyway because
+# snapshot_manifest.json hashes them. Only exceedance_transport.csv is still quoted
+# in the manuscript (Section 3.4); the within-season and duration tables are kept
+# for provenance and are no longer audited against the text.
 analysis/
