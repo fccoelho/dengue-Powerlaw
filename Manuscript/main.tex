@@ -1150,14 +1150,9 @@ distinct problems.
 \subsection{The curve as a hazard, and how far it travels between seasons}
 \label{sec:survivalres}
 
-This section compares the fitted pair $(\alpha_S, x_{\min})$ with data in three
-ways, and only the first of them is descriptive by construction. Through Equation~\eqref{eq:exceed} the
-pair gives the survival function $\Pr(S\ge s)$ of the size variable, so each
-comparison below sets a fitted probability against an observed frequency: within
-the season that produced the pair, which is descriptive because $x_{\min}$ was
-chosen to make it close; against the pooled cross-section of all 16 seasons,
-which can reject; and against the following season, which tests whether the pair
-transfers.
+This section compares the fitted pair $(\alpha_S, x_{\min})$ with data in three ways, and only the first of them is descriptive by construction.
+Through Equation~\eqref{eq:exceed} the pair gives the survival function $\Pr(S\ge s)$ of the size variable, so each comparison below sets a fitted probability against an observed frequency: within
+the season that produced the pair, which is descriptive because $x_{\min}$ was chosen to make it close; against the pooled cross-section of all 16 seasons, which can reject; and against the following season, which tests whether the pair transfers.
 
 In the season that produced the pair the fitted and observed curves agree. Over
 the 16 national cross-sections the largest departure is
@@ -1945,37 +1940,18 @@ and the exceedance statement is usually the one a health service requires.
 
 \section{Conclusion}
 
-Dengue epidemic size in Brazil follows a power law with an exponent close to two.
+Dengue epidemics sizes in Brazil follow a power law with an exponent close to two.
 The power law is preferred to an exponential in 16 of 16 national seasons and in
 96\% of 353 state-year cross-sections, and in each of those fits the lower bound
 lies two to three orders of magnitude above the bulk of the data.
 
-The same data support or reject a power law depending on how the series is
-partitioned. Across the five constructions the median exponent ranges from $1.95$
-to $2.08$, and the share of fits that prefer a power law to an exponential ranges
-from 23\% to 100\%. For the weekly case count the fitted lower bound falls at five
-cases or fewer in most fits, so those exponents describe counts near the origin
-and not a tail. The heterogeneity that the literature on epidemic scaling
-attributes to pathogen or to place is, in these data, a property of the tuple
-(variable, sampling unit, dimension of pooling, comparison model).
+The power law holds for epidemic size and not for the weekly case count. Fitted to the weekly count, for the decade-long cases series, a Power-law is still preferred to an exponential in 77\% of the 5{,}264 municipalities, but in the within-season series, it is preferred in only 23\% of the 43{,}673 seasonal series. This makes the scaling parameters not useful to predict extreme incidence.
 
-Because the size exponent is close to two, the fitted pair $(\alpha_S, x_{\min})$
-fixes the probability that a season exceeds any level $s$, and those two
-parameters reproduce the observed frequency of extreme seasons over two decades.
-This is the main practical result: a surveillance service obtains the exceedance
-probability of a season from the current cross-section, without training a model or
-issuing a forecast.
+Because the size exponent is close to two, the fitted pair $(\alpha_S, x_{\min})$ fixes the probability that a season exceeds any level $s$, and those two parameters reproduce the observed frequency of extreme seasons over two decades.
+This is the main practical result: a surveillance service can obtain the exceedance probability of a given season, without training a model or issuing a forecast.
 
-The same pair does not forecast. For the municipal question of whether a season
-will exceed the unit's own upper quartile, lagged seasonal descriptors improve the
-Brier score over calibrated persistence in 4 of 5 origins and raise discrimination
-from $0.50$ to $0.58$ in area under the curve, the full ladder reaching $0.65$;
-this is the only contrast in the study that satisfies the pre-specified rule,
-while at state level the same contrast cannot be resolved on 25 units. For the
-magnitude of the size no rung achieves skill, and the scaling block adds nothing,
-in 0 of 5 origins, its differential at the 95th percentile being $+4.9\%$ in
-median with intervals that exclude zero in only 2 of 5 origins and in opposite
-directions.
+The same pair does not contribute to a better forecast.
+For the municipal question of whether a season will exceed the unit's own upper quartile, lagged seasonal descriptors improve the Brier score over calibrated persistence in 4 out of 5 origins and raise discrimination from $0.50$ to $0.58$ in termos of AUC, the full ladder reaching $0.65$; this is the only contrast in the study that satisfies the pre-specified rule, while at state level the same contrast cannot be resolved on 25 units. For the magnitude of the size no rung achieves skill, and the scaling block adds nothing, in 0 of 5 origins, its differential at the 95th percentile being $+4.9\%$ in median with intervals that exclude zero in only 2 of 5 origins and in opposite directions.
 
 The reason is a property of the estimates and not a defect of the model.
 $\alpha_S$ co-varies with $x_{\min}$, and therefore with the scale of the season,
