@@ -717,12 +717,62 @@ applied to the predicted probability is chosen by Youden's $J$ statistic
 the training fit, and then held fixed for the test set. We report the area under
 the ROC curve, the area under the precision--recall curve, which is the more
 informative summary under class imbalance, the Brier score
-\citep{gneiting2007strictly}, the $F_1$ score at the Youden threshold and a
+\citep{gneiting2007strictly}, defined in Section~\ref{sec:brier},
+the $F_1$ score at the Youden threshold and a
 calibration curve, and we test differences in the area under the curve between
 nested predictor sets by the method of \citet{delong1988comparing}.
 
-Feature attribution is measured by held-out permutation importance on the Brier
-score, reported both per predictor and for the scaling block permuted as a unit
+\paragraph{The Brier score: definition, reference value and three uses.}
+\label{sec:brier}
+
+Let $Y_{i}\in\{0,1\}$ be the label of Equation~\eqref{eq:label} for unit-season
+$i$, and let $p_{i}^{(M)}\in[0,1]$ be the probability that rung $M$ assigns to
+$Y_{i}=1$. At forecast origin $y$, over the $n_{y}$ evaluated unit-seasons, the
+Brier score of rung $M$ is the mean squared error of those probabilities,
+%
+\begin{equation}
+\mathrm{BS}(M,y)\;=\;\frac{1}{n_{y}}\sum_{i=1}^{n_{y}}
+\bigl(p_{i}^{(M)}-Y_{i}\bigr)^{2}.
+\label{eq:brier}
+\end{equation}
+%
+The score lies in $[0,1]$ and lower is better. The lower endpoint is reached only
+by a forecast that is certain and right on every case, and the upper only by one
+that is certain and wrong on every case. The score is a strictly proper scoring
+rule \citep{gneiting2007strictly}: its expectation is minimised when $p_{i}$
+equals the true conditional probability $\Pr(Y_{i}=1)$, so no rung lowers its
+expected score by reporting a probability other than the one it estimates.
+Properness is what allows the probability target of Section~\ref{sec:bridge} and
+the size target of Section~\ref{sec:targets} to be compared by the same
+statistic, Equation~\eqref{eq:skill}, since both numerators are proper losses.
+
+The scale of the score is set by the forecast that carries no covariate. A
+constant probability $p$, in an origin where the event has frequency $q_{y}$,
+scores $q_{y}(1-p)^{2}+(1-q_{y})p^{2}$. That expression is minimised at
+$p=q_{y}$, where it equals $q_{y}(1-q_{y})$, the score of a forecast that knows
+the season's frequency and nothing else. Rung M0 reports the training base rate
+$\hat q_{y}$, which is the same expression evaluated at $p=\hat q_{y}$. In 2024
+the two values differ sharply: $q_{y}=0.695$ against $\hat q_{y}=0.264$, so M0
+scores $0.40$ where the frequency-only forecast would score $0.21$
+(Section~\ref{sec:classresults}).
+
+Three uses of the score recur in this paper, and all three are oriented so that a
+positive value means the information under test helps. For a contrast between two
+rungs, $\Delta\mathrm{BS}(M',M,y)=\mathrm{BS}(M,y)-\mathrm{BS}(M',y)$ is positive
+when the later rung $M'$ has the lower score; this is the differential of
+Table~\ref{tab:exceed}, whose municipal M1--M0 contrast has median $+0.049$ and
+is positive, with an interval excluding zero, in 4 of the 5 origins. Permutation
+importance reports $\mathrm{BS}(M,y;\text{permuted})-\mathrm{BS}(M,y)$, the
+increase in the score when a predictor or a block is shuffled in the held-out
+origin, and is positive when the model uses what is destroyed
+(Figure~\ref{fig:importance}). Equation~\eqref{eq:skill} takes the score as its
+numerator. Skill is reported on this loss rather than on the area under the curve
+because an area is invariant to monotone transformations of the predicted
+probabilities: a change in calibration that leaves the ordering of units intact
+moves the score and not the area.
+
+Feature attribution uses the same held-out permutation importance, reported both
+per predictor and for the scaling block permuted as a unit
 \citep{breiman2001random}: under the collinearity documented in
 Section~\ref{sec:coupling}, a per-column ranking alone understates the importance
 of a block whose members can substitute for one another.
@@ -1369,7 +1419,7 @@ reference and the dotted grey curve a population-only reference.}
 \caption{What the classifier uses. Held-out permutation importance, measured as the
 increase in the Brier score, the mean squared error of the predicted
 probabilities, so that lower is better, when a predictor is permuted, so that a
-negative value means the model is better with the predictor than without it.
+positive value means the model is better with the predictor than without it.
 Panel (a) ranks the individual predictors, with the block of scaling descriptors
 in red: $\alpha_S$ is the size exponent, $x_{\min}$ the lower bound above
 which the law is fitted, $\dot\alpha$ the least-squares slope of $\alpha_S$ over
