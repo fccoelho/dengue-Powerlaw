@@ -1,8 +1,12 @@
 """Generate candidate figures for every figure environment in main.tex.
 
 Usage:
-    python Manuscript/figures/generate_figures.py            # all 14
-    python Manuscript/figures/generate_figures.py 2 4 6      # subset
+    python Manuscript/figures/generate_figures.py            # all 13
+    python Manuscript/figures/generate_figures.py 4 6 7      # subset
+
+The number of a figure here is its file stem (``fig07`` writes
+``fig07_alpha_by_construction``), not its position in the manuscript: dropping
+a figure must not renumber the arguments.
 
 Every figure is built from the repository's own artefacts (powerlaw_results.db,
 data/episcanner_*.parquet, data/<geocode>.parquet, muni_br.gpkg) using the same
@@ -337,31 +341,6 @@ def _load_classifier():
 
 
 # ---------------------------------------------------------------------------
-# Fig 02 -- alpha by level (boxes), size above, duration below
-# ---------------------------------------------------------------------------
-def fig02():
-    """Distribution of the estimated exponent at each construction."""
-    data = _level_alpha()
-    fig, ax = plt.subplots(figsize=(7.0, 3.4))
-    vals = [data[lvl]["alpha"].values for lvl in SIZE_LEVELS]
-    bp = ax.boxplot(vals, tick_labels=SIZE_LEVELS, whis=1.5, showfliers=False,
-                    patch_artist=True, widths=0.55)
-    for patch in bp["boxes"]:
-        patch.set_facecolor("#aec7e8")
-    ax.axhline(2.0, ls="--", lw=0.9, color="0.4")
-    ax.text(0.02, 0.92, r"$\alpha=2$", transform=ax.transAxes, fontsize=9,
-            color="0.35")
-    ax.set_xlabel("construction")
-    ax.set_ylabel(r"$\alpha$")
-    ax.set_title("estimated exponent by construction (dashed: $\\alpha=2$)",
-                 fontsize=10)
-    fig.tight_layout()
-    fig.savefig(OUT / "fig02_alpha_by_level.pdf", bbox_inches="tight")
-    fig.savefig(OUT / "fig02_alpha_by_level.png", bbox_inches="tight")
-    plt.close(fig)
-
-
-# ---------------------------------------------------------------------------
 # Fig 03 -- verdict proportions by level
 # ---------------------------------------------------------------------------
 def fig03():
@@ -399,6 +378,14 @@ def fig03():
 def fig04():
     """CCDF of epidemic size at the national cross-section, with both models.
 
+    The selected lower bound is drawn as a dotted vertical line and labelled on
+    the panel: it is the left end of the straight segment, so marking it is what
+    turns "the curve is close to linear" into "the curve is close to linear
+    above this value". The bottom of the y axis is fixed at 1e-50 rather than
+    left to the autoscaler, which the exponential alternative would otherwise
+    drive far below the empirical curve, compressing the two decades the figure
+    exists to show.
+
     The figure used to carry a second panel: the same CCDF for epidemic
     duration, drawn to show that it bends downwards while size does not. That
     contrast is gone with the duration aggregation levels -- duration is
@@ -427,15 +414,28 @@ def fig04():
     s = np.logspace(np.log10(xmin), np.log10(v.max()), 200)
     # discrete power law tail: Pr(X >= s) = zeta(alpha, s) / zeta(alpha, xmin)
     ax.plot(s, zeta(alpha, s) / zeta(alpha, xmin), "k-", lw=1.5,
-            label=rf"power law ($\alpha={alpha:.2f}$, $x_\min={xmin:.0f}$)")
+            label=rf"power law ($\alpha={alpha:.2f}$)")
 
     # exponential alternative fitted on the same tail
     lam = 1.0 / v[v >= xmin].mean()
     ax.plot(s, np.exp(-lam * (s - xmin)), "k--", lw=1.4,
             label=f"exponential (mean {1 / lam:.0f} cases)")
 
+    # The lower bound the fit selected, written on the plot rather than in the
+    # legend: the straight segment starts here, and the caption says so.
+    ax.axvline(xmin, ls=":", lw=1.3, color="0.25")
+    ax.annotate(rf"$x_\min={xmin:.0f}$", xy=(xmin, 0.60),
+                xycoords=("data", "axes fraction"), xytext=(4, 0),
+                textcoords="offset points", rotation=90, fontsize=8,
+                color="0.25", ha="left", va="bottom")
+
     ax.set_xscale("log")
     ax.set_yscale("log")
+    # A floor instead of the autoscaled bottom: the exponential alternative
+    # reaches values far below the empirical curve, and letting it set the
+    # bottom edge of the panel compresses the region where the two models
+    # actually differ.
+    ax.set_ylim(bottom=1e-50)
     ax.set_xlabel("epidemic size $s$ (cases)")
     ax.set_ylabel(r"$\Pr(X \geq x)$")
     ax.legend(fontsize=8, loc="lower left")
@@ -485,6 +485,14 @@ def fig05():
 def fig06():
     """Three individual fits, with the power-law and exponential alternatives.
 
+    Each panel marks the selected lower bound $x_min$ with a dotted vertical
+    line, and its value in the legend. The threshold is the whole difference
+    between the three panels: one estimator applied to the same kind of series
+    returns an exponent fitted above two cases in (a) and above hundreds of
+    cases in (c), and without the line the eye reads three curves of the same
+    kind. The line is where the fitted law starts, which is what separates a fit
+    that describes a tail from one that describes the bulk.
+
     The former panel (d) showed the same cross-section for epidemic duration,
     to make the point that the curve bends downwards there. With the duration
     constructions removed there is no duration fit to contrast, and the point
@@ -517,6 +525,11 @@ def fig06():
         except Exception:
             pass
         fit.plot_ccdf(ax=ax, color="0.55", label="empirical")
+        # Where the fitted law starts. Drawn last so the legend entry sits
+        # under the three curves it qualifies, and with the value written into
+        # the label: the caption promises the reader this number.
+        ax.axvline(fit.xmin, ls=":", lw=1.3, color="0.25",
+                   label=rf"$x_\min={fit.xmin:g}$")
         pl_pref = ""
         try:
             R, p = fit.distribution_compare("power_law", "exponential")
@@ -533,42 +546,110 @@ def fig06():
 
 
 # ---------------------------------------------------------------------------
-# Fig 07 -- the W-mun/W-seas window flip
+# Fig 07 -- the estimated exponent at each construction, four panels
 # ---------------------------------------------------------------------------
-def fig07():
-    l1 = _read("SELECT alpha, geocode FROM powerlaw_fits").dropna(subset=["alpha"])
-    l2 = _read(
-        "SELECT alpha FROM powerlaw_fits_yearly WHERE geocode IN "
-        f"(SELECT geocode FROM powerlaw_fits)"
-    ).dropna(subset=["alpha"])
-    l1R = _read("SELECT R, p FROM powerlaw_fits").dropna(subset=["R", "p"])
-    l2R = _read(
-        "SELECT R, p FROM powerlaw_fits_yearly WHERE geocode IN "
-        f"(SELECT geocode FROM powerlaw_fits)"
-    ).dropna(subset=["R", "p"])
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8.6, 3.3))
-    bins = np.linspace(0.5, 6, 60)
-    ax1.hist(l1["alpha"], bins=bins, density=True, alpha=0.65,
-             label=f"W-mun full series (n={len(l1):,})", color="#8fbf8f")
-    ax1.hist(l2["alpha"], bins=bins, density=True, alpha=0.65,
-             label=f"W-seas single seasons (n={len(l2):,})", color="#e8a09a")
-    ax1.axvline(2.0, ls="--", lw=0.9, color="0.4")
-    ax1.set_xlabel(r"estimated $\alpha$")
-    ax1.set_ylabel("density")
-    ax1.legend(fontsize=8)
+#: Binning shared by the four panels of figure 7. It is one bin width for all of
+#: them, fixed here rather than chosen per panel: panels binned differently
+#: cannot be read against one another, and the panels exist to be compared.
+ALPHA_BIN = 0.05
+ALPHA_RANGE = (1.2, 3.05)
 
-    stats = pd.DataFrame({
-        "W-mun, full series": [100 * (l1R["R"] > 0).mean(), 100 * ((l1R["R"] < 0) & (l1R["p"] < .05)).mean()],
-        "W-seas, single seasons": [100 * (l2R["R"] > 0).mean(), 100 * ((l2R["R"] < 0) & (l2R["p"] < .05)).mean()],
-    }, index=["power law preferred", "exponential, $p<0.05$"])
-    stats.T.plot.bar(ax=ax2, rot=0, color=["#2e7d32", "#c62828"], legend=True)
-    ax2.set_ylabel("share of fits (%)")
-    for c in ax2.containers:
-        ax2.bar_label(c, fmt="%.0f", fontsize=7)
+#: What each panel holds. Panel (a) overlays the two weekly constructions,
+#: which is the window contrast; (b)--(d) are the three size constructions, one
+#: per panel, in increasing spatial scope -- the object the rest of the paper
+#: works with.
+ALPHA_PANELS = (("W-mun", "W-seas"), ("S-mun",), ("S-state",), ("S-nat",))
+
+
+def fig07():
+    """The estimated exponent at each construction, as four distributions.
+
+    The figure used to carry two panels: the density of the weekly exponent for
+    ``W-mun`` against ``W-seas``, and beside it the share of fits favouring each
+    model in exactly those two constructions. That bar panel restated two groups
+    of the verdict figure (``fig03``) -- the same two shares, in the same units,
+    for the same two constructions -- while the three size constructions, whose
+    exponents are the ones the rest of the paper uses, had no distribution drawn
+    anywhere. The bar panel is gone and the size distributions take its place,
+    which also lets ``fig02`` go: the box plot it held answered exactly this
+    question, more coarsely, and the summary table (``tab:main``) answers it
+    numerically.
+
+    Every panel is a histogram of the fitted exponent over the same bins and the
+    same range, so a panel is wide where its construction is dispersed and
+    narrow where it is not. The vertical scale is per panel and not shared: the
+    constructions hold between 16 and 43,673 fits, so one scale for all four
+    would rank the panels by their fit count instead of by the share of fits
+    each bin holds. Panel (d) keeps the same bin width as the others even though
+    it holds sixteen fits -- a wider bin or a smoothed curve there would show a
+    shape that sixteen points cannot support. The dashed line marks
+    ``alpha = 2``, below which the second moment of the fitted law diverges; the
+    medians and interquartile ranges are in ``tab:main`` and are not repeated on
+    the panels.
+    """
+    data = _level_alpha()
+    vals = {lvl: data[lvl]["alpha"].dropna().to_numpy(dtype=float)
+            for lvl in LEVELS}
+    empty = sorted(lvl for lvl, v in vals.items() if not len(v))
+    if empty:
+        raise SystemExit(
+            f"{', '.join(empty)}: no fits in the database, so the panel would "
+            "be empty. Run fitpl.py and the episcanner fits first.")
+
+    # ALPHA_RANGE is a floor and a ceiling, not a crop. Were a later vintage of
+    # the data to place an exponent outside it, the range widens: a clipped
+    # histogram states a distribution the sample does not have, and the panels
+    # are the only place the shape of these distributions is drawn.
+    lo = min(ALPHA_RANGE[0], float(min(v.min() for v in vals.values())))
+    hi = max(ALPHA_RANGE[1], float(max(v.max() for v in vals.values())))
+    lo = float(np.floor(lo / ALPHA_BIN) * ALPHA_BIN)
+    bins = np.arange(lo, hi + 0.5 * ALPHA_BIN, ALPHA_BIN)
+
+    fig, axes = plt.subplots(1, len(ALPHA_PANELS), figsize=(12.4, 3.2),
+                             sharex=True)
+
+    drawn = []
+    for letter, (ax, group) in enumerate(zip(axes, ALPHA_PANELS)):
+        panel = []
+        for lvl in group:
+            a = vals[lvl]
+            ax.hist(a, bins=bins, weights=np.full(len(a), 1.0 / len(a)),
+                    alpha=0.70, edgecolor="none",
+                    color=COLORS[list(LEVELS).index(lvl)],
+                    label=f"{lvl} (n={len(a):,})")
+            panel.append({"level": lvl, "n": int(len(a)),
+                          "median": round(float(np.median(a)), 3)})
+        ax.axvline(2.0, ls="--", lw=0.9, color="0.45")
+        ax.set_title(f"({chr(97 + letter)}) " + " vs ".join(group) + "\n"
+                     + " vs ".join(f"n={q['n']:,}" for q in panel),
+                     fontsize=9)
+        ax.set_xlabel(r"estimated $\alpha$")
+        ax.set_xlim(bins[0], bins[-1])
+        if len(group) > 1:
+            ax.legend(fontsize=7, loc="upper right")
+        drawn.append({"panel": f"({chr(97 + letter)})",
+                      "constructions": panel,
+                      "title": " vs ".join(group)})
+
+    axes[0].set_ylabel(f"share of fits per {ALPHA_BIN:g}")
     fig.tight_layout()
-    fig.savefig(OUT / "fig07_window_flip.pdf", bbox_inches="tight")
-    fig.savefig(OUT / "fig07_window_flip.png", bbox_inches="tight")
+    stem = "fig07_alpha_by_construction"
+    fig.savefig(OUT / f"{stem}.pdf", bbox_inches="tight")
+    fig.savefig(OUT / f"{stem}.png", bbox_inches="tight")
     plt.close(fig)
+
+    height, width = plt.imread(OUT / f"{stem}.png").shape[:2]
+    sidecar = {
+        "figure": stem,
+        "statistic": "estimated alpha, one value per fit",
+        "bin_width": ALPHA_BIN,
+        "x_range": [round(float(bins[0]), 3), round(float(bins[-1]), 3)],
+        "reference": {"line": "alpha = 2", "style": "dashed"},
+        "vertical_scale": "per panel (share of that panel's fits)",
+        "panels": drawn,
+        "png_shape": [int(width), int(height)],
+    }
+    (OUT / "fig07_panels.json").write_text(json.dumps(sidecar, indent=2) + "\n")
 
 
 # ---------------------------------------------------------------------------
@@ -1380,7 +1461,7 @@ def fig15(clf):
 
 def main(which=None):
     everything = {
-        "fig02": fig02, "fig03": fig03, "fig04": fig04, "fig05": fig05,
+        "fig03": fig03, "fig04": fig04, "fig05": fig05,
         "fig06": fig06, "fig07": fig07, "fig08": fig08,
         "fig09": fig09, "fig10": fig10, "fig11": fig11, "fig12": fig12,
         "fig13": fig13, "fig14": fig14, "fig15": fig15,

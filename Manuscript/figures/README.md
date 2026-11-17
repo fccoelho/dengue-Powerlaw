@@ -1,22 +1,26 @@
 # Figure specifications
 
-The manuscript (`main.tex`) contains 16 `figure` environments with final
+The manuscript (`main.tex`) contains 15 `figure` environments with final
 captions and labels. Both renderings of each figure are committed in this
-directory, as `.pdf` and as `.png`; regenerate `fig02`--`fig15` with
+directory, as `.pdf` and as `.png`; regenerate `fig03`--`fig15` with
 `generate_figures.py` and `fig16`--`fig17` with `survival_analysis.py` after a
 data update.
+
+`fig02` no longer exists: the box plot of the exponent per construction was
+reporting, third time round, what the summary table (`tab:main`) gives numerically and what
+`fig07_alpha_by_construction` now draws over common bins beside the three size
+constructions. Its two files are deleted and ignored in `.gitignore`.
 
 All environments use `\includegraphics` **without an extension**, so either
 `.pdf` (preferred for vector plots) or `.png` at >= 300 dpi will resolve.
 
 | File | Section | Content |
 |---|---|---|
-| `fig02_alpha_by_level` | Results 3.1 | Box plot of $\alpha$ per construction, single panel; dashed line at $\alpha=2$. |
 | `fig03_verdict_by_level` | Results 3.1 | Grouped bars per construction: share with $R>0$, share with $R>0$ and $p<0.05$, share with $R<0$ and $p<0.05$. |
-| `fig04_size_ccdf` | Results 3.2 | Single-panel empirical CCDF of epidemic size on log--log axes, national cross-section pooled over 16 years, with the fitted power law (solid) and the exponential alternative (dashed). |
+| `fig04_size_ccdf` | Results 3.2 | Single-panel empirical CCDF of epidemic size on log--log axes, national cross-section pooled over 16 years, with the fitted power law (solid), the exponential alternative (dashed), and the selected $x_{\min}$ as a dotted vertical line labelled on the panel; the y axis runs down to $10^{-50}$ so both alternatives stay inside the panel over the range where they differ. |
 | `fig05_xmin_diagnostic` | Results 3.1 | Scatter of $\alpha$ vs $x_{\min}$ (log x), one point per fit, coloured by construction; shaded band at $x_{\min}\le5$. |
-| `fig06_example_fits` | Results 3.1 | Three individual fits side by side: (a) small city weekly, (b) state capital weekly, (c) state-year size cross-section. PL solid, exponential dashed. |
-| `fig07_window_flip` | Results 3.1 | Left: density of $\alpha$ for `W-mun` vs `W-seas`. Right: verdict shares for `W-mun` vs `W-seas`. |
+| `fig06_example_fits` | Results 3.1 | Three individual fits side by side: (a) small city weekly, (b) state capital weekly, (c) state-year size cross-section. PL solid, exponential dashed, and the selected $x_{\min}$ as a dotted vertical line whose value is in the legend of each panel. |
+| `fig07_alpha_by_construction` | Results 3.1 | Four panels of the estimated $\alpha$, identically binned over a common range: (a) `W-mun` vs `W-seas` overlaid, (b) `S-mun`, (c) `S-state`, (d) `S-nat`. Dashed line at $\alpha=2$ in every panel, vertical scale per panel. Writes `fig07_panels.json` with the constructions and fit counts of each panel and the pixel shape of the PNG, which the layout gate compares against the committed image. |
 | `fig08_alpha_stability` | Results 3.3 | (a) $\alpha$ by year, one line per state; (b) $\alpha$ vs $\log_{10}$ population with fitted slope and $r$. |
 | `fig09_exceedance` | Results 3.4 | Implied $\Pr(S\ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ vs empirical exceedance frequency, per national year. |
 | `fig10_pred_vs_obs` | Results 3.7 | Predicted vs observed annual cases for 2025, log--log, one point per municipality; identity line; 10:1 and 1:10 bands; dotted line at the largest training response. Upper panel pools the country; lower panels are the four states with the smallest median absolute percentage error, among those with at least twenty municipalities. Estimator: the spline-basis quantile regression at $\tau=0.5$, the one the ablation uses. Writes `fig10_states.json` (selection rule, full ranking, PNG pixel shape) which `verify_snapshot` checks against the committed image. |
@@ -54,8 +58,6 @@ All environments use `\includegraphics` **without an extension**, so either
 
 - `fig06_example_fits` panel (a)/(b): `Manuscript/figures/Ituiutaba_PL.png`
   and `Manuscript/figures/SP_weekly.png`.
-- `fig02_alpha_by_level`: `report/report_assets/pl_alpha_dist.png` gives a
-  first version, but it pools all constructions and must be split by construction.
 
 ## Note on the ablation figures
 

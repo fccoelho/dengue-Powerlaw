@@ -83,6 +83,10 @@ FIGURE_SOURCES = (os.path.join("Manuscript", "figures", "generate_figures.py"),)
 #: an old image is otherwise invisible to every check here: the image is not in
 #: the manifest, and no artefact knows how many panels it has.
 FIGURE_SIDECARS = (
+    # fig07 went from two panels to four, and a caption that describes four
+    # panels over an image with two is exactly what no other check here can see:
+    # the image is not in the manifest, and no artefact knows its layout.
+    ("07", "fig07_alpha_by_construction", "fig07_panels.json"),
     ("10", "fig10_pred_vs_obs", "fig10_states.json"),
     ("15", "fig15_pred_map", "fig15_map.json"),
 )

@@ -313,7 +313,7 @@ An $\alpha_W$ of $1.95$ and an $\alpha_S$ of $2.08$ differ by $0.13$ in the expo
 
 Every handle is read as a variable and a scope. The initial letter names the fitted variable, \emph{W} for the weekly count, \emph{S} for the epidemic size, and the remainder names the scope over which observations are pooled: \emph{mun} for a single municipality, \emph{seas} for a single season of a single municipality, \emph{state} for the municipalities of one state in one season, and \emph{nat} for the municipalities of the country in one season.
 The handles name constructions and are not random variables: only $c_{i,w}$ and $S_{i,t}$ enter the likelihood.
-They are used throughout for the five constructions and also label the panels of Figures~\ref{fig:alpha}, \ref{fig:verdicts} and \ref{fig:xmin}.
+They are used throughout for the five constructions, for the rows of Tables~\ref{tab:levels} and \ref{tab:main}, and for the panels of Figures~\ref{fig:verdicts}, \ref{fig:xmin} and \ref{fig:window}.
 
 \begin{table}[htbp]
 \centering
@@ -899,7 +899,7 @@ Table~\ref{tab:main} summarises the 50{,}391 fits across the five
 constructions. We read it in the order of the questions posed in
 Section~\ref{sec:questions} and answered below: what the exponent is an exponent
 of, what the fitted pair provides as a risk statement, and what it adds to a
-forecast. Figure~\ref{fig:alpha} shows the estimator's output at each
+forecast. Table~\ref{tab:main} gives the estimator's output at each
 construction, Figure~\ref{fig:verdicts} the corresponding comparisons, and
 Figure~\ref{fig:xmin} the diagnostic that separates the constructions worth
 interpreting from those that are not.
@@ -920,29 +920,6 @@ different windows, and \lvl{S-state} and \lvl{S-nat} the same variable at differ
 
 \input{generated/tab_main}
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{figures/fig02_alpha_by_level}
-\caption{Distribution of the estimated power-law exponent $\alpha$ across fits, by
-construction. The exponent is that of the discrete law $p(x)\propto x^{-\alpha}$
-fitted above a lower bound $x_{\min}$ (Section~\ref{sec:estimation}), so that a
-larger $\alpha$ describes a lighter tail; $\alpha=2$ marks the boundary below
-which the second moment of the fitted law diverges. Boxes give the median and
-interquartile range across fits, whiskers extend to 1.5 times the interquartile
-range, and the dashed line marks $\alpha=2$. The two weekly constructions,
-\lvl{W-mun} (weekly counts of one municipality over its full series) and
-\lvl{W-seas} (the same counts partitioned into single seasons), and the three
-size constructions, \lvl{S-mun} (the annual totals of one municipality across
-seasons), \lvl{S-state} (the municipalities of one state in one season) and
-\lvl{S-nat} (the municipalities of the country in one season), each fit a single
-variable, so that the movement of the box within a group is the movement of the
-construction and not of the object. The two weekly boxes therefore carry
-$\alpha_W$ and the three size boxes $\alpha_S$. Sizes concentrate near
-$\alpha_S\approx2$ throughout, with the weekly constructions producing the widest
-dispersion because most of their fits describe the bulk rather than a tail.}
-\label{fig:alpha}
-\end{figure}
-
 Two features disqualify the weekly constructions as a basis for a scaling claim,
 and both are visible without a further experiment. The first is the position of
 the estimated lower bound: where it falls within the bulk, the fitted law
@@ -951,8 +928,9 @@ have $x_{\min} \le 5$ and the model is then estimated on counts of one and two
 cases. The second is that the comparison changes with the window: pooling the same
 weekly counts over a decade instead of a single season reduces the proportion of
 fits favouring a power law from 77\% to 23\% and raises the proportion
-significantly favouring the exponential from 3\% to 22\%. No transmission parameter differs
-between those two numbers (Figure~\ref{fig:window}). The corresponding
+significantly favouring the exponential from 3\% to 22\%. No transmission parameter
+differs between those two numbers (Figure~\ref{fig:verdicts}; the exponent
+distributions behind them are in Figure~\ref{fig:window}). The corresponding
 consequence for individual fits is shown in Figure~\ref{fig:examples}.
 
 \begin{figure}[htbp]
@@ -996,31 +974,42 @@ of magnitude to its right.}
 \includegraphics[width=\textwidth]{figures/fig06_example_fits}
 \caption{Individual fits at three constructions, each with the power law (solid), the
 exponential alternative (dashed) and the empirical distribution (grey)
-superimposed. (a) Weekly counts of a small municipality, where the selected lower
-bound $x_{\min}$ --- the threshold above which the power law is fitted --- falls
-to 2 cases and the law is fitted to the entire distribution; (b) weekly counts of
-a large state capital; (c) a state-year cross-section of epidemic sizes, where
-$x_{\min}$ lies in the hundreds of cases. The titles give the normalised
-log-likelihood ratio $R$ between the two alternatives, positive where the power
-law is preferred, and its significance level $p$. All three are produced by the
-same estimator applied to different objects, and only the third describes a
-tail.}
+superimposed, and the selected lower bound $x_{\min}$ --- the threshold above
+which the power law is fitted --- drawn as a dotted vertical line and given in
+the legend of the panel. (a) Weekly counts of a small municipality, where
+$x_{\min}$ falls to 2 cases and the law is fitted to the entire distribution;
+(b) weekly counts of a large state capital; (c) a state-year cross-section of
+epidemic sizes, where $x_{\min}$ lies in the hundreds of cases. The titles give
+the normalised log-likelihood ratio $R$ between the two alternatives, positive
+where the power law is preferred, and its significance level $p$. All three are
+produced by the same estimator applied to different objects, and only the third
+describes a tail, which is what the distance between the dotted line and the bulk
+of the points measures.}
 \label{fig:examples}
 \end{figure}
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{figures/fig07_window_flip}
-\caption{The window reverses the model comparison on identical data. Left, density of the
-estimated weekly exponent $\alpha_W$, of the discrete law $p(x)\propto x^{-\alpha}$
-fitted above the lower bound $x_{\min}$, from the full municipal series
-(\lvl{W-mun}) and from the same series partitioned into single seasons
-(\lvl{W-seas}); the dashed line marks $\alpha_W=2$, below which the second moment
-of the fitted law diverges. Right, the corresponding shares: the share of fits favouring the power law falls from 77\% to 23\%, and the share significantly favouring the
-exponential rises from 3\% to 22\%, a fit counting as significantly favouring the
-exponential when $R<0$ and $p<0.05$ in the normalised log-likelihood comparison
-of Section~\ref{sec:comparison}, where $R$ is that ratio and $p$ its significance
-level.}
+\includegraphics[width=\textwidth]{figures/fig07_alpha_by_construction}
+\caption{The estimated exponent at each construction. Panel (a) puts the same
+variable over two windows side by side: the share of fits falling in bins of
+fixed width for the estimated weekly exponent $\alpha_W$, of the discrete law
+$p(x)\propto x^{-\alpha}$ fitted above the lower bound $x_{\min}$, from the full
+municipal series (\lvl{W-mun}) and from the same series partitioned into single
+seasons (\lvl{W-seas}). Panels (b)--(d) give that distribution for the epidemic
+size at the three constructions, \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat},
+which are the ones the remainder of the paper uses. All four panels are binned
+identically over the same range, so the width of a panel measures how dispersed
+its construction is; the vertical scale is not shared, because the constructions
+hold between 16 and 43,673 fits and a common scale would rank the panels by their
+fit count rather than by the shape of the distribution. The dashed line marks
+$\alpha=2$, below which the second moment of the fitted law diverges; medians and
+interquartile ranges are in Table~\ref{tab:main} and are not repeated on the
+panels. The two weekly distributions overlap over most of their range, with
+medians of $1.95$ and $2.07$ and a median lower bound of 2 cases in both, yet the
+comparison between them moves from 77\% of fits favouring the power law to 23\%
+(Figure~\ref{fig:verdicts}); inside this construction the exponent does not carry
+the verdict.}
 \label{fig:window}
 \end{figure}
 
@@ -1060,13 +1049,17 @@ a straight line over two decades above $x_{\min}$.
 cross-section --- the annual totals of all municipalities, pooled over the 16
 seasons --- with the fitted power law and the exponential alternative superimposed
 on logarithmic axes. Both curves are evaluated at the parameters of the fit to the
-pooled sample, whose exponent $\alpha_S$ and lower bound $x_{\min}$ --- the threshold
-above which the law is fitted --- are given in the legend. That pair is not the
-median of the sixteen per-season fits reported in the text: pooling the seasons
-yields a single sample, with its own lower bound, and the two are not
+pooled sample: the exponent $\alpha_S$ is given in the legend, and the lower bound
+$x_{\min}$ --- the threshold above which the law is fitted, so the left end of the
+straight segment --- is the dotted vertical line labelled on the panel. That pair
+is not the median of the sixteen per-season fits reported in the text: pooling the
+seasons yields a single sample, with its own lower bound, and the two are not
 interchangeable. The empirical curve is close to linear over two decades above
 $x_{\min}$, which is the visual form of the claim used in the remainder of the
-paper, and the exponential alternative bends away from it over the same region.}
+paper, and the exponential alternative bends away from it over the same region.
+The vertical axis runs down to $10^{-50}$ so that both alternatives can be
+followed over the whole range in which they differ, rather than being cut off
+where the empirical sample ends.}
 \label{fig:ccdf}
 \end{figure}
 
