@@ -69,7 +69,21 @@ Manuscript/figures/fig02_alpha_by_level.*
 # fig07_alpha_by_construction. Ignored so a stale copy cannot be committed back.
 Manuscript/figures/fig07_window_flip.*
 
+# fig08 (stability of the two exponents) was dropped: panel (a) restated the
+# spread of alpha_S that the text already gives beside its sampling noise, and
+# panel (b) plotted the alpha_W/population correlation whose three numbers the
+# text states in full and make_tables.py audits from the database. Nothing in the
+# figure was a fact the prose did not already carry, so it is not regenerated.
+Manuscript/figures/fig08_alpha_stability.*
+
+# fig16 and fig17 (the survival reading) were dropped: the Kaplan-Meier panel
+# repeated fig09 on a pooled sample, and the AIC bar chart restated numbers the
+# text gives. survival_analysis.py still writes both to Manuscript/figures when
+# it is run -- they are a diagnostic, so they are ignored rather than deleted
+# from the script, and a stale copy cannot be committed back.
+Manuscript/figures/fig16_survival_exceedance.*
+Manuscript/figures/fig17_survival_duration.*
+
 # survival_analysis.py tables and summary: regenerated, and committed anyway
-# because snapshot_manifest.json hashes them. Its two figures ARE cited (Section
-# 3.5) and are written to Manuscript/figures, which is not ignored.
+# because snapshot_manifest.json hashes them.
 analysis/

@@ -1,15 +1,25 @@
 # Figure specifications
 
-The manuscript (`main.tex`) contains 15 `figure` environments with final
+The manuscript (`main.tex`) contains 12 `figure` environments with final
 captions and labels. Both renderings of each figure are committed in this
-directory, as `.pdf` and as `.png`; regenerate `fig03`--`fig15` with
-`generate_figures.py` and `fig16`--`fig17` with `survival_analysis.py` after a
-data update.
+directory, as `.pdf` and as `.png`; regenerate them with
+`generate_figures.py` after a data update.
 
 `fig02` no longer exists: the box plot of the exponent per construction was
 reporting, third time round, what the summary table (`tab:main`) gives numerically and what
 `fig07_alpha_by_construction` now draws over common bins beside the three size
 constructions. Its two files are deleted and ignored in `.gitignore`.
+
+`fig08`, `fig16` and `fig17` no longer exist either, and the reason is the same
+in all three: the figure carried no fact the text did not already state.
+`fig08` drew the spread of $\alpha_S$ beside its sampling noise and the
+$\alpha_W$-against-population correlation, both of which Section 3.3 gives with
+numbers that `make_tables.py` audits; `fig16` repeated `fig09` on a pooled
+sample, adding a band the text quotes as a single departure in band units; and
+`fig17` was the Kaplan--Meier and AIC scaffolding behind one sentence about
+duration. The three files are deleted and ignored. `survival_analysis.py` still
+writes `fig16`/`fig17` when it runs: they are a diagnostic of the section that
+quotes its tables, not an exhibit.
 
 All environments use `\includegraphics` **without an extension**, so either
 `.pdf` (preferred for vector plots) or `.png` at >= 300 dpi will resolve.
@@ -21,7 +31,6 @@ All environments use `\includegraphics` **without an extension**, so either
 | `fig05_xmin_diagnostic` | Results 3.1 | Scatter of $\alpha$ vs $x_{\min}$ (log x), one point per fit, coloured by construction; shaded band at $x_{\min}\le5$. |
 | `fig06_example_fits` | Results 3.1 | Three individual fits side by side: (a) small city weekly, (b) state capital weekly, (c) state-year size cross-section. PL solid, exponential dashed, and the selected $x_{\min}$ as a dotted vertical line whose value is in the legend of each panel. |
 | `fig07_alpha_by_construction` | Results 3.1 | Four panels of the estimated $\alpha$, identically binned over a common range: (a) `W-mun` vs `W-seas` overlaid, (b) `S-mun`, (c) `S-state`, (d) `S-nat`. Dashed line at $\alpha=2$ in every panel, vertical scale per panel. Writes `fig07_panels.json` with the constructions and fit counts of each panel and the pixel shape of the PNG, which the layout gate compares against the committed image. |
-| `fig08_alpha_stability` | Results 3.3 | (a) $\alpha$ by year, one line per state; (b) $\alpha$ vs $\log_{10}$ population with fitted slope and $r$. |
 | `fig09_exceedance` | Results 3.4 | Implied $\Pr(S\ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ vs empirical exceedance frequency, per national year. |
 | `fig10_pred_vs_obs` | Results 3.7 | Predicted vs observed annual cases for 2025, log--log, one point per municipality; identity line; 10:1 and 1:10 bands; dotted line at the largest training response. Upper panel pools the country; lower panels are the four states with the smallest median absolute percentage error, among those with at least twenty municipalities. Estimator: the spline-basis quantile regression at $\tau=0.5$, the one the ablation uses. Writes `fig10_states.json` (selection rule, full ranking, PNG pixel shape) which `verify_snapshot` checks against the committed image. |
 | `fig11_ablation_skill` | Results 3.7 | (a) Skill score vs M0 for epidemic size, M1/M2/M3; (b) pinball loss vs $\tau$ for M2 vs M3, with the range over origins. |
@@ -29,8 +38,6 @@ All environments use `\includegraphics` **without an extension**, so either
 | `fig13_importance` | Results 3.6 | Held-out permutation importance ($\Delta$ Brier), power-law block highlighted; joint block row plus per-origin stability of the three scaling features. |
 | `fig14_error_vs_pop` | Results 3.8 | (a) absolute percentage error of the median ($\tau=0.5$) spline-quantile size forecast vs municipal population, with the median within population bins and the 100,000-inhabitant threshold marked; (b) standardised persistence residuals for epidemic size vs N(0,1). Writes `fig14_pop_bands.json` with the median error either side of the threshold. |
 | `fig15_pred_map` | Results 3.8 | Three panels for the record season, at the M3 rung: (a) choropleth of the predicted probability of exceeding the unit's own 75th percentile, quintile classes; (b) the realised outcome on the same municipalities; (c) observed share against mean prediction by predicted quintile. Grey = no forecast (fewer than five seasons of history). Uses `muni_br.gpkg` and writes `fig15_map.json` recording the origin, the rung and the pixel shape. |
-| `fig16_survival_exceedance` | Results 3.5 | (a) pooled cross-section (16 seasons fitted together): empirical exceedance frequency as a Kaplan--Meier step against the fitted $\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$, on log--log axes, with the 95\% simultaneous DKW band around the empirical curve and $x_{\min}$ marked. (b) Out-of-season transport: departure of $(\alpha_t,x_{\min,t})$ applied to season $t+1$, in band units and log scale, against the departure of a pair refitted inside the target season. Written by `survival_analysis.py`, not by `generate_figures.py`. |
-| `fig17_survival_duration` | Results 3.5 | (a) Kaplan--Meier duration by epidemic-size tercile, with the fitted Weibull overlaid; (b) $\Delta$AIC per parametric family, labelled. Written by `survival_analysis.py`. |
 
 ## Where the numbers come from
 
@@ -46,11 +53,12 @@ All environments use `\includegraphics` **without an extension**, so either
   `ablation_results.csv` and `classifier_results*`, so they cannot disagree
   with the tables; `fig15` in particular draws the out-of-fold predictions
   rather than refitting a classifier of its own.
-- Survival panels: `fig16`--`fig17` are written by `survival_analysis.py` from
-  the EpiScanner panel (`data/episcanner_*.parquet`) and the national fits in
-  `powerlaw_results.db`, and its tables are what Section 3.5 quotes. They are the
-  only two figures the manuscript includes that this directory's generator does
-  not produce.
+- Survival numbers: Section 3.5 quotes the tables `survival_analysis.py` writes
+  to `analysis/survival/` from the EpiScanner panel
+  (`data/episcanner_*.parquet`) and the national fits in `powerlaw_results.db`.
+  Every figure in this directory is now produced by `generate_figures.py`; the
+  script also writes two diagnostic panels (`fig16`, `fig17`) that the manuscript
+  no longer includes and that `.gitignore` therefore keeps out of the tree.
 - Population and geography: `parquet_cache/city_stats.parquet`,
   `parquet_cache/geography.parquet`, `muni_br.gpkg`.
 

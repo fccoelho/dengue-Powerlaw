@@ -653,43 +653,6 @@ def fig07():
 
 
 # ---------------------------------------------------------------------------
-# Fig 08 -- stability by year per state + alpha vs population
-# ---------------------------------------------------------------------------
-def fig08():
-    st = _read(
-        "SELECT state, year, alpha FROM episcanner_state_fits "
-        "WHERE metric='total_cases' AND year>0"
-    )
-    l1 = _read(
-        "SELECT f.alpha, c.population FROM powerlaw_fits f "
-        "JOIN city_stats c USING (geocode) WHERE c.population>0"
-    ).dropna()
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.0, 3.5))
-    pivot = st.pivot_table(index="year", columns="state", values="alpha")
-    ax1.plot(pivot.index, pivot.values, lw=0.7, alpha=0.6)
-    ax1.plot(pivot.index, pivot.median(axis=1), lw=2.2, color="k",
-             label="national median")
-    ax1.set_xlabel("year")
-    ax1.set_ylabel(r"$\alpha$ (size, state cross-section)")
-    ax1.legend(fontsize=8)
-    ax1.axhline(2.0, ls="--", lw=0.8, color="0.5")
-
-    ax2.scatter(np.log10(l1["population"]), l1["alpha"], s=3, alpha=0.2, color="0.4")
-    ax2.set_xlabel(r"$\log_{10}$ municipal population")
-    ax2.set_ylabel(r"$\alpha$ (weekly, city)")
-    from scipy.stats import pearsonr, spearmanr
-
-    pr = pearsonr(np.log10(l1["population"]), l1["alpha"])
-    sr = spearmanr(np.log10(l1["population"]), l1["alpha"])
-    ax2.set_title(f"Pearson r={pr[0]:.3f}, Spearman $\\rho$={sr[0]:.3f} (n={len(l1):,})",
-                  fontsize=8)
-    fig.tight_layout()
-    fig.savefig(OUT / "fig08_alpha_stability.pdf", bbox_inches="tight")
-    fig.savefig(OUT / "fig08_alpha_stability.png", bbox_inches="tight")
-    plt.close(fig)
-
-
-# ---------------------------------------------------------------------------
 # Fig 09 -- fitted exceedance curve vs empirical, national cross-sections
 # ---------------------------------------------------------------------------
 def fig09():
@@ -1462,8 +1425,8 @@ def fig15(clf):
 def main(which=None):
     everything = {
         "fig03": fig03, "fig04": fig04, "fig05": fig05,
-        "fig06": fig06, "fig07": fig07, "fig08": fig08,
-        "fig09": fig09, "fig10": fig10, "fig11": fig11, "fig12": fig12,
+        "fig06": fig06, "fig07": fig07, "fig09": fig09,
+        "fig10": fig10, "fig11": fig11, "fig12": fig12,
         "fig13": fig13, "fig14": fig14, "fig15": fig15,
     }
     todo = which or list(everything)
