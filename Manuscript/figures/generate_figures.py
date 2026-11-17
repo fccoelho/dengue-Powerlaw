@@ -1300,23 +1300,39 @@ def fig14(oof):
 # ---------------------------------------------------------------------------
 # Fig 15 -- predicted-probability map for one forecast origin
 # ---------------------------------------------------------------------------
-def fig15(clf):
-    """The risk map against its realisation, for the record season.
+#: The operating point of the map: alert when the predicted probability that the
+#: season exceeds the unit's own upper quartile is at least one half. No quantity
+#: is estimated to obtain it, which is the point -- a threshold fitted to the
+#: season being drawn would let the figure choose the answer it reports. It is
+#: also the only cut point that needs no explanation to a reader: more likely
+#: than not. The threshold is drawn on the panel (c) curve so the rest of the
+#: menu stays visible.
+ALERT_THRESHOLD = 0.50
 
-    Predicted probability alone is unfalsifiable on a page: a reader cannot tell
-    a map that ranked the country correctly from one that produced a plausible
-    gradient, and the two differ exactly where surveillance decisions are made.
-    So the map pair is drawn with the outcome beside it and the agreement
-    quantified, which is what turns the panel from an illustration into a
-    measurement.
+
+def fig15(clf):
+    """The map as a decision: where the alert was raised, and what became of it.
+
+    The previous version drew the predicted probability in quintiles and set
+    them beside the outcome, so the reader had to hold two different fractions
+    in mind at once -- the quartile of a municipality's own history that defines
+    the event, and the fifth of the country's municipalities that defines the
+    colour. The two are unrelated, and the calibration panel then compared a
+    mean probability against an observed share on the same axis, which is a
+    comparison of quantities with different denominators.
+
+    What a surveillance service does with this map is decide whom to watch, so
+    the figure is drawn as that decision. Panel (a) is the alert at a declared
+    threshold, (b) is what became of it -- hit, false alarm, missed -- and (c) is
+    the whole menu of budgets, because a single threshold hides the trade the
+    service is actually making: false alarms against the number of municipalities
+    it can follow.
 
     The origin is the season in which the largest share of municipalities
     exceeded their own upper quartile, not a fixed year: the figure follows the
     data rather than a constant.
 
-    This used to refit its own classifier -- a second, undeclared experiment
-    drawn as if it were a view of the first, which is the defect figures 11 to
-    13 already lost. It now reads the out-of-fold artefact, so the map cannot
+    It reads the out-of-fold artefact rather than refitting, so the map cannot
     disagree with Table 4.
     """
     oof = clf["oof"]
@@ -1331,77 +1347,116 @@ def fig15(clf):
             f"classifier_results.parquet holds no {rung} rows for origin "
             f"{origin}; nothing to map")
 
-    s["q"] = pd.qcut(s["y_prob"], 5, labels=False, duplicates="drop")
-    agree = (s.groupby("q").agg(n=("y_true", "size"),
-                                observed=("y_true", "mean"),
-                                predicted=("y_prob", "mean")).sort_index())
+    n = len(s)
+    base = float(s["y_true"].mean())
+    flagged = s["y_prob"].to_numpy() >= ALERT_THRESHOLD
+    s["flagged"] = flagged.astype(int)
+    # Four exhaustive classes, named from the side of the decision rather than
+    # from the side of the label: the alert either hit or it did not, and the
+    # silence either cost a season or did not.
+    cls = np.where(flagged,
+                   np.where(s["y_true"] == 1, "hit", "false"),
+                   np.where(s["y_true"] == 1, "missed", "correct"))
+    s["cls"] = cls
+    counts = {k: int((cls == k).sum()) for k in ("hit", "false", "missed", "correct")}
+    alerts = counts["hit"] + counts["false"]
+    precision = counts["hit"] / alerts if alerts else float("nan")
+    recall = counts["hit"] / int((s["y_true"] == 1).sum())
+
+    # What an unranked alert list of the same length would produce. This is the
+    # only reference that makes "few false alarms" a statement rather than an
+    # impression: without it the count 128 is a number with no scale.
+    neg = int((s["y_true"] == 0).sum())
+    fp_unranked = alerts * neg / n
+
+    CLS = {
+        "hit": ("#1b5e20", "alerted, exceeded"),
+        "false": ("#c62828", "alerted, did not"),
+        "missed": ("#f9a825", "not alerted, exceeded"),
+        "correct": ("#f7f7f7", "not alerted, did not"),
+    }
 
     gdf = gpd.read_file("muni_br.gpkg")
     gdf["code_muni"] = gdf["code_muni"].astype(int)
     merged = gdf[["code_muni", "geometry"]].merge(
         s, left_on="code_muni", right_on="unit", how="left")
-    unmatched = int(merged["q"].isna().sum() - (len(gdf) - len(s)))
+    unmatched = int(merged["flagged"].isna().sum() - (len(gdf) - n))
     if unmatched > 0:
         warnings.warn(f"{unmatched} forecast unit(s) have no polygon in "
                       "muni_br.gpkg and are absent from the map", stacklevel=2)
 
-    palette = ["#f4f0f7", "#ddd0e6", "#bfa3d3", "#9663b7", "#5b1a7a"]
-    cls = merged["q"].astype(float)
+    fig, axes = plt.subplots(1, 3, figsize=(12.4, 4.3),
+                             gridspec_kw={"width_ratios": [1, 1, 0.98],
+                                          "wspace": 0.06})
+    ax_a, ax_b, ax_c = axes
 
-    fig = plt.figure(figsize=(11.0, 4.5))
-    gs = fig.add_gridspec(2, 3, width_ratios=[1, 1, 0.95],
-                          height_ratios=[1, 0.05], wspace=0.13, hspace=0.28)
-    ax_a = fig.add_subplot(gs[0, 0])
-    ax_b = fig.add_subplot(gs[0, 1])
-    ax_c = fig.add_subplot(gs[0, 2])
-    cax = fig.add_subplot(gs[1, 0])
-
-    merged.plot(column=cls, cmap=mpl.colors.ListedColormap(palette),
-                norm=mpl.colors.BoundaryNorm(range(6), 5), ax=ax_a,
+    # (a) the decision itself
+    merged.plot(column=merged["flagged"].astype(float),
+                cmap=mpl.colors.ListedColormap(["#f7f7f7", "#4a148c"]),
+                norm=mpl.colors.BoundaryNorm([-0.5, 0.5, 1.5], 2), ax=ax_a,
                 linewidth=0.03, edgecolor="0.55",
-                missing_kwds={"color": "#efefef"})
-    ax_a.set_title(f"(a) predicted probability, {origin} season", fontsize=8)
+                missing_kwds={"color": "#d4d4d4"})
+    ax_a.set_title(f"(a) alerted for {origin}: {alerts} of {n:,} municipalities",
+                   fontsize=8.5)
     ax_a.set_axis_off()
-    sm = plt.cm.ScalarMappable(cmap=mpl.colors.ListedColormap(palette),
-                              norm=mpl.colors.BoundaryNorm(range(6), 5))
-    cb = fig.colorbar(sm, cax=cax, orientation="horizontal", ticks=[0.5, 4.5])
-    cb.ax.set_xticklabels(["lowest\nquintile", "highest\nquintile"], fontsize=6.5)
-    cb.outline.set_visible(False)
 
-    observed = merged["y_true"].astype(float)
-    merged.plot(column=observed, cmap=mpl.colors.ListedColormap(["#cfe8cf", "#1b5e20"]),
-                norm=mpl.colors.BoundaryNorm([-0.5, 0.5, 1.5], 2), ax=ax_b,
-                linewidth=0.03, edgecolor="0.55",
-                missing_kwds={"color": "#efefef"})
-    ax_b.set_title(f"(b) observed: above its own Q75?", fontsize=8)
+    # (b) what became of it
+    codes = {"correct": 0, "missed": 1, "hit": 2, "false": 3}
+    merged["code"] = merged["cls"].map(codes)
+    merged.plot(column=merged["code"].astype(float),
+                cmap=mpl.colors.ListedColormap([CLS["correct"][0], CLS["missed"][0],
+                                                CLS["hit"][0], CLS["false"][0]]),
+                norm=mpl.colors.BoundaryNorm([-0.5, 0.5, 1.5, 2.5, 3.5], 4),
+                ax=ax_b, linewidth=0.03, edgecolor="0.55",
+                missing_kwds={"color": "#d4d4d4"})
+    ax_b.set_title(f"(b) outcome: {counts['hit']} hits, {counts['false']} false alarms",
+                   fontsize=8.5)
     ax_b.set_axis_off()
 
-    x = np.arange(len(agree))
-    ax_c.bar(x, agree["predicted"], width=0.55, color="#9663b7", alpha=0.8,
-             label="mean predicted")
-    ax_c.plot(x, agree["observed"], "o", color="#1b5e20", ms=6.0,
-              label="observed share")
-    ax_c.axhline(s["y_true"].mean(), ls="--", lw=1.0, color="#1b5e20")
-    ax_c.axhline(s["y_prob"].mean(), ls=":", lw=1.0, color="#5b1a7a")
-    ax_c.set_xticks(x)
-    ax_c.set_xticklabels([f"Q{i + 1}" for i in x], fontsize=7.5)
-    ax_c.set_ylim(0, 1.0)
-    ax_c.set_ylabel("probability", fontsize=7.5)
-    ax_c.tick_params(labelsize=7)
-    ax_c.set_title("(c) agreement by predicted quintile", fontsize=8)
-    ax_c.legend(fontsize=6.5, loc="upper left", frameon=False)
-    for xi, (n_i, obs_i) in enumerate(zip(agree["n"], agree["observed"])):
-        ax_c.annotate(f"{obs_i:.2f}", (xi, obs_i), textcoords="offset points",
-                      xytext=(0, 5), ha="center", fontsize=6.5, color="#1b5e20")
+    # (c) the budget curve: every threshold, not just the declared one
+    order = np.argsort(-s["y_prob"].to_numpy())
+    y_ord = s["y_true"].to_numpy()[order]
+    fp = np.cumsum(y_ord == 0)
+    issued = np.arange(1, n + 1)
+    ax_c.plot(issued, fp, color="#4a148c", lw=1.4,
+              label="ranked by the model")
+    ax_c.plot([0, n], [0, neg], ls="--", lw=1.0, color="0.45",
+              label="unranked list of the same length")
+    ax_c.plot([alerts], [counts["false"]], "o", ms=7, mfc="none", mec="#c62828",
+              mew=1.6, label=f"declared alert, $p\\geq {ALERT_THRESHOLD:.1f}$")
+    ax_c.annotate(f"{alerts} alerts\n{counts['false']} false alarms",
+                  (alerts, counts["false"]), textcoords="offset points",
+                  xytext=(12, 16), fontsize=7, color="#c62828",
+                  arrowprops=dict(arrowstyle="-", lw=0.8, color="#c62828"))
+    ax_c.set_xlim(0, n)
+    ax_c.set_ylim(0, neg * 1.05)
+    ax_c.set_xlabel("municipalities alerted", fontsize=8)
+    ax_c.set_ylabel("false alarms among them", fontsize=8)
+    ax_c.tick_params(labelsize=7.5)
+    ax_c.set_title("(c) false alarms against the size of the alert list",
+                   fontsize=8.5)
+    ax_c.legend(fontsize=6.8, loc="upper left")
 
+    handles = [mpl.patches.Patch(facecolor=CLS[k][0], edgecolor="0.55",
+                                 label=f"{CLS[k][1]} ({counts[k]})")
+               for k in ("hit", "false", "missed", "correct")]
+    handles.append(mpl.patches.Patch(facecolor="#d4d4d4", edgecolor="0.55",
+                                     label="no forecast"))
+    fig.legend(handles=handles, loc="lower center", ncol=5, fontsize=7.2,
+               frameon=False, bbox_to_anchor=(0.5, -0.045))
+
+    fig.suptitle(
+        f"{origin} season, M3 rung, {n:,} municipalities with five seasons of "
+        f"history; {base:.1%} of them exceeded their own upper quartile",
+        fontsize=9, y=1.03)
     fig.savefig(OUT / "fig15_pred_map.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig15_pred_map.png", bbox_inches="tight")
     plt.close(fig)
 
     # The sidecar is what lets the design gate tell a committed image drawn by
-    # this code from one that merely has the right name. It also records the two
-    # choices the figure makes -- which origin and which rung -- so that a
-    # caption cannot describe a selection nobody has drawn.
+    # this code from one that merely has the right name. It now carries the whole
+    # ledger, so the caption is a view of the figure rather than a paraphrase of
+    # it, and the prose gate can hold the two together.
     height, width = plt.imread(OUT / "fig15_pred_map.png").shape[:2]
     sidecar = {
         "figure": "fig15_pred_map",
@@ -1411,12 +1466,28 @@ def fig15(clf):
             "the forecast origin in which the largest share of municipalities "
             "exceeded the 75th percentile of their own history -- the record "
             "season -- rather than a fixed year, so that the figure follows the "
-            "data instead of freezing on one origin"
-        ),
+            "data instead of freezing on one origin"),
         "rung": rung,
-        "n_units": int(len(s)),
-        "panels": ["predicted probability quintiles", "realised outcome",
-                   "agreement by predicted quintile"],
+        "n_units": int(n),
+        "base_rate": round(base, 4),
+        "alert_threshold": ALERT_THRESHOLD,
+        "alert_rule": (
+            "alert when the predicted probability of exceeding the unit's own "
+            "75th percentile is at least one half; declared, not fitted to the "
+            "season drawn"),
+        "alerts": int(alerts),
+        "hits": counts["hit"],
+        "false_alarms": counts["false"],
+        "missed": counts["missed"],
+        "correctly_silent": counts["correct"],
+        "precision": round(float(precision), 4),
+        "recall": round(float(recall), 4),
+        "false_alarms_unranked": round(float(fp_unranked), 2),
+        "mean_predicted": round(float(s["y_prob"].mean()), 4),
+        "observed_share": round(base, 4),
+        "panels": ["the alert at the declared threshold",
+                   "outcome of the alert: hit, false alarm, missed, correct silence",
+                   "false alarms against the size of the alert list"],
         "png_shape": [int(width), int(height)],
     }
     (OUT / "fig15_map.json").write_text(json.dumps(sidecar, indent=2) + "\n")

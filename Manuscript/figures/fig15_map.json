@@ -5,13 +5,26 @@
   "origin_rule": "the forecast origin in which the largest share of municipalities exceeded the 75th percentile of their own history -- the record season -- rather than a fixed year, so that the figure follows the data instead of freezing on one origin",
   "rung": "M3",
   "n_units": 1484,
+  "base_rate": 0.6954,
+  "alert_threshold": 0.5,
+  "alert_rule": "alert when the predicted probability of exceeding the unit's own 75th percentile is at least one half; declared, not fitted to the season drawn",
+  "alerts": 648,
+  "hits": 520,
+  "false_alarms": 128,
+  "missed": 512,
+  "correctly_silent": 324,
+  "precision": 0.8025,
+  "recall": 0.5039,
+  "false_alarms_unranked": 197.37,
+  "mean_predicted": 0.4688,
+  "observed_share": 0.6954,
   "panels": [
-    "predicted probability quintiles",
-    "realised outcome",
-    "agreement by predicted quintile"
+    "the alert at the declared threshold",
+    "outcome of the alert: hit, false alarm, missed, correct silence",
+    "false alarms against the size of the alert list"
   ],
   "png_shape": [
-    1308,
-    623
+    1471,
+    715
   ]
 }

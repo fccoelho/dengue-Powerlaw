@@ -1435,32 +1435,43 @@ reported here.}
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig15_pred_map}
-\caption{The forecast read as a risk map, for the record season and the M3 rung of
-Table~\ref{tab:exceed}. Panel (a) classes each municipality by the predicted
-probability that its season exceeds the 75th percentile of its own history --- the
-event defined in Section~\ref{sec:classifier}, a season larger than all but a
-quarter of that municipality's earlier seasons --- in quintiles of that
-probability, so that each class holds a fifth of the municipalities. Panel (b)
-gives the realisation of the same event. Panel (c) confronts the two by quintile
-of the prediction: bars are the mean predicted probability, dots the observed
-share, and the dotted and dashed rules their overall means. The ranking survives
---- the observed share rises from $0.51$ in the lowest quintile to $0.82$ in the
-fourth and settles at $0.80$ in the fifth --- but the level does not: the
-prediction sits between $0.15$ and $0.27$ below the observed share in every
-quintile, with an overall mean of $0.47$ against an observed $0.70$. A reader who
-took the classes as frequencies would therefore under-alert everywhere.
-Municipalities without the five seasons of history needed to define their own
-threshold carry no forecast and are drawn in grey.}
+\caption{The forecast read as a decision, for the record season and the top rung
+of the ladder of Table~\ref{tab:exceed}. The event is the one defined in
+Section~\ref{sec:classifier}: a season exceeding the 75th percentile of the
+municipality's own earlier seasons. Panel (a) is the alert itself, a
+municipality being coloured when the predicted probability of the event reaches
+one half --- a threshold declared in advance and not fitted to the season drawn.
+Panel (b) is what became of it, dark green where the municipality was alerted
+and did exceed its own upper quartile, red where it was alerted and did not, and
+amber where the alert fell below the threshold and the season exceeded it
+regardless; red is therefore the false alarms and amber the seasons the map
+leaves unflagged. Of the 648 municipalities alerted out of the 1{,}484 with the
+five seasons of history the event requires, 520 exceeded their own upper
+quartile and 128 did not: one alert in five is a false alarm, against one in
+three in an unranked list of the same length, which would carry 197. Panel (c)
+sweeps the threshold instead of fixing it, plotting the number of false alarms
+against the number of municipalities alerted, with the declared alert marked and
+the unranked list of each length as the dashed diagonal; the vertical gap
+between the two is what the ranking buys, and it narrows only as the list
+approaches every municipality. The rung is the top of the ladder, and the
+increment of its scaling block over the rung below is not distinguishable from
+zero (Table~\ref{tab:exceed}), so what the panels measure is the performance of
+the ladder rather than the contribution of any one block. Municipalities without
+that history carry no forecast and are drawn in grey.}
 \label{fig:map}
 \end{figure}
 
 A probability map with no observed counterpart cannot be checked, so
-Figure~\ref{fig:map} carries both the prediction for the record season and its
-realisation. What the two panels separate are the properties the area under the
-curve averages together: within the season the ordering of the municipalities is
-informative, and the level of the probabilities is not, because every quintile
-under-predicts a season that no model trained on earlier ones could have placed
-at its realised base rate. A map of this kind is therefore usable as a ranking of
+Figure~\ref{fig:map} carries the alert for the record season beside its
+realisation. The two separate the properties that the area under the curve
+averages together. The ordering is informative: four alerts in five are correct,
+and the map carries 128 false alarms where an unranked list of the same length
+would carry 197, a gap that holds across the range of budgets in panel (c) and
+closes only as the list approaches every municipality. The level is not: the map
+assigns a mean probability of $0.47$ to a season in which $0.70$ of the
+municipalities exceeded their own upper quartile, because no model trained on
+earlier seasons could have placed the season at its realised base rate, and every
+threshold inherits that shortfall. The map is therefore usable as a ranking of
 municipalities for attention within a season, and unusable as a forecast of how
 many alerts a season will generate.
 
