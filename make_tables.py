@@ -488,176 +488,66 @@ def claims(f: dict) -> list[dict]:
     ]
 
 
-#: Artefacts of the survival reading (``survival_analysis.py``). They are not in
-#: the database: they are computed from the panel the database summarises, so the
-#: audit reads them from disk. When they are absent -- a reader who has not run
-#: the script -- the block is skipped and the skip is printed, rather than failed.
+#: The out-of-season transport of the fitted pair (``survival_analysis.py``).
+#: Its table is not in the database: it is computed from the panel the database
+#: summarises, so the audit reads it from disk. When it is absent -- a reader who
+#: has not run the script -- the block is skipped and the skip is printed, rather
+#: than failed. Only the transport is left in the manuscript: the within-season
+#: band comparison and the duration analysis were dropped as technical results
+#: with no bearing on surveillance practice, and are no longer quoted in the text.
 SURV_DIR = os.path.join("analysis", "survival")
 
-SURV_FILES = ["exceedance_within_season.csv", "exceedance_transport.csv",
-              "duration_models.csv", "duration_summary.json"]
+SURV_FILES = ["exceedance_transport.csv"]
 
 
-def survival_facts(root: str = ".") -> dict | None:
-    """Every quantity the survival section states, or ``None`` if unrun."""
+def transport_facts(root: str = ".") -> dict | None:
+    """Every quantity the transport paragraph states, or ``None`` if unrun."""
     import pandas as pd
 
     d = os.path.join(root, SURV_DIR)
     if not all(os.path.exists(os.path.join(d, n)) for n in SURV_FILES):
         return None
-    within = pd.read_csv(os.path.join(d, SURV_FILES[0]))
-    trans = pd.read_csv(os.path.join(d, SURV_FILES[1]))
-    models = pd.read_csv(os.path.join(d, SURV_FILES[2]))
-    with open(os.path.join(d, SURV_FILES[3]), encoding="utf-8") as fh:
-        dur = json.load(fh)
-
-    seasons = within[within["year"] > 0]
-    pooled = within[within["year"] == 0].iloc[0]
-    cox = {row["term"]: row for row in dur["cox"]}
-    # The manuscript states the Cox effect of a *doubling* of the case count,
-    # which is one log-unit effect raised to ln 2. Derive it rather than typing
-    # it, so the two can never disagree.
-    log_cases = cox["log_cases"]
+    trans = pd.read_csv(os.path.join(d, SURV_FILES[0]))
     return {
-        "within_max": float(seasons["departure_in_bands"].max()),
-        "within_min": float(seasons["departure_in_bands"].min()),
-        "within_median": float(seasons["departure_in_bands"].median()),
-        "within_n": int(len(seasons)),
-        "tail_min": int(seasons["n_above_xmin"].min()),
-        "tail_max": int(seasons["n_above_xmin"].max()),
-        "share_min": 100 * float(seasons["share_above_xmin"].min()),
-        "share_max": 100 * float(seasons["share_above_xmin"].max()),
-        "pooled_alpha": float(pooled["alpha"]),
-        "pooled_xmin": float(pooled["xmin"]),
-        "pooled_dep": float(pooled["departure_in_bands"]),
-        "pooled_n": int(pooled["n_units"]),
-        "pairs_possible": len(SEASON_YEARS) - 1,
         "pairs": int(len(trans)),
-        "inside": int(trans["inside_band"].sum()),
-        "trans_median": float(trans["departure_in_bands"].median()),
-        "trans_max": float(trans["departure_in_bands"].max()),
-        "trans_max_years": (int(trans.loc[trans["departure_in_bands"].idxmax(),
-                                          "fitted_year"]),
-                            int(trans.loc[trans["departure_in_bands"].idxmax(),
-                                          "target_year"])),
+        # The manuscript gives the error at ten times the bound as an absolute
+        # difference in percentage points, and at a hundred times as the two
+        # shares side by side. Derive both rather than typing them.
         "e10_median": float(((trans["pred_10x"] - trans["obs_10x"]).abs()
                              * 100).median()),
-        "e10_below": int((trans["pred_10x"] < trans["obs_10x"]).sum()),
         "pred100_median": float(trans["pred_100x"].median() * 100),
         "obs100_median": float(trans["obs_100x"].median() * 100),
-        "over100": int((trans["pred_100x"] > trans["obs_100x"]).sum()),
-        "obs100_zero": int((trans["obs_100x"] == 0).sum()),
-        "dur_median": float(dur["km_median_duration"]),
-        "dur_n": int(dur["n_units"]),
-        "censored": 100 * float(dur["censored_share"]),
-        "weibull": float(dur["weibull_shape"]),
-        "weibull_lo": float(dur["weibull_shape_ci"][0]),
-        "weibull_hi": float(dur["weibull_shape_ci"][1]),
-        "exp_aic": float(models.loc[models["model"] == "exponential",
-                                    "delta_aic"].iloc[0]),
-        "weibull_aic": float(models.loc[models["model"] == "weibull",
-                                        "delta_aic"].iloc[0]),
-        "logrank_p": float(dur["logrank_p"]),
-        "cox_hr": float(log_cases["hazard_ratio"]),
-        "cox_lo": float(log_cases["ci_low"]),
-        "cox_hi": float(log_cases["ci_high"]),
-        "cox_p": float(log_cases["p"]),
-        # The prose also says what that per-log-unit effect means for a season
-        # twice the size. Derived from the same coefficient so the two cannot
-        # disagree the way they did when the interval was quoted on one scale
-        # and the point estimate on the other.
-        "cox_doubling_pct": 100 * (float(log_cases["hazard_ratio"]) ** 0.6931471805599453 - 1),
-        "cox_season": float(cox["season"]["hazard_ratio"]),
-        "cox_season_lo": float(cox["season"]["ci_low"]),
-        "cox_season_hi": float(cox["season"]["ci_high"]),
     }
 
 
-def survival_claims(root: str = ".") -> list[dict]:
-    """Prose statements about Section~\\ref{sec:survivalres}.
+def transport_claims(root: str = ".") -> list[dict]:
+    """Prose statements about the transport paragraph of Section~\\ref{sec:riskmodel}.
 
-    Same contract as ``claims`` -- the string that should appear, and optionally
-    literals from earlier drafts that must not -- except that ``stale`` is
-    omitted here. These quantities enter the manuscript with the section that
-    audits them, so there is no earlier draft whose values could be named; the
-    check is that each stated number is still derived. ``audit_prose`` treats
-    the key as optional and validates the key set instead.
+    Same contract as ``claims`` -- the string that should appear -- except that
+    ``stale`` is omitted here: these quantities entered the manuscript with the
+    paragraph that states them, so there is no earlier draft whose literals could
+    be named. ``audit_prose`` treats the key as optional and validates the key set
+    instead.
     """
-    f = survival_facts(root)
+    f = transport_facts(root)
     if f is None:
         return []
-    y0, y1 = f["trans_max_years"]
     return [
-        {"name": "survival: within-season departure",
-         "want": f"{f['within_max']:.2f} of the 95\\% simultaneous band"},
-        {"name": "survival: within-season spread",
-         "want": (f"the smallest {f['within_min']:.2f}, with a median of "
-                  f"{f['within_median']:.2f}")},
-        {"name": "survival: tail sizes",
-         "want": f"between {f['tail_min']} and {f['tail_max']} municipalities"},
-        {"name": "survival: left-truncation share",
-         "want": f"ranges from {f['share_min']:.0f}\\% to {f['share_max']:.0f}\\%"},
-        {"name": "survival: pooled fit",
-         "want": (f"$\\hat\\alpha_S={f['pooled_alpha']:.2f}$ and "
-                  f"$x_{{\\min}}={f['pooled_xmin']:.0f}$")},
-        {"name": "survival: pooled departure",
-         "want": f"by {f['pooled_dep']:.2f} bands"},
-        {"name": "survival: pooled sample",
-         "want": f"all {_fmt(f['pooled_n'])} municipality-seasons"},
-        {"name": "survival: consecutive pairs",
-         "want": f"Of the {f['pairs_possible']} consecutive pairs, {f['pairs']}"},
-        {"name": "survival: pairs inside the band",
-         "want": f"in {f['inside']} of those {f['pairs']}"},
-        {"name": "survival: transport median",
-         "want": f"the median departure is {f['trans_median']:.2f} bands"},
-        {"name": "survival: transport worst pair",
-         "want": f"and the largest is {f['trans_max']:.2f}, from {y0} to {y1}"},
-        {"name": "survival: ten times the bound",
-         "want": (f"the median absolute error is {f['e10_median']:.1f} percentage "
+        {"name": "transport: consecutive pairs",
+         "want": f"over the {f['pairs']} consecutive pairs"},
+        {"name": "transport: ten times the bound",
+         "want": (f"a median absolute error of {f['e10_median']:.1f} percentage "
                   f"points")},
-        {"name": "survival: ten times, sign balance",
-         "want": f"{f['e10_below']} pairs of {f['pairs']} each way"},
-        {"name": "survival: hundred times, observed",
-         "want": f"delivers {f['obs100_median']:.2f}\\%"},
-        {"name": "survival: hundred times, predicted",
+        {"name": "transport: hundred times, predicted",
          "want": f"implies a median share of {f['pred100_median']:.1f}\\%"},
-        {"name": "survival: hundred times, overstatement",
-         "want": f"overstates the observed share in {f['over100']} of the "
-                 f"{f['pairs']} pairs"},
-        {"name": "survival: seasons with no exceedance",
-         "want": f"meets {_spell(f['obs100_zero'])} seasons"},
-        {"name": "survival: duration median",
-         "want": f"the median season lasts {f['dur_median']:.0f} weeks"},
-        {"name": "survival: censoring",
-         "want": f"{f['censored']:.1f}\\% of spells are censored"},
-        {"name": "survival: weibull shape",
-         "want": (f"the Weibull shape is {f['weibull']:.2f} (95\\% CI "
-                  f"{f['weibull_lo']:.2f}--{f['weibull_hi']:.2f})")},
-        {"name": "survival: exponential rejected",
-         "want": f"rejected by {_fmt(round(f['exp_aic']))} AIC units"},
-        {"name": "survival: gamma improvement",
-         "want": f"improves on the Weibull by {round(f['weibull_aic'])}"},
-        {"name": "survival: cox on size",
-         "want": (f"is {f['cox_hr']:.3f} per log unit of the case count "
-                  f"({f['cox_lo']:.3f}--{f['cox_hi']:.3f}, $p={f['cox_p']:.2f}$)")},
-        {"name": "survival: cox size, doubling",
-         "want": f"{f['cox_doubling_pct']:.1f}\\% change in the hazard"},
-        {"name": "survival: cox on season",
-         "want": (f"(${f['cox_season']:.3f}$ per season, "
-                  f"${f['cox_season_lo']:.3f}$--${f['cox_season_hi']:.3f}$)")},
+        {"name": "transport: hundred times, observed",
+         "want": f"delivers {f['obs100_median']:.2f}\\%"},
     ]
 
 
-def _spell(n: int) -> str:
-    """Small integers in the prose are words, not digits."""
-    words = {1: "one", 2: "two", 3: "three", 4: "four", 5: "five", 6: "six",
-             7: "seven", 8: "eight", 9: "nine", 10: "ten"}
-    return words.get(int(n), str(int(n)))
-
-
-#: Keys a claim may carry. ``stale`` is optional -- see ``survival_claims``.
+#: Keys a claim may carry. ``stale`` is optional -- see ``transport_claims``.
 #: Validated rather than assumed: reading ``c["stale"]`` unconditionally turned
-#: the first run of the survival block into a KeyError, and reading it with a
+#: the first run of the transport block into a KeyError, and reading it with a
 #: bare ``.get`` would let a misspelled key pass as a claim with nothing to
 #: check.
 CLAIM_KEYS = frozenset({"name", "want", "stale", "count"})
@@ -674,10 +564,9 @@ def audit_prose(tex_path: str, f: dict) -> dict:
     # is not a check but a coincidence.
     tex = re.sub(r"\s+", " ", tex)
     out = {"stale": [], "missing": [], "ok": []}
-    # The survival block is audited too: those numbers are typed into the
-    # prose the same way, and until now nothing checked them. Skipped, not
-    # failed, when the artefacts are absent.
-    for c in claims(f) + survival_claims():
+    # The transport paragraph is audited too: those numbers are typed into the
+    # prose the same way. Skipped, not failed, when the artefact is absent.
+    for c in claims(f) + transport_claims():
         unknown = set(c) - CLAIM_KEYS
         if unknown:
             raise ValueError(
@@ -744,8 +633,8 @@ def main(argv=None) -> int:
         for m in audit["missing"]:
             print(f"MISSING {m['name']}: {m['want']!r} not present", file=sys.stderr)
         if not audit["stale"] and not audit["missing"]:
-            skip = "" if survival_facts() is not None else (
-                " -- survival artefacts absent, that block not audited")
+            skip = "" if transport_facts() is not None else (
+                " -- transport artefacts absent, that block not audited")
             print(f"manuscript in step with {a.db} "
                   f"({len(audit['ok'])} claims verified){skip}")
             return 0

@@ -176,12 +176,12 @@ historical-rate baseline in 4 of 5 forecast years, the only contrast in the stud
 satisfy the pre-specified rule. At state scale the same contrast reaches 2 of 5 and
 fails it (Section~\ref{sec:ablation}).
 
-\item \textbf{A risk curve with a horizon.} Each season's parameters describes its own
-cross-section, and the pooled cross-section is rejected. Transported to the next
-season it holds to $10x_{\min}$ (median error 1.6~pp) and breaks by $100x_{\min}$
-(1.0\% predicted against 0.24\% observed). The companion survival analysis returns
-the opposite hazard shape, Weibull $2.77$ and size-independent ($p=0.50$), so the
-law does not extend to season duration (\eqref{eq:hazard}; Section~\ref{sec:survivalres}).
+\item \textbf{A risk curve, and how far it reaches.} The pair gives the probability
+that a season exceeds any level $s$, and it describes the cross-section that
+produced it rather than the next one (Section~\ref{sec:riskmodel}). Carried forward a
+season without refitting it still returns the level of risk at $10x_{\min}$ (median
+error 1.6~pp) and overstates the far tail at $100x_{\min}$ (1.0\% implied against
+0.24\% observed). It is a risk statement, not a prediction of the next season's size.
 \end{enumerate}
 
 \section{Methods}
@@ -376,7 +376,6 @@ Two further samples pool across seasons as well, keeping the spatial scope fixed
 %
 At \lvl{S-nat} every season clears the floor, so its pooled sample is the multiset union of the national cross-sections.
 At \lvl{S-state} it is not the union of the per-season samples: the floor removes state-seasons from the fits of \lvl{S-state} and removes nothing from the pooled sample, which therefore holds observations that no state-year fit has seen.
-The pooled national sample is the one behind the departure from the fitted law reported in Section~\ref{sec:survivalres}.
 
 Constructions \lvl{W-mun} and \lvl{W-seas} differ only in the temporal window over which the weekly case counts are pooled: \lvl{W-mun} uses the complete available series of a municipality (January 2010 to January 2026), whereas \lvl{W-seas} restricts the sample to a single season, of at most 53 weeks. Their sample sizes differ by roughly an order of magnitude, which is why the comparison between them is made on shares rather than on counts.
 
@@ -519,62 +518,6 @@ two models should be indistinguishable, and the descriptive result would carry n
 forecasting content. Section~\ref{sec:ablation} specifies the comparison that
 decides between these outcomes, and Section~\ref{sec:leakage} lists the four ways
 in which such a comparison could be falsified and how each is prevented.
-
-\subsection{A survival reading of the same curve}
-\label{sec:survival}
-
-Equation~\eqref{eq:exceed} is a survival function, and reading it as one changes
-what the fit is a claim about. With $\bar S(s)=\Pr(S\ge s)$ and $f$ the discrete
-density of $S$, a power law implies the hazard
-%
-\begin{equation}
-h(s) \;=\; \frac{f(s)}{\bar S(s)} \;=\; \frac{\alpha_S-1}{s},
-\label{eq:hazard}
-\end{equation}
-%
-which decreases with size: among municipalities already at $s$ cases, the
-conditional probability of reaching the next size is not constant but decays in
-proportion to $1/s$. This is the contrast already drawn in
-Section~\ref{sec:comparison}, where the exponential alternative was characterised
-by a constant hazard of termination. The comparison of Section~\ref{sec:comparison} establishes only that the hazard
-is not constant; Equation~\eqref{eq:hazard} gives its form, a decay in
-proportion to $1/s$.
-
-Three properties of Equation~\eqref{eq:exceed} follow from that reading, and each
-is checked in Section~\ref{sec:survivalres}. \emph{The fit is conditional.} Every
-size fit in this paper is estimated on the units at or above $x_{\min}$, so
-$\bar S$ describes a left-truncated sample and is silent about the units below the
-bound. The truncation is not a formality: the share of a national cross-section
-above $x_{\min}$ ranges from 6\% to 84\% across the 16 seasons, so in some years
-the curve speaks for a small minority of the municipalities in the panel.
-\emph{The within-season comparison cannot test the family.} Since $x_{\min}$ is
-chosen by minimising the distance between $\bar S$ and the empirical exceedance
-frequency, that distance is small by construction for any sample, whatever
-generated it. We therefore report it as a magnitude, in multiples of the
-simultaneous Kolmogorov band $\varepsilon=\sqrt{\log(2/\delta)/(2n)}$ evaluated at
-the sample size $n$ of the tail with $\delta=0.05$, and not as a $p$-value.
-\emph{The comparison that is not circular is out of season.} We fit the pair
-$(\alpha_S,x_{\min})$ to season $t$ and evaluate the resulting $\bar S$ on the
-municipalities of season $t+1$ at or above $x_{\min,t}$, over the window
-$[x_{\min,t},\max S_{t+1}]$, which is the only interval in which the transported
-curve makes a claim. Each departure is read against the band at the target
-season's own sample size, and against the same pair re-estimated inside the target
-season, which is the reference the transport has to close. Because the evaluated
-window narrows when $x_{\min}$ moves up, the window ratio is reported with every
-pair, so that a small departure on a narrow window is not read as a better
-transport than a larger one on a wide window.
-
-The same framework applies to the descriptor that the
-scaling claim excludes a priori (Section~\ref{sec:questions}). We treat the duration of a
-municipal season as a time to event, censored at the data cut-off in the final
-season, and compare exponential, Weibull, log-normal, log-logistic and
-generalised-gamma families by AIC. Dependence on the size of the season is
-screened with a log-rank test over size terciles, read as a screen rather than as
-inference because a municipality contributes one or more seasons, and then with a
-Cox model whose standard errors are clustered on the municipality. A constant
-hazard is the only version of duration that could be called scale-free, so whether
-duration may carry an exponent is settled by the shape of its hazard and by
-whether that hazard depends on the size of the season.
 
 \subsection{Predictive target and predictors}
 \label{sec:targets}
@@ -889,8 +832,8 @@ The municipal weekly series and the derived seasonal descriptors are those
 distributed by the InfoDengue/Mosqlimate platform \citep{araujo2025large}. The
 fitted parameters and the evaluation outputs underlying every table and figure
 reported here are available from the corresponding author on request. Every number in
-Section~\ref{sec:survivalres} is produced by script from the same municipal panel
-and audited against the text by the same consistency check as the tables.
+the exceedance analysis is produced by script from the same municipal panel and
+audited against the text by the same consistency check as the tables.
 
 \section{Results}
 \label{sec:results}
@@ -1114,37 +1057,21 @@ tracks the magnitude of the season: seasons in which municipalities produce larg
 epidemics place the threshold higher, and $\alpha_S$ moves with it. The pair is
 therefore a two-number summary of how large a season was, available for every
 municipality, far less volatile than the case count it summarises, and stable
-enough to be compared across seasons (Figure~\ref{fig:stability}). Read as a
+enough to be compared across seasons. Read as a
 predictor set, the same fact is a warning: an $\alpha_S$ that co-varies with the
 scale of the season is, to that extent, a re-encoding of $S_{t-1}$, which any
 model of size already carries. Both readings are correct, and they make different
 predictions about the ablation of Section~\ref{sec:prediction}.
 
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{figures/fig08_alpha_stability}
-\caption{Stability of the two exponents. (a) Estimated size exponent
-$\alpha_S$ of the discrete law $p(x)\propto x^{-\alpha}$ fitted above the lower
-bound $x_{\min}$, for epidemic size by season, one line per state, at the
-state-year cross-section: the lines are flat, and the spread between states is far
-smaller than the season-to-season variation in case counts. (b) Estimated weekly
-exponent $\alpha_W$ of the municipal construction against $\log_{10}$ municipal
-population, a different construction and a different object from panel (a), which
-shows no association (Pearson $r=-0.043$, Spearman $-0.048$, $n=5{,}264$). Panel
-(a) is the empirical reason $\alpha_S$ can serve as a compact descriptor of a
-season: it varies slowly along exactly the axis in which the observables do not.}
-\label{fig:stability}
-\end{figure}
-
 The weekly exponent $\alpha_W$ is essentially unrelated to municipality size
-($\mathrm{corr}(\alpha_W, \log_{10}\text{population})=-0.043$, Spearman $-0.048$;
-$n=5{,}264$) and only weakly related to incidence
+(Pearson $r=-0.043$, Spearman $-0.048$ against $\log_{10}$ population; $n=5{,}264$)
+and only weakly related to incidence
 (Pearson $-0.143$, Spearman $-0.248$; $n=4{,}663$). Larger or more heavily burdened
 municipalities are therefore not in a different scaling regime, and $\alpha_W$ is
 not a proxy for how much transmission a place sees. It is a property of the
 construction; $\alpha_S$ is, within a unit, a property of the scale of the season.
 
-\subsection{The fitted law as a risk curve}
+\subsection{The fitted law as a risk curve, and how far it travels}
 \label{sec:riskmodel}
 
 Equation~\eqref{eq:exceed} makes the description operational. A power law with
@@ -1155,11 +1082,14 @@ requires no fitted case count, no covariate and no training period: it is
 available from the current cross-section alone.
 
 Figure~\ref{fig:exceed} confronts the exceedance curve implied by each national
-fit with the empirical exceedance frequency of the same cross-section. The
-agreement holds over roughly two decades of epidemic size. Numerically, the 16
-national fits imply that between 5.6\% and 16.5\% of municipalities exceed ten
-times $x_{\min}$ in a given season, and that between 0.3\% and 2.7\% exceed one
-hundred times it. These are statements on which a surveillance service can act
+fit with the empirical exceedance frequency of the same cross-section. The agreement
+holds over roughly two decades of epidemic size. Part of it is by construction:
+$x_{\min}$ was chosen to minimise the distance between the two curves, so the figure
+measures the size of the agreement rather than testing the choice of family. That a
+curve with two parameters reaches this far is the result.
+Numerically, the 16 national fits imply that between 5.6\% and 16.5\% of municipalities
+exceed ten times $x_{\min}$ in a given season, and that between 0.3\% and 2.7\% exceed
+one hundred times it. These are statements on which a surveillance service can act
 and which a subsequent season can falsify.
 
 \begin{figure}[htbp]
@@ -1190,105 +1120,14 @@ seasons unpredictable, is a statement about squared-error loss and not about
 information. Prediction of a tail event and prediction of its magnitude are
 distinct problems.
 
-\subsection{The curve as a hazard, and how far it travels between seasons}
-\label{sec:survivalres}
-
-This section compares the fitted pair $(\alpha_S, x_{\min})$ with data in three ways, and only the first of them is descriptive by construction.
-Through Equation~\eqref{eq:exceed} the pair gives the survival function $\Pr(S\ge s)$ of the size variable, so each comparison below sets a fitted probability against an observed frequency: within
-the season that produced the pair, which is descriptive because $x_{\min}$ was chosen to make it close; against the pooled cross-section of all 16 seasons, which can reject; and against the following season, which tests whether the pair transfers.
-
-In the season that produced the pair the fitted and observed curves agree. Over
-the 16 national cross-sections the largest departure is
-0.79 of the 95\% simultaneous band and the smallest 0.26, with a median of 0.45,
-computed on tails that hold between 164 and 793 municipalities. This is the agreement plotted in Figure~\ref{fig:exceed}, now with a band around
-it. The comparison is descriptive and cannot reject the power-law family, because
-$x_{\min}$ was selected to make the departure small (Section~\ref{sec:survival});
-it can fail, however, if the fitted pair misstates the cross-section that
-produced it.
-
-The pooled cross-section is the first comparison that can reject.
-Fitting all 28{,}470 municipality-seasons together gives $\hat\alpha_S=1.92$ and
-$x_{\min}=641$, and that single curve departs from the empirical exceedance
-frequency of the same pooled sample by 1.78 bands, more than twice the largest
-departure observed in any individual season. A mixture of 16 seasons is not a power law even though each of its components is.
-This rejection supports the claim that $\alpha_S$ describes a season rather than
-the disease more directly than the spread of the per-season estimates does,
-because it does not rest on those estimates. Figure~\ref{fig:survival-exceed}(a) draws that comparison.
-
-Across seasons the answer depends on the threshold. Of the 15 consecutive pairs, 14 carry
-enough municipalities above the fitted bound to be evaluated at all; in 5 of those
-14 the transported curve stays inside the band, the median departure is 1.14 bands
-and the largest is 5.15, from 2018 to 2019. A band is a tolerance for the whole curve, so the count above understates the
-agreement at the levels a service would use. At ten times the bound the median absolute error is 1.6
-percentage points and the transported curve falls below the observed share as
-often as above it, 7 pairs of 14 each way, so the level of risk at that scale does
-survive the transfer. At a hundred times the bound it does not: the transported
-curve implies a median share of 1.0\% where the following season delivers 0.24\%,
-overstates the observed share in 12 of the 14 pairs, and meets six seasons in
-which the observed share is exactly zero. The shape of the curve is a property of the
-cross-section that produced it: the further the threshold, the larger the share
-the transported curve predicts and the smaller the share the next season shows. Figure~\ref{fig:survival-exceed}(b) plots the whole sequence against the gap a pair re-fitted inside the target season achieves, which separates the cost of carrying the parameters over from the floor that any curve faces in its own data.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{figures/fig16_survival_exceedance}
-\caption{The fitted law read as a survival curve, and what survives of it one
-season later. Panel (a) pools the 16 seasons and plots the empirical exceedance
-frequency $\Pr(S\ge s)$ as a Kaplan--Meier step against the fitted curve
-$\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ of Equation~\eqref{eq:exceed}, both on
-log--log axes and both conditioned on $s\ge x_{\min}$, the dotted vertical line.
-The grey envelope is the 95\,\% simultaneous band of the empirical curve by the
-Dvoretzky--Kiefer--Wolfowitz inequality, which needs no assumption about the tail
-and whose half-width depends only on the number of municipalities above the
-bound; the band is drawn around the data, not around the fit, so it is the fit
-that is on trial. The pooled fit leaves that band by 1.78 half-widths, where no
-individual season exceeds 0.79. Panel (b) carries the pair
-$(\alpha_t,x_{\min,t})$ of each season into season $t+1$ without refitting and
-plots, in half-widths of the band, the largest gap between the resulting curve
-and the exceedance frequency of the season it is applied to (circles). Squares
-give the same gap for a pair fitted inside the target season, which is the floor
-any fit faces in its own data rather than a standard the transported pair could
-meet. The dotted line at one is the edge of the band, and the vertical axis is
-logarithmic because the worst pair overshoots it fivefold.}
-\label{fig:survival-exceed}
-\end{figure}
-
-Duration, examined as a time to event, does not behave as a scale-free quantity.
-Across 28{,}470 municipality-seasons the median season lasts 27 weeks, 6.1\% of
-spells are censored at the data cut-off, and the Weibull shape is 2.77 (95\% CI
-2.74--2.79): the hazard of a season ending rises with the time already elapsed,
-which is the opposite of the memoryless case. The exponential is rejected by
-28{,}984 AIC units and a generalised gamma improves on the Weibull by 458, so no
-single simple family describes the duration distribution. Nor does duration scale
-with the size of the season: the log-rank screen over size terciles is significant
-at 28 thousand seasons ($p=7.9\times10^{-6}$), but the Cox hazard ratio is
-1.006 per log unit of the case count (0.989--1.023, $p=0.50$), which amounts to a
-0.4\% change in the hazard for a doubling of the season, a magnitude too small
-to matter at the resolution of these data. The hazard does
-fall with calendar season ($0.971$ per season, $0.968$--$0.973$), so seasons
-lengthen over the period; we do not read that as epidemiological change, since the
-final season is truncated at the data cut-off and the series is nowcast-adjusted,
-and a longer low-count tail is what both would produce. Figure~\ref{fig:survival-duration} shows both halves of that comparison: the duration curves by size tercile, and the family comparison that rejects the memoryless case.
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=\textwidth]{figures/fig17_survival_duration}
-\caption{Season duration as a time-to-event outcome. Panel (a) gives the
-Kaplan--Meier estimate of the probability that a season is still running after
-$t$ weeks, for the three terciles of epidemic size, and overlays the fitted
-Weibull survival curve. The three empirical curves lie almost on top of one
-another, which is the graphical form of the Cox result reported in the text: size
-moves the hazard of a season ending by an amount that is negligible at this
-resolution. The Weibull shape exceeds one, so the hazard rises with the time
-already elapsed instead of staying flat as the exponential requires. Panel (b) is
-the AIC comparison behind that rejection, labelled with the gap in AIC units
-against the best family of the set: the exponential has the highest AIC of
-the set and the generalised gamma the lowest, so no single simple family describes
-the distribution. That is why duration enters the paper as a covariate of size
-and not as a power law. Durations of the final season are censored at the data
-cut-off.}
-\label{fig:survival-duration}
-\end{figure}
+The reach of the curve is fixed by the season that produced it. Carried forward one
+season without refitting, over the 14 consecutive pairs that hold enough
+municipalities above the fitted bound to be evaluated, it returns the level of risk
+at ten times the bound with a median absolute error of 1.6 percentage points, and it
+overstates the far tail: at a hundred times the bound it implies a median share of
+1.0\% where the following season delivers 0.24\%. A pair describes the cross-section
+in which it was estimated, and that is the cross-section a service holds when it
+plans the coming season.
 
 \subsection{Predicting the probability of a large season}
 \label{sec:classresults}
@@ -1666,11 +1505,11 @@ law assigns $\Pr(S \ge s)$ at every level; what it precludes is that the
 distinct claims, and conflating them is what produced the intuition that
 heavy-tailed epidemics are unforecastable.
 
-As a risk specification the fitted pair is accurate over the range tested. Two
-parameters reproduce the empirical exceedance frequency over two decades of
-epidemic size (Figure~\ref{fig:exceed}), and they imply that between 5.6\% and
-16.5\% of municipalities exceed ten times $x_{\min}$ in a given season against
-0.3--2.7\% exceeding a hundred times it. No covariate, no training period and no
+As a risk specification the fitted pair reproduces the empirical exceedance
+frequency over two decades of epidemic size (Figure~\ref{fig:exceed}; the distance is
+small by construction, the range over which it stays small is not), and it implies
+that between 5.6\% and 16.5\% of municipalities exceed ten times $x_{\min}$ in a given
+season against 0.3--2.7\% exceeding a hundred times it. No covariate, no training period and no
 fitted case count is involved: the statement is available from the current
 cross-section, for every municipality, including those that have never experienced
 an extreme season. For a service deciding how much capacity to hold in reserve,
@@ -1687,24 +1526,16 @@ to 25 units per origin and with a label pooled across them. The scaling block, w
 the object of the paper, satisfies the criterion at neither level. Where the question is posed as a magnitude, the answer
 is negative, and the failure has a stated mechanism.
 
-Equation~\eqref{eq:hazard} states the same result in the form that shows how far
-it reaches. Read as a hazard (Equation~\eqref{eq:hazard}), the fitted law says that the
-conditional probability of a still larger season decays as $1/s$: risk does not vanish as a season grows,
-it recedes slowly, which is what $\alpha_S\approx2$ means once the second moment is
-set aside. The transport test of Section~\ref{sec:survivalres} then says how far
-the statement reaches. Within the season that produced it the curve is
-indistinguishable from the data by construction; across seasons the level at ten
-times the bound survives the transfer while the level at a hundred times it does
-not. The rule this implies is the one argued throughout the paper: a fitted pair
-describes the cross-section in which it was estimated, and it does not extend to an
-unobserved season at an arbitrary threshold. It is also a
-further reason why the pair is not a forecast input. A quantity whose second moment does not exist, and whose upper levels do not
-transport, gives a risk level for the current cross-section, and that is what a
-service holding capacity in reserve needs. It gives no information about which
-municipality will have a large season next, and that is what a forecast needs. The same framework also accounts for the exclusion of duration from the scaling
-claim (Section~\ref{sec:questions}): with a hazard that rises with elapsed
-time, no single simple family and no dependence on the size of the season, a
-duration exponent would have had nothing to describe.
+The reach of the statement is set by the season, not by the exponent. Within the
+season that produced it the curve reproduces the data; one season ahead it holds at
+ten times the bound and overstates a hundred times it. The rule this implies is the
+one argued throughout the paper: a fitted pair describes the cross-section in which
+it was estimated, and it does not extend to an unobserved season at an arbitrary
+threshold. It is also a further reason why the pair is not a forecast input. A
+quantity whose second moment does not exist, and whose upper levels do not transport,
+gives a risk level for the current cross-section, and that is what a service holding
+capacity in reserve needs. It gives no information about which municipality will have
+a large season next, and that is what a forecast needs.
 
 \subsection{How the coupling explains both results}
 
@@ -1898,16 +1729,13 @@ within-state estimates are more robust than the national ones because they pool 
 24 states.
 
 \emph{The transport test rests on few pairs and unequal windows.} The out-of-season
-comparison of Section~\ref{sec:survivalres} uses 14 consecutive pairs; the
-fifteenth is lost because the following season does not carry enough municipalities
-above the fitted bound to be evaluated. When $x_{\min}$ moves up the evaluated
-window narrows, so power is not uniform across pairs and a departure counted in
-bands is not strictly comparable from one pair to the next, which is why the
-window ratio accompanies every pair. Because the test transports a pair, it also
-cannot attribute a departure to the change in the exponent or to the change in the
-bound, and its result concerns the pair as a whole. What it buys in exchange is
-the one thing the within-season agreement cannot provide: a comparison that the
-estimator did not construct.
+comparison uses 14 consecutive pairs; the fifteenth is lost because the following
+season does not carry enough municipalities above the fitted bound to be evaluated.
+When $x_{\min}$ moves up the evaluated window narrows, so power is not uniform across
+pairs, and because the test transports the pair as a whole it cannot attribute a
+departure to the change in the exponent or to the change in the bound. What it buys
+in exchange is the one thing the within-season agreement cannot provide: a
+comparison that the estimator did not construct.
 
 \emph{Extrapolation rests on an assumption rather than on data.} The primary
 estimator continues the boundary trend of the spline basis linearly, which is what
