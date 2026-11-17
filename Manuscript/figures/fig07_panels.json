@@ -1,0 +1,69 @@
+{
+  "figure": "fig07_alpha_by_construction",
+  "statistic": "estimated alpha, one value per fit",
+  "bin_width": 0.05,
+  "x_range": [
+    1.15,
+    3.05
+  ],
+  "reference": {
+    "line": "alpha = 2",
+    "style": "dashed"
+  },
+  "vertical_scale": "per panel (share of that panel's fits)",
+  "panels": [
+    {
+      "panel": "(a)",
+      "constructions": [
+        {
+          "level": "W-mun",
+          "n": 5264,
+          "median": 1.948
+        },
+        {
+          "level": "W-seas",
+          "n": 43673,
+          "median": 2.072
+        }
+      ],
+      "title": "W-mun vs W-seas"
+    },
+    {
+      "panel": "(b)",
+      "constructions": [
+        {
+          "level": "S-mun",
+          "n": 1085,
+          "median": 2.079
+        }
+      ],
+      "title": "S-mun"
+    },
+    {
+      "panel": "(c)",
+      "constructions": [
+        {
+          "level": "S-state",
+          "n": 353,
+          "median": 1.977
+        }
+      ],
+      "title": "S-state"
+    },
+    {
+      "panel": "(d)",
+      "constructions": [
+        {
+          "level": "S-nat",
+          "n": 16,
+          "median": 2.026
+        }
+      ],
+      "title": "S-nat"
+    }
+  ],
+  "png_shape": [
+    1848,
+    469
+  ]
+}

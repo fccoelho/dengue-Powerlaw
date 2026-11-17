@@ -59,6 +59,16 @@ powerlaw_results.db.bak*
 # fig01 (aggregation schematic) was dropped by PR #10 and must stay deleted
 Manuscript/figures/fig01_aggregation_levels.*
 
+# fig02 (box plot of alpha per construction) was dropped: the same distributions
+# are drawn, by construction and over common bins, in fig07_alpha_by_construction,
+# which also carries the three size constructions. the summary table (tab:main) answers
+# the same question numerically, so the box plot was reporting a third time.
+Manuscript/figures/fig02_alpha_by_level.*
+
+# The two-panel version of fig07, superseded by the four-panel
+# fig07_alpha_by_construction. Ignored so a stale copy cannot be committed back.
+Manuscript/figures/fig07_window_flip.*
+
 # survival_analysis.py tables and summary: regenerated, and committed anyway
 # because snapshot_manifest.json hashes them. Its two figures ARE cited (Section
 # 3.5) and are written to Manuscript/figures, which is not ignored.
