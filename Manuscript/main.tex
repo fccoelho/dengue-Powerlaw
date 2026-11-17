@@ -1950,8 +1950,21 @@ The power law holds for epidemic size and not for the weekly case count. Fitted 
 Because the size exponent is close to two, the fitted pair $(\alpha_S, x_{\min})$ fixes the probability that a season exceeds any level $s$, and those two parameters reproduce the observed frequency of extreme seasons over two decades.
 This is the main practical result: a surveillance service can obtain the exceedance probability of a given season, without training a model or issuing a forecast.
 
-The same pair does not contribute to a better forecast.
-For the municipal question of whether a season will exceed the unit's own upper quartile, lagged seasonal descriptors improve the Brier score over calibrated persistence in 4 out of 5 origins and raise discrimination from $0.50$ to $0.58$ in termos of AUC, the full ladder reaching $0.65$; this is the only contrast in the study that satisfies the pre-specified rule, while at state level the same contrast cannot be resolved on 25 units. For the magnitude of the size no rung achieves skill, and the scaling block adds nothing, in 0 of 5 origins, its differential at the 95th percentile being $+4.9\%$ in median with intervals that exclude zero in only 2 of 5 origins and in opposite directions.
+The fitted pair adds no forecast skill; where the ladder improves, the gain comes
+from the lagged descriptors.
+
+The first question is whether a season will exceed the unit's own upper quartile.
+At municipal level the lagged descriptors improve the Brier score over calibrated
+persistence in 4 of 5 origins and lift AUC from $0.50$ to $0.58$, the full ladder
+reaching $0.65$. That contrast is the only one in the study that satisfies the
+pre-specified rule. At state level it holds in 2 of 5 origins and fails it, since
+each origin is a bootstrap over only 23 to 25 units — an interval wider than the
+effect it must resolve.
+
+The second question is how large the season will be. No model in the ladder achieves
+skill, in any of the 5 origins. The scaling block contributes nothing: its
+contribution at the 95th percentile has median $+4.9\%$, and the interval excludes
+zero in only 2 of the 5 origins, in opposite directions.
 
 The reason is a property of the estimates and not a defect of the model.
 $\alpha_S$ co-varies with $x_{\min}$, and therefore with the scale of the season,
@@ -1961,22 +1974,10 @@ large a season was. That makes it a compact description of a season, and a
 redundant input to any model that already contains the previous season's size; the
 ablation confirmed the redundancy that the coupling predicted.
 
-Two consequences follow for work in this area. First, an exponent reported without
-its lower bound, its construction, its sample size and its comparison model cannot
-be interpreted, because two analyses that report the same exponent can describe
-objects that differ by two orders of magnitude in scale. The convention costs one line in a table.
-Second, a heavy tail constrains how well the magnitude of the largest event can be
-estimated from second moments, and it leaves the probability of exceeding any level
-fully specified. These are separate statements, and reading the first as a limit on
-the second is the step that produced the claim that heavy-tailed epidemics cannot
-be forecast.
+Two consequences follow for work in this area. First, an exponent reported without its lower bound, its construction, its sample size and its comparison model is not interpretable, because two analyses that report the same exponent can describe objects that differ by two orders of magnitude in scale. The convention costs one line in a table.
+Second, a heavy tail constrains how well the magnitude of the largest event can be estimated from second moments, but leaves the probability of exceeding any level fully specified. These are separate statements, and reading the first as a limit on the second is the step that produced the claim that heavy-tailed epidemics cannot be forecast.
 
-The two exponents are not two estimates of one quantity. $\alpha_W$ describes the
-weekly count, sits at $1.95$ in the pooled series and at $2.07$ within single
-seasons, and its lower bound of two cases makes the exceedance curve attached to it
-silent about the risk of a large season. $\alpha_S$ describes the epidemic size; it
-is the quantity to report, and it is to be reported with its lower bound and as a
-risk curve rather than as a predictor.
+The two exponents are not two estimates of one quantity. $\alpha_W$ describes the weekly count, sits at $1.95$ in the pooled series and at $2.07$ within single seasons, and its lower bound of two cases makes the exceedance curve attached to it silent about the risk of a large season. $\alpha_S$ describes the epidemic size; it is the quantity to report, and it is to be reported with its lower bound and as a risk curve rather than as a predictor.
 
 \bibliographystyle{apalike}
 \bibliography{refs}
