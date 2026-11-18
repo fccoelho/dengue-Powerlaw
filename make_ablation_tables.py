@@ -1211,24 +1211,19 @@ def claims(f: dict) -> list[dict]:
              "stale": [], "needs": "classifier_importance"},
         ]
 
-    # The map's own numbers: predicted quintile against the realised outcome.
+    # The map's level: the mean probability it assigns to a season against the
+    # share of municipalities that season actually delivered. Only this one
+    # survives in the prose. The quintile agreement the figure used to draw is
+    # gone -- the map is now the alert and its outcome -- and the ledger that
+    # replaced it is audited by ``make_tables.map_claims`` against the sidecar
+    # the drawing writes, so it is not re-derived and re-typed here.
     ma = f.get("map_agreement") or {}
     if ma:
-        out += [
-            {"name": "realised exceedance by predicted quintile",
-             "want": (f"rises from ${ma['first']:.2f}$ in the lowest quintile to "
-                      f"${ma['fourth']:.2f}$ in the fourth and settles at "
-                      f"${ma['last']:.2f}$ in the fifth"),
-             "stale": [], "needs": "classifier_oof"},
-            {"name": "level gap of the map prediction",
-             "want": (f"between ${abs(ma['gap_max']):.2f}$ and "
-                      f"${abs(ma['gap_min']):.2f}$ below the observed share"),
-             "stale": [], "needs": "classifier_oof"},
-            {"name": "overall means of the map",
-             "want": (f"${ma['predicted_mean']:.2f}$ against an observed "
-                      f"${ma['observed_rate']:.2f}$"),
-             "stale": [], "needs": "classifier_oof"},
-        ]
+        out.append(
+            {"name": "map: mean prediction against the realised rate",
+             "want": (f"mean probability of ${ma['predicted_mean']:.2f}$ to a "
+                      f"season in which ${ma['observed_rate']:.2f}$"),
+             "stale": [], "needs": "classifier_oof"})
 
     # The alert list of the record season. Every number the worked example of
     # Section~\ref{sec:errors} types is derived here from the same out-of-fold

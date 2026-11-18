@@ -545,6 +545,53 @@ def transport_claims(root: str = ".") -> list[dict]:
     ]
 
 
+#: The sidecar written by ``fig15`` (``Manuscript/figures/generate_figures.py``).
+#: The map's caption states a ledger -- how many municipalities were alerted, how
+#: many of those were right, how many false alarms an unranked list of the same
+#: length would carry -- and every one of those numbers is drawn by the figure.
+#: Typing them into the prose is how a caption comes to describe a figure nobody
+#: drew, so they are read back from the sidecar and audited like the rest.
+MAP_SIDECAR = os.path.join("Manuscript", "figures", "fig15_map.json")
+
+
+def map_facts(root: str = ".") -> dict | None:
+    """The ledger of the risk map, or ``None`` if the figure has not been drawn."""
+    path = os.path.join(root, MAP_SIDECAR)
+    if not os.path.exists(path):
+        return None
+    with open(path, encoding="utf-8") as fh:
+        side = json.load(fh)
+    needed = {"alerts", "hits", "false_alarms", "n_units", "false_alarms_unranked"}
+    missing = needed - set(side)
+    if missing:
+        raise ValueError(
+            f"{MAP_SIDECAR} lacks {sorted(missing)}; regenerate the figure rather "
+            "than auditing a sidecar written by an older version of it")
+    return side
+
+
+def map_claims(root: str = ".") -> list[dict]:
+    """Prose statements about the map of Section~\\ref{sec:errors}.
+
+    Same contract as ``transport_claims``: the string that should appear, and no
+    stale literal, because these numbers entered the manuscript with the figure
+    that draws them.
+    """
+    f = map_facts(root)
+    if f is None:
+        return []
+    return [
+        {"name": "map: municipalities alerted",
+         "want": (f"Of the {f['alerts']} municipalities alerted out of the "
+                  f"{_fmt(f['n_units'])}")},
+        {"name": "map: hits and false alarms",
+         "want": (f"{f['hits']} exceeded their own upper quartile and "
+                  f"{f['false_alarms']} did not")},
+        {"name": "map: false alarms of an unranked list",
+         "want": f"which would carry {round(f['false_alarms_unranked'])}"},
+    ]
+
+
 #: Keys a claim may carry. ``stale`` is optional -- see ``transport_claims``.
 #: Validated rather than assumed: reading ``c["stale"]`` unconditionally turned
 #: the first run of the transport block into a KeyError, and reading it with a
@@ -566,7 +613,7 @@ def audit_prose(tex_path: str, f: dict) -> dict:
     out = {"stale": [], "missing": [], "ok": []}
     # The transport paragraph is audited too: those numbers are typed into the
     # prose the same way. Skipped, not failed, when the artefact is absent.
-    for c in claims(f) + transport_claims():
+    for c in claims(f) + transport_claims() + map_claims():
         unknown = set(c) - CLAIM_KEYS
         if unknown:
             raise ValueError(
@@ -633,8 +680,13 @@ def main(argv=None) -> int:
         for m in audit["missing"]:
             print(f"MISSING {m['name']}: {m['want']!r} not present", file=sys.stderr)
         if not audit["stale"] and not audit["missing"]:
-            skip = "" if transport_facts() is not None else (
-                " -- transport artefacts absent, that block not audited")
+            skipped = [name for name, present in (
+                ("transport", transport_facts() is not None),
+                ("map", map_facts() is not None)) if not present]
+            skip = ("" if not skipped else
+                    f" -- {', '.join(skipped)} artefact(s) absent, "
+                    f"{'those blocks' if len(skipped) > 1 else 'that block'} "
+                    "not audited")
             print(f"manuscript in step with {a.db} "
                   f"({len(audit['ok'])} claims verified){skip}")
             return 0
