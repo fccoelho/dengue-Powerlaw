@@ -1231,127 +1231,189 @@ def fig13(art):
     plt.close(fig)
 
 
+#: The threshold the resolution-limit section turns on, and the cut that splits
+#: the single panel of figure 14 into two populations. It is the same 100,000
+#: inhabitants that Section~\ref{sec:smallmunic} quotes as 93.2% of the units and
+#: 37.7% of the cases, so the two boxes of the figure are the two populations
+#: that sentence describes.
+SIZE_CUT = 100_000.0
+
+
 def fig14(oof):
-    """Where the forecast's error sits, at two scales.
+    r"""Whether the size forecast resolves a municipality, as two populations.
 
-    Both panels describe the same estimator -- the median quantile forecast of
-    the size of Section~\ref{sec:regression}, refitted once per origin -- and
-    the same error, so neither can be read as evidence about a model the paper
-    does not report. Panel (a) is the relative error against population and
-    panel (b) the same error in cases, on the same population bins: the first is
-    what a municipality's own series can resolve, the second is what it
-    contributes to the total of missed cases. The two move in opposite
-    directions, which is why one pooled error statistic is not enough.
+    One panel, two size classes, one box each. The previous version drew the
+    median error over population deciles as a line, and the line was the defect:
+    the median relative error falls smoothly with population, and on an axis
+    that spans several decades a smooth fall over one and a half of them is a
+    segment the eye reads as flat. A reader could not tell a trend from a level,
+    which is the one thing the panel existed to show.
 
-    The previous panel (b) drew standardised persistence residuals against a
-    normal reference. No sentence in the manuscript quoted it, and the claim it
-    supported -- that the target is not Gaussian -- is not one the paper makes,
-    so it is replaced by the quantity the error-structure section needs.
+    The claim the paper makes is not that the error declines *gradually*. It is
+    that a municipality below 100,000 inhabitants is a different forecasting
+    problem from one above it (Section~\ref{sec:smallmunic}). A box per class
+    shows the shift of the whole distribution -- median, interquartile range and
+    whiskers together -- instead of asking the reader to compare the endpoints of
+    a line segment and decide whether the difference is larger than the noise
+    around it.
+
+    The second panel is gone as well. It drew the same error in cases against
+    the same population, so that the pair of panels could support the claim that
+    the small municipalities carry the largest relative error and the smallest
+    absolute error, and that most units sit where the two disagree. That is an
+    argument of one sentence and it is now made in the text; as a figure it was
+    the same cloud drawn twice on two scales, which invites the reading that two
+    estimators disagree when one estimator was measured twice.
+
+    The vertical window is a declared rule rather than an aesthetic choice: the
+    axis spans the 1st to the 99th percentile of the plotted errors with a 15%
+    margin, and the count of units outside it is written to the sidecar. An axis that ran to the largest relative error in the data would be
+    set by a handful of municipalities that missed a count of two, and the
+    difference between the two boxes -- which is the point -- would collapse to
+    the width of a line.
 
     One point per municipality. A unit evaluated in three origins would otherwise
     contribute three correlated copies of itself, thickening the cloud without
     adding a unit to it; the unit's error is taken as the median over the origins
-    in which it was evaluated, and the count of origins is recorded beside the
-    figure so that the averaging is visible rather than implied.
+    in which it was evaluated, and the count of origins is written to the sidecar
+    so that the averaging is visible rather than implied.
     """
     d = oof[(oof["y_true"] > 0) & (oof["y_pred"] > 0)
             & (oof["population"] > 0)].copy()
     d["ape"] = np.abs(d["y_pred"] - d["y_true"]) / d["y_true"] * 100.0
-    d["aerr"] = np.abs(d["y_pred"] - d["y_true"])
-    d["logpop"] = np.log10(d["population"])
 
     unit = (d.groupby("geocode")
-              .agg(logpop=("logpop", "first"),
-                   population=("population", "first"),
+              .agg(population=("population", "first"),
                    ape=("ape", "median"),
-                   aerr=("aerr", "median"),
                    n_origins=("origin", "nunique"))
               .reset_index())
     n_units = int(len(unit))
     n_origins = int(d["origin"].nunique())
     # A logarithmic axis cannot show an error of exactly zero, and an exact
-    # forecast is not misinformation. Count them instead of letting the log
-    # drop them silently.
-    exact = {c: int((unit[c] <= 0).sum()) for c in ("ape", "aerr")}
+    # forecast is not misinformation. Count them instead of letting the log drop
+    # them silently.
+    n_exact = int((unit["ape"] <= 0).sum())
 
-    # Equal-count population bins, so that the median line is not dominated by
-    # the empty tail of the population distribution.
-    unit["bin"] = pd.qcut(unit["logpop"], 10, labels=False, duplicates="drop")
-    g = (unit.groupby("bin")
-         .agg(x=("logpop", "median"), n=("geocode", "size"),
-              ape_med=("ape", "median"),
-              ape_q1=("ape", lambda s: s.quantile(0.25)),
-              ape_q3=("ape", lambda s: s.quantile(0.75)),
-              aerr_med=("aerr", "median"),
-              aerr_q1=("aerr", lambda s: s.quantile(0.25)),
-              aerr_q3=("aerr", lambda s: s.quantile(0.75)))
-         .sort_index())
+    unit = unit[unit["ape"] > 0]
+    unit["small"] = unit["population"] < SIZE_CUT
 
-    panels = (
-        ("ape", "ape_med", "ape_q1", "ape_q3",
-         "absolute percentage error (%)", "(a) relative error"),
-        ("aerr", "aerr_med", "aerr_q1", "aerr_q3",
-         "absolute error (cases)", "(b) the same error in cases"),
+    # The declared window: the 1st to the 99th percentile of the plotted errors,
+    # with a 15% margin at each end. Rounding to whole decades was the first
+    # attempt and it defeated the purpose -- three decades of axis turn a factor
+    # of 1.5 between the two medians into a sliver, which is the defect the
+    # continuous median line already had. The count of units outside the window
+    # goes to the sidecar so that clipping is visible rather than assumed.
+    lo = float(unit["ape"].quantile(0.01)) * 0.85
+    hi = float(unit["ape"].quantile(0.99)) * 1.15
+    lo = max(lo, 1e-3)
+    if hi <= lo:
+        lo, hi = lo / 2.0, lo * 2.0
+    n_outside = int(((unit["ape"] < lo) | (unit["ape"] > hi)).sum())
+
+    classes = (
+        ("small", "< 100,000", "#f4a582"),
+        ("large", "$\\geq$ 100,000", "#9ecae1"),
     )
 
-    fig, axes = plt.subplots(1, 2, figsize=(9.4, 3.9))
-    for ax, (col, med, lo, hi, ylab, title) in zip(axes, panels):
-        y = unit[col].to_numpy(dtype=float)
-        keep = y > 0
-        ax.scatter(unit.loc[keep, "logpop"], y[keep], s=3, alpha=0.15,
-                   color="0.45", linewidths=0, zorder=1)
-        ax.fill_between(g["x"], g[lo], g[hi], color="#d62728", alpha=0.18,
-                        lw=0, zorder=2, label="interquartile range")
-        ax.plot(g["x"], g[med], "o-", color="#d62728", lw=1.5, ms=4,
-                zorder=3, label="median")
-        ax.set_yscale("log")
-        ax.set_xlabel(r"$\log_{10}$ municipal population")
-        ax.set_ylabel(ylab)
-        # The threshold the resolution-limit section turns on, drawn rather than
-        # described: the reader can see where each quantity bends instead of
-        # taking the number on trust.
-        ax.axvline(np.log10(1e5), color="k", ls="--", lw=1.0)
-        ax.text(0.015, 0.97,
-                f"{n_units:,} municipalities\nmedian over {n_origins} origins",
-                transform=ax.transAxes, va="top", ha="left", fontsize=7,
-                color="0.3")
-        ax.set_title(title, fontsize=9)
-        ax.legend(fontsize=7, loc="lower left")
+    # An empty class is not a figure with one box: the paper reports the two
+    # populations against each other (93.2% of the units below the threshold), so
+    # an empty side means the panel handed to this function is not the municipal
+    # panel, and the sidecar would then carry a null median that reads as a
+    # result. Abort instead.
+    counts = {k: int((unit["small"] if k == "small" else ~unit["small"]).sum())
+              for k, _l, _c in classes}
+    if min(counts.values()) == 0:
+        raise RuntimeError(
+            f"fig14 needs both size classes populated; got {counts}. The "
+            "municipal panel this figure draws has 93.2% of its units below "
+            f"{SIZE_CUT:,.0f} inhabitants in the paper, so a side with no unit "
+            "means the input is not that panel.")
 
-    # The bands a reader would otherwise have to estimate from the cloud. The
-    # share of total absolute error is what says whether the small municipalities
-    # dominate the sum: they carry most units and the largest relative error,
-    # and they may still carry little of the total of missed cases.
-    below = unit["logpop"] < 5.0
-    total_aerr = float(unit["aerr"].sum())
+    fig, ax = plt.subplots(figsize=(6.2, 4.3))
+    rng = np.random.default_rng(0)
+    stats = {}
+    for pos, (key, _label, colour) in enumerate(classes):
+        sel = unit["small"] if key == "small" else ~unit["small"]
+        y = unit.loc[sel, "ape"].to_numpy(dtype=float)
+        # The cloud first, so the boxes are read against the units they summarise
+        # rather than against a cleaned-up sample of them.
+        ax.scatter(pos + rng.uniform(-0.24, 0.24, y.size), y, s=2.5,
+                   alpha=0.09, color="0.40", linewidths=0, zorder=1)
+        ax.boxplot([y], positions=[pos], widths=0.46, patch_artist=True,
+                   showfliers=False, whis=1.5, zorder=3,
+                   boxprops=dict(facecolor=colour, edgecolor="0.20", lw=1.0,
+                                 alpha=0.85),
+                   medianprops=dict(color="#c62828", lw=2.2),
+                   whiskerprops=dict(color="0.20", lw=1.0),
+                   capprops=dict(color="0.20", lw=1.0))
+        med = float(np.median(y))
+        q1, q3 = (float(v) for v in np.percentile(y, [25, 75]))
+        ax.annotate(f"{med:.0f}%", xy=(pos, med), xytext=(0, 5),
+                    textcoords="offset points", ha="center", va="bottom",
+                    fontsize=8, color="#c62828", zorder=4,
+                    bbox=dict(fc="white", ec="none", alpha=0.80, pad=1.0))
+        stats[key] = {"n": int(y.size), "median_ape": round(med, 1),
+                      "q1_ape": round(q1, 1), "q3_ape": round(q3, 1)}
 
-    def band(sel: pd.Series) -> dict:
-        sub = unit.loc[sel]
-        if sub.empty:
-            # A band with no unit in it must serialise as null, not as NaN: the
-            # file is read by json.loads, which accepts neither.
-            return {"n": 0, "median_ape": None, "median_abs_error": None,
-                    "share_of_abs_error": None}
-        return {"n": int(len(sub)),
-                "median_ape": round(float(sub["ape"].median()), 1),
-                "median_abs_error": round(float(sub["aerr"].median()), 1),
-                "share_of_abs_error": round(
-                    float(sub["aerr"].sum()) / total_aerr, 3)}
+    ratio = (stats["small"]["median_ape"] / stats["large"]["median_ape"]
+             if stats["large"]["median_ape"] else float("nan"))
 
-    (OUT / "fig14_pop_bands.json").write_text(json.dumps({
-        "threshold": 100_000.0,
-        "n_units": n_units,
-        "n_origins": n_origins,
-        "exact_forecasts": exact,
-        "population_median": round(float(unit["population"].median()), 0),
-        "below": band(below),
-        "above": band(~below),
-    }, indent=2) + "\n")
-
+    # The gap between the two medians, drawn as a distance. Two boxes side by
+    # side already show it, but a reader has to carry the height of one box
+    # across to the other to measure it; the arrow does that eye movement once.
+    m_small, m_large = (stats["small"]["median_ape"], stats["large"]["median_ape"])
+    if m_small > 0 and m_large > 0:
+        ax.annotate("", xy=(0.5, m_small), xytext=(0.5, m_large),
+                    arrowprops=dict(arrowstyle="<->", color="0.25", lw=1.0,
+                                    shrinkA=0, shrinkB=0), zorder=4)
+        mid = 10.0 ** ((np.log10(m_small) + np.log10(m_large)) / 2.0)
+        ax.annotate(f"$\\times${ratio:.2f}", xy=(0.5, mid), xytext=(7, 0),
+                    textcoords="offset points", va="center", ha="left",
+                    fontsize=8.5, color="0.25", zorder=5,
+                    bbox=dict(fc="white", ec="none", alpha=0.85, pad=1.5))
+    ax.set_yscale("log")
+    ax.set_ylim(lo, hi)
+    ax.set_xlim(-0.6, 1.6)
+    ax.set_xticks([0, 1])
+    # The counts travel in the tick label rather than in a corner annotation:
+    # the two classes differ by more than an order of magnitude in size, and a
+    # reader who does not see the counts can mistake a difference between two
+    # samples of very different precision for a difference between two levels.
+    ax.set_xticklabels([f"{lbl}\n(n = {stats[k]['n']:,})"
+                        for k, lbl, _c in classes])
+    ax.set_ylabel("absolute percentage error (%)")
+    ax.tick_params(axis="x", length=0)
+    ax.text(0.985, 0.97,
+            f"municipalities: {n_units:,}\nmedian over {n_origins} origins",
+            transform=ax.transAxes, va="top", ha="right", fontsize=7,
+            color="0.30")
     fig.tight_layout()
     fig.savefig(OUT / "fig14_error_vs_pop.pdf", bbox_inches="tight")
     fig.savefig(OUT / "fig14_error_vs_pop.png", bbox_inches="tight")
     plt.close(fig)
+
+    # The sidecar is what lets the design gate tell a committed image drawn by
+    # this code from one that merely has the right name: a caption rewritten to
+    # describe one panel over an image that still carries two is invisible to
+    # every other check in verify_snapshot.
+    height, width = plt.imread(OUT / "fig14_error_vs_pop.png").shape[:2]
+    (OUT / "fig14_pop_bands.json").write_text(json.dumps({
+        "figure": "fig14_error_vs_pop",
+        "threshold": SIZE_CUT,
+        "n_units": n_units,
+        "n_origins": n_origins,
+        "exact_forecasts": n_exact,
+        "population_median": round(float(unit["population"].median()), 0),
+        "axis_window": [lo, hi],
+        "axis_rule": ("1st to 99th percentile of the plotted errors with a "
+                      "15% margin at each end"),
+        "units_outside_axis": n_outside,
+        "below": stats["small"],
+        "above": stats["large"],
+        "median_ratio_below_over_above": round(float(ratio), 2),
+        "panels": ["relative error by size class, below and above 100,000"],
+        "png_shape": [int(width), int(height)],
+    }, indent=2) + "\n")
 
 
 # ---------------------------------------------------------------------------
