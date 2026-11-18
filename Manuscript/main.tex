@@ -1410,28 +1410,27 @@ surveillance service would read (Figure~\ref{fig:map}).
 
 \begin{figure}[htbp]
 \centering
-\includegraphics[width=\textwidth]{figures/fig14_error_vs_pop}
-\caption{Where the forecast's error sits, at municipal level. Both panels
-describe the same estimator and the same error, at two scales: the median
+\includegraphics[width=0.82\textwidth]{figures/fig14_error_vs_pop}
+\caption{Whether the size forecast resolves a municipality. Each point is one
+municipality and each box the distribution of its relative error: the median
 ($\tau=0.5$) quantile forecast of the size of Section~\ref{sec:regression},
 refitted on the municipal panel for each forecast origin, set against the season
-it was asked to predict. Each point is one municipality, and a unit's error is
-the median over the origins in which it was evaluated, so that a unit observed in
-three origins contributes one point and not three. Panel (a): relative error,
-$100\,|S_t-\hat S_t|/S_t$, against population, on logarithmic axes. The red line
-is the median within population deciles, the band the interquartile range, and
-the dashed rule 100{,}000 inhabitants, the threshold discussed in
-Section~\ref{sec:smallmunic}. Relative error is largest in the smallest
-municipalities, where case counts are low and a single imported case is a large
-relative change, and it narrows but does not vanish at the top of the size
-distribution. Panel (b): the same error in cases, $|S_t-\hat S_t|$, against
-population, on the same bins. It rises with size over the same range. The two
-panels together are why a single pooled error statistic is not enough: the
-majority of municipalities sit below the dashed rule, where the relative error is
-largest and the absolute error smallest, so one pooled figure describes neither
-side of it. The ladder of Table~\ref{tab:ablation_results} is reported at state
-level, so neither panel is the municipal counterpart of that table: no municipal
-ladder for size is reported here.}
+it was asked to predict. A unit's error is the median over the origins in which
+it was evaluated, so a unit observed in three origins contributes one point and
+not three. The two classes are the populations that
+Section~\ref{sec:smallmunic} separates, and the split between them is the
+100{,}000-inhabitant threshold itself: fewer than 100{,}000 inhabitants, which is
+93.2\% of the units and 37.7\% of the cases, and 100{,}000 or more. The vertical
+axis is logarithmic, so a forecast exact to the case has no place on it. Red is
+the median, the box the interquartile range, the whiskers 1.5 interquartile
+ranges, and the arrow the distance between the two medians. The median relative
+error is larger below the threshold. Carrying population as a covariate does not
+repair the difference (Section~\ref{sec:smallmunic}), which is why the two classes
+are reported apart rather than pooled. The vertical window is the 1st to the 99th
+percentile of the plotted errors with a 15\% margin, and the units outside it are
+not drawn. The ladder of Table~\ref{tab:ablation_results} is reported at state
+level, so this figure is not its municipal counterpart: no municipal ladder for
+size is reported here.}
 \label{fig:errors}
 \end{figure}
 
@@ -1662,8 +1661,8 @@ observations.
 
 The second quantity is the noise of the target. The annual total of a small
 municipality is a small count, and a single imported case is a large relative
-change in it; this is why the error is largest at the left of
-Figure~\ref{fig:errors}. The third is that the effect is not linear in
+change in it; this is why the error is largest in the class below
+the threshold of Figure~\ref{fig:errors}. The third is that the effect is not linear in
 population and cannot be repaired by carrying population as a covariate. Where
 the exceedance label is referred to each municipality's own history, a
 population-only reference reaches a median area under the curve of $0.47$,
