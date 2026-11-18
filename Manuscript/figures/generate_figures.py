@@ -1232,64 +1232,121 @@ def fig13(art):
 
 
 def fig14(oof):
-    """Where the forecast's error sits, in population and in shape.
+    """Where the forecast's error sits, at two scales.
 
-    (a) absolute percentage error of the reported size forecast against unit
-    population, one point per unit and origin, summarised by the median in
-    population bins, with the 100,000-inhabitant threshold marked; (b)
-    standardised persistence residuals against a normal
-    reference, which involves no fitted model at all. Panel (a) describes the
-    same estimator fig 10 draws, so the figure cannot be read as evidence
-    about a model the paper does not report.
+    Both panels describe the same estimator -- the median quantile forecast of
+    the size of Section~\ref{sec:regression}, refitted once per origin -- and
+    the same error, so neither can be read as evidence about a model the paper
+    does not report. Panel (a) is the relative error against population and
+    panel (b) the same error in cases, on the same population bins: the first is
+    what a municipality's own series can resolve, the second is what it
+    contributes to the total of missed cases. The two move in opposite
+    directions, which is why one pooled error statistic is not enough.
+
+    The previous panel (b) drew standardised persistence residuals against a
+    normal reference. No sentence in the manuscript quoted it, and the claim it
+    supported -- that the target is not Gaussian -- is not one the paper makes,
+    so it is replaced by the quantity the error-structure section needs.
+
+    One point per municipality. A unit evaluated in three origins would otherwise
+    contribute three correlated copies of itself, thickening the cloud without
+    adding a unit to it; the unit's error is taken as the median over the origins
+    in which it was evaluated, and the count of origins is recorded beside the
+    figure so that the averaging is visible rather than implied.
     """
-    from scipy.stats import norm
+    d = oof[(oof["y_true"] > 0) & (oof["y_pred"] > 0)
+            & (oof["population"] > 0)].copy()
+    d["ape"] = np.abs(d["y_pred"] - d["y_true"]) / d["y_true"] * 100.0
+    d["aerr"] = np.abs(d["y_pred"] - d["y_true"])
+    d["logpop"] = np.log10(d["population"])
 
-    d = oof[(oof["y_true"] > 0) & (oof["y_pred"] > 0) & (oof["population"] > 0)].copy()
-    d["ape"] = np.abs(d["y_pred"] - d["y_true"]) / d["y_true"] * 100
+    unit = (d.groupby("geocode")
+              .agg(logpop=("logpop", "first"),
+                   population=("population", "first"),
+                   ape=("ape", "median"),
+                   aerr=("aerr", "median"),
+                   n_origins=("origin", "nunique"))
+              .reset_index())
+    n_units = int(len(unit))
+    n_origins = int(d["origin"].nunique())
+    # A logarithmic axis cannot show an error of exactly zero, and an exact
+    # forecast is not misinformation. Count them instead of letting the log
+    # drop them silently.
+    exact = {c: int((unit[c] <= 0).sum()) for c in ("ape", "aerr")}
 
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(9.0, 3.6))
-    ax1.scatter(np.log10(d["population"]), d["ape"].clip(upper=500), s=4,
-                alpha=0.2, color="0.4")
-    ax1.set_xlabel(r"$\log_{10}$ municipal population")
-    ax1.set_ylabel("absolute percentage error (%)")
-    med = d.groupby(pd.cut(np.log10(d["population"]), 12), observed=True)["ape"].median()
-    ax1.plot([iv.mid for iv in med.index], med.values, "o-",
-             color="#d62728", lw=1.4, label="median APE")
-    # The threshold the Discussion turns on, drawn rather than described: the
-    # reader can see where the median error bends instead of taking a number.
-    ax1.axvline(np.log10(1e5), color="k", ls="--", lw=1.0,
-                label="100,000 inhabitants")
-    ax1.legend(fontsize=8)
-    ax1.set_title("(a) APE vs population", fontsize=9)
+    # Equal-count population bins, so that the median line is not dominated by
+    # the empty tail of the population distribution.
+    unit["bin"] = pd.qcut(unit["logpop"], 10, labels=False, duplicates="drop")
+    g = (unit.groupby("bin")
+         .agg(x=("logpop", "median"), n=("geocode", "size"),
+              ape_med=("ape", "median"),
+              ape_q1=("ape", lambda s: s.quantile(0.25)),
+              ape_q3=("ape", lambda s: s.quantile(0.75)),
+              aerr_med=("aerr", "median"),
+              aerr_q1=("aerr", lambda s: s.quantile(0.25)),
+              aerr_q3=("aerr", lambda s: s.quantile(0.75)))
+         .sort_index())
 
-    df = _city_panel()
-    # Epidemic size only: duration and peak timing are bounded by the length of
-    # the season and enter as covariates, not as targets.
-    prev, tgt = "prev_total_cases", "total_cases"
-    sub = df.dropna(subset=[prev, tgt])
-    resid = sub[tgt] - sub[prev]  # persistence residual
-    z = (resid - resid.mean()) / resid.std()
-    ax2.hist(z, bins=60, density=True, alpha=0.4, color=COLORS[0], label=tgt)
-    xs = np.linspace(-4, 4, 200)
-    ax2.plot(xs, norm.pdf(xs), "k-", lw=1.2, label="standard normal")
-    ax2.set_xlabel("standardised persistence residual")
-    ax2.set_ylabel("density")
-    ax2.set_xlim(-5, 5)
-    ax2.legend(fontsize=8)
-    ax2.set_title("(b) residuals vs normal reference", fontsize=9)
+    panels = (
+        ("ape", "ape_med", "ape_q1", "ape_q3",
+         "absolute percentage error (%)", "(a) relative error"),
+        ("aerr", "aerr_med", "aerr_q1", "aerr_q3",
+         "absolute error (cases)", "(b) the same error in cases"),
+    )
 
-    # The medians the threshold separates. Figure 14 is read from an artefact
-    # that carries aggregate losses only, so these are computed from the same
-    # row-level refit the panel is drawn from and written beside it; whoever
-    # quotes them quotes the run that drew the figure.
-    bands = {"threshold": 100_000.0}
-    for name, sel in (("below", d["population"] < 1e5),
-                      ("above", d["population"] >= 1e5)):
-        ape = d.loc[sel, "ape"]
-        bands[name] = {"n": int(sel.sum()),
-                       "median_ape": (round(float(ape.median()), 1)
-                                      if len(ape) else None)}
-    (OUT / "fig14_pop_bands.json").write_text(json.dumps(bands, indent=2) + "\n")
+    fig, axes = plt.subplots(1, 2, figsize=(9.4, 3.9))
+    for ax, (col, med, lo, hi, ylab, title) in zip(axes, panels):
+        y = unit[col].to_numpy(dtype=float)
+        keep = y > 0
+        ax.scatter(unit.loc[keep, "logpop"], y[keep], s=3, alpha=0.15,
+                   color="0.45", linewidths=0, zorder=1)
+        ax.fill_between(g["x"], g[lo], g[hi], color="#d62728", alpha=0.18,
+                        lw=0, zorder=2, label="interquartile range")
+        ax.plot(g["x"], g[med], "o-", color="#d62728", lw=1.5, ms=4,
+                zorder=3, label="median")
+        ax.set_yscale("log")
+        ax.set_xlabel(r"$\log_{10}$ municipal population")
+        ax.set_ylabel(ylab)
+        # The threshold the resolution-limit section turns on, drawn rather than
+        # described: the reader can see where each quantity bends instead of
+        # taking the number on trust.
+        ax.axvline(np.log10(1e5), color="k", ls="--", lw=1.0)
+        ax.text(0.015, 0.97,
+                f"{n_units:,} municipalities\nmedian over {n_origins} origins",
+                transform=ax.transAxes, va="top", ha="left", fontsize=7,
+                color="0.3")
+        ax.set_title(title, fontsize=9)
+        ax.legend(fontsize=7, loc="lower left")
+
+    # The bands a reader would otherwise have to estimate from the cloud. The
+    # share of total absolute error is what says whether the small municipalities
+    # dominate the sum: they carry most units and the largest relative error,
+    # and they may still carry little of the total of missed cases.
+    below = unit["logpop"] < 5.0
+    total_aerr = float(unit["aerr"].sum())
+
+    def band(sel: pd.Series) -> dict:
+        sub = unit.loc[sel]
+        if sub.empty:
+            # A band with no unit in it must serialise as null, not as NaN: the
+            # file is read by json.loads, which accepts neither.
+            return {"n": 0, "median_ape": None, "median_abs_error": None,
+                    "share_of_abs_error": None}
+        return {"n": int(len(sub)),
+                "median_ape": round(float(sub["ape"].median()), 1),
+                "median_abs_error": round(float(sub["aerr"].median()), 1),
+                "share_of_abs_error": round(
+                    float(sub["aerr"].sum()) / total_aerr, 3)}
+
+    (OUT / "fig14_pop_bands.json").write_text(json.dumps({
+        "threshold": 100_000.0,
+        "n_units": n_units,
+        "n_origins": n_origins,
+        "exact_forecasts": exact,
+        "population_median": round(float(unit["population"].median()), 0),
+        "below": band(below),
+        "above": band(~below),
+    }, indent=2) + "\n")
 
     fig.tight_layout()
     fig.savefig(OUT / "fig14_error_vs_pop.pdf", bbox_inches="tight")
