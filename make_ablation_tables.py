@@ -71,6 +71,15 @@ EXTREME_TAU = 0.95
 #: Adjacent rungs of the ladder, as contrasts.
 ADJACENT = ("M1-M0", "M2-M1", "M3-M2")
 
+#: The two operating points of the alert list of the record season. Both are
+#: choices rather than estimates, so they are named once here and stated in the
+#: caption: the probability at which the paper calls an alert, and the list
+#: lengths a service of a given size can follow when capacity, not probability,
+#: is what binds.
+ALARM_RULE = 0.5
+ALARM_CAPACITIES = (300, 600, 1000)
+ALARM_RUNGS = ("M0", "POP", "M1", "M2", "M3")
+
 #: Every artefact the tables depend on. ``columns`` is the minimum a file must
 #: have to be used at all: a file that exists but carries the wrong shape is
 #: worse than a missing one, because it reads as present.
@@ -257,6 +266,72 @@ def _contrast_summary(df: pd.DataFrame, task: str, tau: float | None = None) -> 
             out[r["contrast"]]["decision_origins"] = (
                 int(r["value"]) if pd.notna(r.get("value")) else None)
     return out
+
+
+def _thou(n) -> str:
+    """A count with a thin space every three digits, as the manuscript sets it."""
+    return f"{int(n):,}".replace(",", "{,}")
+
+
+def _alarm_facts(oof: pd.DataFrame) -> dict:
+    """The alert list a surveillance service would read, for the record season.
+
+    Two readings of one set of out-of-fold predictions. ``rule`` applies the
+    declared probability threshold and counts what the resulting list contains.
+    ``capacity`` ranks the units and counts the true exceedances a list of fixed
+    length holds, which is the form the decision takes when the service can
+    follow only some of the municipalities. ``chance`` is the count expected in a
+    list of the same length drawn with no information, at the season's own base
+    rate: it is not a constant 50 per cent, because in the record season most
+    municipalities exceed their own quartile.
+
+    The season is the one with the highest realised share rather than a
+    hard-coded year, so that extending the series moves the table instead of
+    freezing it on whichever year the paper was written.
+    """
+    rate = oof.groupby("origin")["y_true"].mean()
+    origin = int(rate.idxmax())
+    s_all = oof[oof["origin"] == origin]
+    rungs = [r for r in ALARM_RUNGS if r in set(s_all["rung"].dropna())]
+    if not rungs:
+        raise ValueError(f"no rung in {sorted(set(oof['rung'].dropna()))} is a "
+                         "classifier rung this table knows how to read")
+    ref = "M3" if "M3" in rungs else rungs[-1]
+    n_units = int(s_all.groupby("rung").size().max())
+    n_true = int(s_all[s_all["rung"] == ref]["y_true"].sum())
+    base = (n_true / n_units) if n_units else float("nan")
+
+    rule: dict[str, dict] = {}
+    for rung in rungs:
+        s = s_all[s_all["rung"] == rung]
+        alarm = s["y_prob"] >= ALARM_RULE
+        tp = int((alarm & (s["y_true"] == 1)).sum())
+        fp = int((alarm & (s["y_true"] == 0)).sum())
+        fn = int((~alarm & (s["y_true"] == 1)).sum())
+        rule[rung] = {
+            "alerts": tp + fp,
+            "hits": tp,
+            "false": fp,
+            "precision": (tp / (tp + fp)) if (tp + fp) else None,
+            "recall": (tp / (tp + fn)) if (tp + fn) else None,
+            "max_prob": float(s["y_prob"].max()),
+        }
+
+    capacity: dict[str, dict] = {}
+    for cap in ALARM_CAPACITIES:
+        row: dict[str, object] = {"chance": int(round(cap * base))}
+        for rung in rungs:
+            s = s_all[s_all["rung"] == rung]
+            if len(s) < cap:
+                continue
+            row[rung] = int(s.sort_values("y_prob", ascending=False)
+                            .head(cap)["y_true"].sum())
+        capacity[str(cap)] = row
+
+    return {"origin": origin, "n_units": n_units, "n_true": n_true,
+            "base_rate": float(base), "rule_threshold": ALARM_RULE,
+            "rule": rule, "capacity": capacity, "rungs": rungs,
+            "capacities": list(ALARM_CAPACITIES)}
 
 
 def compute_facts(root: str = ".") -> dict:
@@ -582,6 +657,10 @@ def compute_facts(root: str = ".") -> dict:
             "ablation_city.csv is stale; the CI column and the pre-registered "
             "verdicts need the re-run")
 
+    # ---- The alert list a service would read, for the record season --------
+    if odf is not None and facts["sources"]["classifier_oof"]["present"]:
+        facts["alarms"] = _alarm_facts(odf)
+
     return facts
 
 
@@ -710,6 +789,99 @@ def render_exceed_table(f: dict) -> str:
         "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
+
+
+def render_alarms_table(f: dict) -> str:
+    """LaTeX float for the alert list of the record season.
+
+    The table is a view of ``classifier_results.parquet``, the same artefact
+    figures 12 and 13 draw, so it cannot disagree with them. It refuses to
+    render when that artefact is absent: a placeholder here would be a row of
+    numbers a reader could mistake for the alert list.
+    """
+    a = f.get("alarms")
+    if not a:
+        raise ValueError(
+            "no alert-list facts: classifier_results.parquet is absent or "
+            "unreadable, so the record-season alert list cannot be rendered")
+
+    label = {"M0": "M0 (persistence)", "POP": "POP (population only)"}
+    rule_rows = []
+    for r in a["rungs"]:
+        d = a["rule"][r]
+        # Three decimals in every cell of these two columns: the reference row
+        # below carries the season's base rate to three, and a column that
+        # changes precision part-way down invites the reader to compare
+        # quantities that were rounded differently.
+        prec = "--" if d["precision"] is None else f"${d['precision']:.3f}$"
+        rec = "--" if d["recall"] is None else f"${d['recall']:.3f}$"
+        rule_rows.append(
+            f"{label.get(r, r)} & {_thou(d['alerts'])} & {_thou(d['hits'])} & "
+            f"{_thou(d['false'])} & {prec} & {rec}\\\\")
+    # The reference the precision column has to be read against. It is not a
+    # model: it is the base rate of the season expressed as an alert rule.
+    rule_rows.append(
+        f"Alert every municipality & {_thou(a['n_units'])} & {_thou(a['n_true'])} & "
+        f"{_thou(a['n_units'] - a['n_true'])} & ${a['base_rate']:.3f}$ & $1.00$\\\\")
+
+    cap_rungs = [r for r in ("M1", "M2", "M3", "POP") if r in a["rungs"]]
+    cap_rows = []
+    for cap in a["capacities"]:
+        d = a["capacity"][str(cap)]
+        cells = [_thou(cap)]
+        for r in cap_rungs:
+            cells.append(_thou(d[r]) if r in d else "--")
+        cells.append(_thou(d["chance"]))
+        cap_rows.append(" & ".join(cells) + "\\\\")
+
+    ncol_b = len(cap_rungs) + 2
+    max_m0 = (a["rule"].get("M0") or {}).get("max_prob")
+
+    caption = (
+        "\\caption{The alert list of the record season, read two ways from the same\n"
+        "out-of-fold predictions that Figures~\\ref{fig:roc} and~\\ref{fig:importance}\n"
+        "draw, so that the three cannot disagree. The season is the one with the\n"
+        "highest realised share --- not a hard-coded year --- and here it is "
+        f"{a['origin']}: "
+        f"{_thou(a['n_units'])} municipalities had the five seasons of history needed\n"
+        "to define their own upper quartile, and "
+        f"{_thou(a['n_true'])} of them exceeded it, a\n"
+        f"base rate of ${a['base_rate']:.3f}$. (a) The declared rule "
+        f"$p\\ge {a['rule_threshold']:g}$,\n"
+        "applied unchanged and not tuned to the season it describes. The last row is\n"
+        "the reference the precision column must be read against: a service that\n"
+        "alerted every municipality would have been right at the base rate. Rung M0\n"
+        "is the calibrated-persistence benchmark of Section~\\ref{sec:brier}"
+        + (f", and its highest\npredicted probability anywhere in the season is "
+           f"${max_m0:.3f}$" if max_m0 is not None else "") +
+        ". (b) The same ranking read\n"
+        "where capacity rather than probability is what binds: the true exceedances\n"
+        "held by the first $C$ municipalities of each order, with ``Chance'' the\n"
+        "count expected in a list of the same length drawn with no information, at\n"
+        "the season's own base rate. The capacities are illustrative list lengths and\n"
+        "not estimates of any service's capacity.}"
+    )
+
+    return (
+        "% GENERATED by make_ablation_tables.py -- do not edit.\n"
+        "% Regenerate with: python make_ablation_tables.py\n"
+        "\\begin{table}[htbp]\n\\centering\n\\small\n"
+        "\\setlength{\\tabcolsep}{5pt}\n" + caption + "\n"
+        "\\label{tab:alarms}\n"
+        "\\begin{tabular}{@{}lrrrrr@{}}\n\\toprule\n"
+        "\\multicolumn{6}{@{}l}{\\emph{(a) The declared rule, "
+        "and the season it is applied to}}\\\\\n"
+        "Model & Alerts & Hits & False alarms & Precision & Recall\\\\\n"
+        "\\midrule\n" + "\n".join(rule_rows) +
+        "\n\\bottomrule\n\\end{tabular}\n\n"
+        "\\vspace{1.4ex}\n"
+        f"\\begin{{tabular}}{{@{{}}l{'r' * (ncol_b - 1)}@{{}}}}\n\\toprule\n"
+        f"\\multicolumn{{{ncol_b}}}{{@{{}}l}}{{\\emph{{(b) A bounded list: true "
+        "exceedances in the first $C$ of each order}}\\\\\n"
+        "Capacity $C$ & " + " & ".join(cap_rungs + ["Chance"]) + "\\\\\n"
+        "\\midrule\n" + "\n".join(cap_rows) +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+    )
 
 
 def render_regression_table(f: dict) -> str:
@@ -1053,6 +1225,49 @@ def claims(f: dict) -> list[dict]:
                       f"season in which ${ma['observed_rate']:.2f}$"),
              "stale": [], "needs": "classifier_oof"})
 
+    # The alert list of the record season. Every number the worked example of
+    # Section~\ref{sec:errors} types is derived here from the same out-of-fold
+    # predictions the table renders, so the prose and the table cannot drift.
+    al = f.get("alarms") or {}
+    if al:
+        r = al["rule"]
+        _m3 = r.get("M3") or {}
+        _m0 = r.get("M0") or {}
+        _c = al["capacity"]
+        out += [
+            {"name": "municipalities in the alert season",
+             "want": f"{_thou(al['n_units'])} municipalities had the five seasons",
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "alert list at the declared rule",
+             "want": (f"{_thou(_m3['alerts'])} alerts, {_thou(_m3['hits'])} of "
+                      f"them true"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "base rate as an alert rule",
+             "want": (f"${100 * al['base_rate']:.1f}\\%$ of municipalities "
+                      f"exceeded"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "ceiling of the persistence benchmark",
+             "want": ("highest probability it assigns anywhere in the season is "
+                      f"${_m0['max_prob']:.3f}$"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "bounded list at 600, M3 against chance",
+             "want": (f"yields {_c['600']['M3']} true exceedances, against "
+                      f"{_c['600']['chance']}"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "bounded list at 600, M1",
+             "want": f"yields {_c['600']['M1']}",
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "bounded list at 600, population only",
+             "want": f"alone yields {_c['600']['POP']}",
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "bounded list at 300, M3 against chance",
+             "want": f"holds {_c['300']['M3']}, against {_c['300']['chance']}",
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "bounded list at 300, M1",
+             "want": f"while M1's holds {_c['300']['M1']}",
+             "stale": [], "needs": "classifier_oof"},
+        ]
+
     for o in out:
         if o["needs"] == "train_prevalence":
             o["available"] = "train_prevalence" in (
@@ -1189,7 +1404,8 @@ def main(argv=None) -> int:
     rendered = {}
     for name, fn in (("tab_ablation.tex", render_ablation_table),
                      ("tab_exceed.tex", render_exceed_table),
-                     ("tab_regression.tex", render_regression_table)):
+                     ("tab_regression.tex", render_regression_table),
+                     ("tab_alarms.tex", render_alarms_table)):
         try:
             rendered[name] = fn(f)
         except ValueError as e:

@@ -1411,24 +1411,27 @@ surveillance service would read (Figure~\ref{fig:map}).
 \begin{figure}[htbp]
 \centering
 \includegraphics[width=\textwidth]{figures/fig14_error_vs_pop}
-\caption{Forecast error against population size, at municipal level. Panel (a): absolute
-percentage error of the size forecast by unit population, one point per unit and
-forecast origin, with the median within population bins and the
-100{,}000-inhabitant threshold marked, the threshold discussed in
-Section~\ref{sec:smallmunic}. The forecast is the median quantile --- $\tau=0.5$,
-the quantile level of the forecast --- of the estimator of
-Section~\ref{sec:regression} refitted on the municipal panel; the absolute
-percentage error of an observed size $S_t$ and its forecast $\hat S_t$ is
-$100\,|S_t-\hat S_t|/S_t$. Errors are largest for the smallest municipalities,
-where case counts are low and a single imported case represents a large relative
-change, and they narrow but do not vanish at the top of the size distribution.
-Panel (b): the standardised residual of plain persistence, that is, of the
-previous season's total $S_{t-1}$ taken as the forecast of $S_t$, against a
-standard normal reference. That panel involves no fitted model at all and gives
-the distribution the forecast has to cope with. The ladder of
-Table~\ref{tab:ablation_results} is reported at state level, so neither panel is
-the municipal counterpart of that table: no municipal ladder for size is
-reported here.}
+\caption{Where the forecast's error sits, at municipal level. Both panels
+describe the same estimator and the same error, at two scales: the median
+($\tau=0.5$) quantile forecast of the size of Section~\ref{sec:regression},
+refitted on the municipal panel for each forecast origin, set against the season
+it was asked to predict. Each point is one municipality, and a unit's error is
+the median over the origins in which it was evaluated, so that a unit observed in
+three origins contributes one point and not three. Panel (a): relative error,
+$100\,|S_t-\hat S_t|/S_t$, against population, on logarithmic axes. The red line
+is the median within population deciles, the band the interquartile range, and
+the dashed rule 100{,}000 inhabitants, the threshold discussed in
+Section~\ref{sec:smallmunic}. Relative error is largest in the smallest
+municipalities, where case counts are low and a single imported case is a large
+relative change, and it narrows but does not vanish at the top of the size
+distribution. Panel (b): the same error in cases, $|S_t-\hat S_t|$, against
+population, on the same bins. It rises with size over the same range. The two
+panels together are why a single pooled error statistic is not enough: the
+majority of municipalities sit below the dashed rule, where the relative error is
+largest and the absolute error smallest, so one pooled figure describes neither
+side of it. The ladder of Table~\ref{tab:ablation_results} is reported at state
+level, so neither panel is the municipal counterpart of that table: no municipal
+ladder for size is reported here.}
 \label{fig:errors}
 \end{figure}
 
@@ -1474,6 +1477,36 @@ earlier seasons could have placed the season at its realised base rate, and ever
 threshold inherits that shortfall. The map is therefore usable as a ranking of
 municipalities for attention within a season, and unusable as a forecast of how
 many alerts a season will generate.
+
+The list itself can be counted, and counting it is what turns the ranking into a
+decision. Table~\ref{tab:alarms} reads, in two ways, the list the classifier
+produces in the record season. In 2024, 1{,}484 municipalities had the five seasons of
+history needed to define their own upper quartile, and 1{,}032 of them exceeded it.
+
+\input{generated/tab_alarms}
+
+The first reading applies the declared rule, $p\ge 0.5$, unchanged. Rung M3
+returns 648 alerts, 520 of them true and 128 false: four alerts in five are real,
+at the price of missing half of the municipalities that did exceed. The
+persistence benchmark alerts nobody, because the highest probability it assigns
+anywhere in the season is $0.264$ --- the level problem of Figure~\ref{fig:map}
+stated as an operational failure rather than as a calibration defect. Precision
+must be read against the season it comes from: here $69.5\%$ of municipalities
+exceeded their own upper quartile, so a service that alerted every one of them
+would have been right $69.5\%$ of the time, and the list of 648 is better than
+that by about ten percentage points.
+
+The second reading takes the ordering and asks what a bounded list holds, which is
+the form the decision takes when capacity, not probability, is what binds.
+Following the first 600 municipalities of the M3 order yields 486 true
+exceedances, against 417 in a list of the same length drawn without information;
+M1, which carries neither the climate nor the scaling block, yields 437, and
+ordering by population alone yields 394, fewer than chance. The advantage sits at
+the head of the list: at 300 the M3 order holds 241, against 209 by chance, while
+M1's holds 199, below chance. The list is therefore an order of attention. Its
+length is an output of the rule and not a forecast of the season, and the gain
+over no information is real but narrow, in line with the discrimination of
+Figure~\ref{fig:roc}.
 
 \section{Discussion}
 \label{sec:discussion}
