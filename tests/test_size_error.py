@@ -6,6 +6,9 @@ caption asserted that the median was larger below the threshold. A test that onl
 checked the arithmetic would have passed that caption; the rule test is what
 makes the claim falsifiable.
 """
+import importlib.util
+import sys
+
 import numpy as np
 import pandas as pd
 import pytest
@@ -56,18 +59,22 @@ def test_unit_errors_collapses_origins_to_one_row_per_municipality():
 def test_unit_errors_drops_predictions_without_a_relative_error():
     unit = _unit(n_small=10, n_large=5)
     oof = _oof(unit, origins=(2024,))
+    # Geocodes the synthetic panel does not use. The first version of this test
+    # reused "0000000"-"0000002", which `_unit` generates itself, so the good row
+    # for those units survived the drop and the assertion passed on nothing.
     bad = pd.DataFrame([
-        {"origin": 2024, "geocode": "0000000", "y_true": 0, "y_pred": 10.0,
+        {"origin": 2024, "geocode": "9999990", "y_true": 0, "y_pred": 10.0,
          "population": 5e3},      # no season -> no relative error
-        {"origin": 2024, "geocode": "0000001", "y_true": 100, "y_pred": 0.0,
+        {"origin": 2024, "geocode": "9999991", "y_true": 100, "y_pred": 0.0,
          "population": 5e3},      # zero forecast -> no ratio
-        {"origin": 2024, "geocode": "0000002", "y_true": 100, "y_pred": 120.0,
+        {"origin": 2024, "geocode": "9999992", "y_true": 100, "y_pred": 120.0,
          "population": 0.0},      # no population -> not attributable
     ])
+    assert not set(bad["geocode"]) & set(oof["geocode"])
     back = se.unit_errors(pd.concat([oof, bad], ignore_index=True))
-    assert "0000000" not in set(back["geocode"])
-    assert "0000001" not in set(back["geocode"])
-    assert "0000002" not in set(back["geocode"])
+    assert not set(back["geocode"]) & set(bad["geocode"])
+    # and the usable rows are still there, so the drop is targeted, not a wipe
+    assert set(oof["geocode"]) <= set(back["geocode"])
 
 
 def test_class_stats_reports_the_median_and_the_tail():
@@ -137,7 +144,77 @@ def test_draw_ecdf_returns_a_figure_with_two_curves():
     matplotlib.use("Agg")
     unit = _unit()
     fig, ax = se.draw_ecdf(unit)
-    lines = [ln for ln in ax.get_lines() if ln.get_drawstyle() == "steps"]
+    # "steps" in 3.10 and earlier, "steps-post" from 3.11: the panel is a step
+    # function either way, so accept both rather than pin the version.
+    lines = [ln for ln in ax.get_lines()
+             if ln.get_drawstyle().startswith("steps")]
     assert len(lines) == 2
     assert ax.get_xscale() == "log"
     assert ax.get_ylim()[1] <= 1.1
+
+
+# ---------------------------------------------------------------------------
+# the refit's imports: a source file is not a dependency
+# ---------------------------------------------------------------------------
+def test_doctor_reports_every_file_the_refit_needs():
+    rep = se.doctor()
+    assert rep["repo_root"] == str(se.repo_root())
+    assert set(rep["local_modules"]) == set(se._LOCAL_MODULES)
+    for name, d in rep["local_modules"].items():
+        assert d["file"].endswith(f"{name}.py")
+        assert isinstance(d["exists"], bool) and isinstance(d["resolves"], bool)
+    # The refit is a question about this checkout, so its own files must be here.
+    assert rep["local_modules"]["run_ablation"]["exists"], (
+        "run_ablation.py is a tracked file of the repository, not an optional "
+        "input: if it is absent the checkout is incomplete")
+
+
+def test_a_missing_local_module_blames_the_checkout_not_the_environment(tmp_path):
+    """The failure whose old message said `uv sync`, which cannot help.
+
+    `run_ablation` is a file of the repository. `uv sync` installs packages from
+    the index and never the project itself -- `pyproject.toml` declares no build
+    backend -- so the advice sent the reader to a command that could not possibly
+    fix the problem.
+    """
+    with pytest.raises(RuntimeError) as ei:
+        se.ensure_local_module("size_error_absent_probe", tmp_path)
+    msg = str(ei.value)
+    assert "not a dependency" in msg
+    assert "cannot supply a missing source file" in msg
+    assert str(tmp_path) in msg          # the path it looked in
+    assert "uv sync" in msg              # named, but as the thing that cannot help
+
+
+def test_a_local_module_loads_from_its_file_when_the_name_does_not_resolve(tmp_path):
+    """`python -P`, a rewritten sys.path, or an import hook all arrive here."""
+    name = "size_error_probe_module"
+    (tmp_path / f"{name}.py").write_text("VALUE = 41\n")
+    assert importlib.util.find_spec(name) is None
+    mod = se.ensure_local_module(name, tmp_path)
+    try:
+        assert mod.VALUE == 41
+        # Registered, so the module's own `from <name> import ...` sees this copy
+        # rather than compiling a second one from a different path.
+        assert sys.modules[name] is mod
+    finally:
+        sys.modules.pop(name, None)
+
+
+def test_a_module_that_fails_mid_execution_is_not_left_in_sys_modules(tmp_path):
+    name = "size_error_broken_probe"
+    (tmp_path / f"{name}.py").write_text("raise RuntimeError('boom')\n")
+    with pytest.raises(RuntimeError, match="boom"):
+        se.ensure_local_module(name, tmp_path)
+    assert name not in sys.modules
+
+
+def test_the_error_text_separates_a_package_from_a_source_file(tmp_path):
+    dep = ModuleNotFoundError("No module named 'dotenv'", name="dotenv")
+    msg = se._module_error(dep, tmp_path)
+    assert "dependency 'dotenv'" in msg and "uv sync" in msg
+
+    src = ModuleNotFoundError("No module named 'run_ablation'", name="run_ablation")
+    msg = se._module_error(src, tmp_path)
+    assert "file of this checkout" in msg
+    assert "dependency 'run_ablation'" not in msg
