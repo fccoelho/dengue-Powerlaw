@@ -31,6 +31,9 @@ Usage
 
     # no data at all: check that the arithmetic and the rule behave
     python check_size_error.py --demo
+
+    # --refit failed on my machine: what is it actually looking for?
+    python check_size_error.py --doctor
 """
 from __future__ import annotations
 
@@ -46,6 +49,42 @@ import size_error as se
 
 def _fmt(x, spec=".1f"):
     return format(x, spec)
+
+
+def _yn(flag: bool) -> str:
+    return "yes" if flag else "no"
+
+
+def print_doctor(rep: dict) -> None:
+    """Every path the refit resolves, so a failure names its own cause."""
+    print()
+    print(f"  python        {rep['python']}  ({rep['executable']})")
+    print(f"  cwd           {rep['cwd']}")
+    print(f"  repository    {rep['repo_root']}")
+    print(f"  sys.path[:4]  {rep['sys_path_head']}")
+    print()
+    print(f"  {'source file':<20}{'exists':>8}{'importable':>12}")
+    print("  " + "-" * 38)
+    for name, d in rep["local_modules"].items():
+        print(f"  {name:<20}{_yn(d['exists']):>8}{_yn(d['resolves']):>12}")
+    print()
+    absent = [n for n, ok in rep["third_party"].items() if not ok]
+    print("  third-party   "
+          + ("all present" if not absent else "MISSING: " + ", ".join(absent)))
+    data = rep["data"]
+    print(f"  data/         "
+          + (f"{data['parquet_files']:,} parquet files" if data["exists"]
+             else "ABSENT -- --refit cannot run without it"))
+    print(f"  panel cache   "
+          + ("present" if rep["panel_cache"]["exists"]
+             else "absent (rebuilt on the first --refit, slowly)"))
+    print()
+    print(f"  ready to --refit: {_yn(rep['ready_to_refit'])}")
+    if not rep["ready_to_refit"]:
+        print("  Note: the source files above are files of this repository, not "
+              "packages.")
+        print("        `uv sync` installs dependencies and cannot supply them.")
+    print()
 
 
 def print_table(res: dict) -> None:
@@ -149,6 +188,9 @@ def main(argv=None) -> int:
                      help="recompute the out-of-fold predictions (needs data/)")
     src.add_argument("--demo", action="store_true",
                      help="run on synthetic data with a planted effect")
+    src.add_argument("--doctor", action="store_true",
+                     help="report where every piece the refit needs resolves to, "
+                          "and stop (use this when --refit refuses to start)")
     ap.add_argument("--cut", type=float, default=se.SIZE_CUT,
                     help=f"population threshold (default {se.SIZE_CUT:,.0f})")
     ap.add_argument("--figure", type=Path, default=None,
@@ -161,6 +203,10 @@ def main(argv=None) -> int:
                     help="forecast origins used by --refit")
     ap.add_argument("--n-boot", type=int, default=se.N_BOOT)
     args = ap.parse_args(argv)
+
+    if args.doctor:
+        print_doctor(se.doctor())
+        return 0
 
     if args.demo:
         unit = make_demo()
