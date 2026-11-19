@@ -1,22 +1,25 @@
 """How the size forecast's relative error depends on municipality size.
 
-One question, one place to answer it. The manuscript reports that a municipality
+One question, one place to answer it. The manuscript claimed that a municipality
 below 100,000 inhabitants is a different forecasting problem from one above it
-(Section ``sec:smallmunic``), and both Figure 14 and the three sentences of the
-text that lean on it rest on the same quantity: the distribution of the relative
-error in each size class, computed from the out-of-fold predictions of the
-reported estimator.
+(Section ``sec:smallmunic``), and both the deleted Figure 14 and the three
+sentences of the text that leaned on it rested on the same quantity: the
+distribution of the relative error in each size class, computed from the
+out-of-fold predictions of the reported estimator.
 
-Keeping that computation here rather than inside the figure has two
-consequences. The first is that the numbers the figure draws and the numbers the
-text quotes cannot drift apart, which they did: the caption of Figure 14 said
+Keeping that computation here rather than inside the figure had two
+consequences. The first is that the numbers the figure drew and the numbers the
+text quoted could not drift apart, which they had: the caption of Figure 14 said
 "the median relative error is larger below the threshold" over an image whose two
-medians were the *same number*. The second is that the claim can be audited
+medians were the *same number*. The second is that the claim could be audited
 without drawing anything -- ``check_size_error.py`` prints the table and the
-verdict, and the figure is one optional flag away.
+verdict, and the figure was one optional flag away.
 
 The decision rule is fixed here, before any run, so that a figure that does not
-support the claim is removed instead of re-drawn until it does.
+support the claim is removed instead of re-drawn until it does. That is what
+happened: the rule required a third-quartile ratio of 1.3 between the classes and
+the run returned 1.051, the figure was deleted, and the sentences that quoted it
+were cut. See the Outcome note in ``check_size_error.py``.
 
 Why the median is the wrong statistic for this question
 -------------------------------------------------------
@@ -84,8 +87,8 @@ def unit_errors(oof: pd.DataFrame) -> pd.DataFrame:
 
     A unit evaluated in three forecast origins would otherwise enter three times,
     inflating every count and thickening any cloud with correlated copies of
-    itself. The reduction is the median over the origins, which is what
-    Figure 14 in the manuscript draws and what the text calls "a unit's error".
+    itself. The reduction is the median over the origins, which is the convention
+    the paper's own error table follows and what the text calls "a unit's error".
 
     Predictions that are not strictly positive, or against a season of zero
     cases, carry no relative error and are dropped before the reduction; the

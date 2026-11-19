@@ -1273,10 +1273,10 @@ answer is negative, and the reason is the coupling measured in
 Section~\ref{sec:coupling}.
 
 Table~\ref{tab:ablation_results} reports the ladder over the five origins at state
-level. The two figures that follow are not the municipal counterpart of that
-table: Figures~\ref{fig:predobs} and~\ref{fig:errors} refit the same specification
-on the municipal panel, and no municipal ladder for size is reported here. Against
-calibrated persistence, the lagged-descriptor rung M1 carries
+level. The figure that follows is not the municipal counterpart of that table:
+Figure~\ref{fig:predobs} refits the same specification on the municipal panel, and
+no municipal ladder for size is reported here. Against calibrated persistence,
+the lagged-descriptor rung M1 carries
 essentially no skill for size (median skill $0.30$, range $-0.06$ to $0.86$, positive in
 3 of 5 origins and with an interval excluding zero in 2 of 5), and
 successive rungs do not improve on it: M2 has median $0.12$ and M3 $0.15$. The
@@ -1401,40 +1401,12 @@ interval belonging to the paired differential.}
 \label{fig:ablation}
 \end{figure}
 
-\subsection{Error structure and spatial output}
-\label{sec:errors}
+\subsection{Spatial output and the alarm list}
+\label{sec:spatial}
 
 Accuracy pooled over units is not the same as accuracy where decisions are taken,
-so we report the error structure (Figure~\ref{fig:errors}) and the map a
-surveillance service would read (Figure~\ref{fig:map}).
-
-\begin{figure}[htbp]
-\centering
-\includegraphics[width=0.82\textwidth]{figures/fig14_error_vs_pop}
-\caption{Whether the size forecast resolves a municipality. Each point is one
-municipality and each box the distribution of its relative error: the median
-($\tau=0.5$) quantile forecast of the size of Section~\ref{sec:regression},
-refitted on the municipal panel for each forecast origin, set against the season
-it was asked to predict. A unit's error is the median over the origins in which
-it was evaluated, so a unit observed in three origins contributes one point and
-not three. The two classes are the populations that
-Section~\ref{sec:smallmunic} separates, and the split between them is the
-100{,}000-inhabitant threshold itself: fewer than 100{,}000 inhabitants, which is
-93.2\% of the units and 37.7\% of the cases, and 100{,}000 or more. The vertical
-axis is logarithmic, so a forecast exact to the case has no place on it. Red is
-the median, the box the interquartile range, the whiskers 1.5 interquartile
-ranges, and the arrow the distance between the two medians. The median relative
-error is larger below the threshold. Carrying population as a covariate does not
-repair the difference (Section~\ref{sec:smallmunic}), which is why the two classes
-are reported apart rather than pooled. The vertical window is the 1st to the 99th
-percentile of the plotted errors with a 15\% margin, and the units outside it are
-not drawn. The ladder of Table~\ref{tab:ablation_results} is reported at state
-level, so this figure is not its municipal counterpart: no municipal ladder for
-size is reported here.}
-\label{fig:errors}
-\end{figure}
-
-
+so we report the output a surveillance service would read: the map for the record
+season (Figure~\ref{fig:map}) and the list of alerts that follows from it.
 
 \begin{figure}[htbp]
 \centering
@@ -1648,34 +1620,32 @@ by four orders of magnitude in population, and the pooling conceals a boundary
 that a user of the forecast meets at once. Of the 4{,}664 municipalities with at
 least one season in the platform's decomposition, 93.2\% have fewer than 100{,}000 inhabitants
 and together carry 37.7\% of the cases in the series; 86.0\% have fewer than 50{,}000 and carry 25.3\%.
-The median municipality has 13{,}220 inhabitants. The forecast is least accurate
-in that majority, and the reason is arithmetic rather than epidemiological.
+The median municipality has 13{,}220 inhabitants. Three limits set the resolution
+of the forecast there, all of them arithmetic rather than epidemiological.
 
-Three quantities set the scale. The first is the lower bound of the size
-distribution. The municipal power law is fitted above $x_{\min}=300$ cases
-(Table~\ref{tab:main}), so the tail this paper describes is the set of seasons
-above that threshold; 300 cases is an attack rate of 2.3\% in the median municipality
-and of 0.3\% in one of 100{,}000 inhabitants. A small municipality therefore
+The first is the lower bound of the size distribution. The municipal power law is
+fitted above $x_{\min}=300$ cases (Table~\ref{tab:main}), so the tail this paper
+describes is the set of seasons above that threshold; 300 cases is an attack rate
+of 2.3\% in the median municipality and of 0.3\% in one of 100{,}000 inhabitants. A small municipality therefore
 enters the tail only in its exceptional seasons, which are precisely the seasons
 the forecast is asked about, and it contributes few such points, so that the
 $\alpha_S$ which would order its next season is estimated from a handful of
 observations.
 
-The second quantity is the noise of the target. The annual total of a small
-municipality is a small count, and a single imported case is a large relative
-change in it; this is why the error is largest in the class below
-the threshold of Figure~\ref{fig:errors}. The third is that the effect is not linear in
-population and cannot be repaired by carrying population as a covariate. Where
-the exceedance label is referred to each municipality's own history, a
-population-only reference reaches a median area under the curve of $0.47$,
-indistinguishable from no skill, so the information that separates a strong
-season from a weak one at that level is not the size of the municipality.
+The second is the noise of the target. The annual total of a small municipality
+is a small count, and a single imported case is a large relative change in it.
+The third is that none of this is linear in population, and carrying population
+as a covariate does not repair it. Where the exceedance label is referred to each
+municipality's own history, a population-only reference reaches a median area
+under the curve of $0.47$, indistinguishable from no skill, so the information
+that separates a strong season from a weak one at that level is not the size of
+the municipality.
 
 The practical consequence is a change of product rather than of model. Below the
 resolution limit the defensible output is the exceedance probability of
 Section~\ref{sec:classifier} and the interval implied by the quantile grid, not a
 point size; a point forecast there should be read as an order of magnitude. The
-aggregate panel of Figure~\ref{fig:predobs} measures that limit, and the four
+aggregate panel of Figure~\ref{fig:predobs} is the pooled view, and the four
 state panels show what the forecast achieves where the limit does not bind.
 
 \subsection{A reporting convention}

@@ -1,22 +1,38 @@
 #!/usr/bin/env python
 """Does the size forecast get worse below 100,000 inhabitants? Print the answer.
 
-This is the audit behind Figure 14 and behind the three sentences of
-``main.tex`` that lean on it. It prints the two size classes side by side, the
+This was the audit behind Figure 14 and behind the three sentences of
+``main.tex`` that leaned on it. It prints the two size classes side by side, the
 ratios, a bootstrap interval on the one that decides, and a verdict from a rule
 that was fixed before the run (``size_error.DECISION_Q3_RATIO``).
 
+Outcome
+-------
+It was run, the verdict was DROP, and the manuscript was cut accordingly. The
+numbers: median APE 62.7% below the cut against 62.7% above -- the same number,
+which is what a median does when 93.2% of the sample sits on one side of the cut
+-- third quartile 85.0% against 80.9%, a ratio of 1.051 with a 95% interval of
+[1.00, 1.10], against the 1.3 the rule required. Figure 14 has been deleted, the
+sentences quoting it are gone from ``main.tex``, and what remains of the claim is
+the argument about the lower bound `x_min` in Section 3.8. The script is kept because it is
+the record of that decision: the rule above the fold, the verdict below it.
+
+One number the run produced that the rule did not cover, kept here so it is not
+lost: the far tail does separate. The share of units missing by more than a
+factor of two is 16.9% below the cut against 9.5% above (1.78x), and the ninth
+decile of APE is 142.2% against 96.9% (1.47x). That is a statement about the
+*instability* of the forecast in small municipalities, not about its centre, and
+it is not the pre-registered statistic: adopting it now, after seeing it, would
+be the move the rule exists to block. To put it in the paper it needs its own
+clause in ``size_error.decide``, declared before the run that tests it.
+
 Why a script and not just the figure
 ------------------------------------
-The committed sidecar (``Manuscript/figures/fig14_pop_bands.json``) says the two
-medians are 62.7% and 62.7%, and that the third quartiles are 85.0% and 80.9%.
-Those numbers are a ratio of 1.05 -- no effect. If a fresh run reproduces them,
-the figure is not something to redraw: it has nothing to show, and the sentences
-that quote it ("the median relative error is larger below the threshold", "the
-forecast is least accurate in that majority") are false and must go. If a run on
-refreshed data gives a ratio of 1.3 or more with an interval excluding 1, the
-claim can be restated about the tail -- where the effect actually lives -- and
-the figure earns its place.
+The sidecar the deleted figure wrote said the two medians were 62.7% and 62.7%,
+and the third quartiles 85.0% and 80.9%. Those numbers are a ratio of 1.05 -- no
+effect. A figure with nothing to show is not something to redraw, and the
+sentences that quoted it ("the median relative error is larger below the
+threshold", "the forecast is least accurate in that majority") were false.
 
 Usage
 -----
@@ -27,7 +43,7 @@ Usage
     python check_size_error.py --refit --dump-oof /tmp/oof.parquet
 
     # and draw the candidate panel somewhere harmless
-    python check_size_error.py --refit --figure /tmp/fig14_ecdf.png
+    python check_size_error.py --refit --figure /tmp/size_error_ecdf.png
 
     # no data at all: check that the arithmetic and the rule behave
     python check_size_error.py --demo
@@ -102,17 +118,19 @@ def print_verdict(res: dict) -> None:
     print(f"  {d['reason']}.")
     print()
     if d["verdict"] == "drop":
-        print("  Consequence: Figure 14 has no effect to draw. Remove it, and "
-              "remove the sentences that quote it -- the caption's \"the median "
-              "relative error is larger below the threshold\" included. What "
-              "remains defensible, if anything, is a statement about x_min: a "
-              "small municipality reaches 300 cases only in its exceptional "
-              "seasons, so the tail that would order its next season is fitted "
-              "from a handful of points. That is an argument, not a figure.")
+        print("  Consequence: there is no effect for a figure to draw. Remove it "
+              "and remove every sentence that quotes it -- the caption's \"the "
+              "median relative error is larger below the threshold\" included. "
+              "What remains defensible is a statement about x_min: a small "
+              "municipality reaches 300 cases only in its exceptional seasons, "
+              "so the tail that would order its next season is fitted from a "
+              "handful of points. That is an argument, not a figure. This is "
+              "what was done: see the Outcome note in the module docstring.")
     else:
         print("  Consequence: state the claim about the tail, not the median -- "
               "\"the typical error is the same; a large error is N times more "
-              "likely\" -- and wire the ECDF panel into fig14().")
+              "likely\" -- and that claim needs a panel of its own; there is no "
+              "fig14() left to wire it into.")
     print()
 
 

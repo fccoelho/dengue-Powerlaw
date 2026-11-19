@@ -1,9 +1,9 @@
 # Figure specifications
 
-The manuscript (`main.tex`) contains 12 `figure` environments with final
+The manuscript (`main.tex`) contains 11 `figure` environments with final
 captions and labels. Both renderings of each figure are committed in this
 directory, as `.pdf` and as `.png`; regenerate `fig03`--`fig15` with
-`generate_figures.py` after a data update; all twelve are written by that script.
+`generate_figures.py` after a data update; all eleven are written by that script.
 
 `fig02` no longer exists: the box plot of the exponent per construction was
 reporting, third time round, what the summary table (`tab:main`) gives numerically and what
@@ -20,6 +20,20 @@ paragraph of Section~3.4; the duration analysis is gone from the paper. `surviva
 still regenerates the tables and both figures, and their filenames are ignored in
 `.gitignore` so they cannot be committed back.
 
+`fig14` no longer exists. It drew the relative error of the size forecast as
+two boxplots for the municipalities either side of 100,000 inhabitants, and the
+captions of three sections leaned on the difference between the two. The audit in
+`check_size_error.py` (driver `size_error.py`) put numbers on it against a rule
+fixed before the run: median APE 62.7% below the cut against 62.7% above, third
+quartile 85.0% against 80.9%, a ratio of 1.05 with the 1.3 the rule required.
+There is no size effect for the panel to draw, and the sentences that quoted it
+-- including "the median relative error is larger below the threshold" -- are
+gone from `main.tex`. The argument that survives is the one about $x_{\min}$ in
+Section~5.5, the resolution limit of the size forecast: a small municipality reaches 300 cases only in its exceptional
+seasons, so the tail that would order its next season is fitted from a handful of
+points. That is an argument, not a figure. The three files are deleted and
+ignored in `.gitignore`.
+
 All environments use `\includegraphics` **without an extension**, so either
 `.pdf` (preferred for vector plots) or `.png` at >= 300 dpi will resolve.
 
@@ -31,12 +45,11 @@ All environments use `\includegraphics` **without an extension**, so either
 | `fig06_example_fits` | Results 3.1 | Three individual fits side by side: (a) small city weekly, (b) state capital weekly, (c) state-year size cross-section. PL solid, exponential dashed, and the selected $x_{\min}$ as a dotted vertical line whose value is in the legend of each panel. |
 | `fig07_alpha_by_construction` | Results 3.1 | Four panels of the estimated $\alpha$, identically binned over a common range: (a) `W-mun` vs `W-seas` overlaid, (b) `S-mun`, (c) `S-state`, (d) `S-nat`. Dashed line at $\alpha=2$ in every panel, vertical scale per panel. Writes `fig07_panels.json` with the constructions and fit counts of each panel and the pixel shape of the PNG, which the layout gate compares against the committed image. |
 | `fig09_exceedance` | Results 3.4 | Implied $\Pr(S\ge s)=\zeta(\alpha,s)/\zeta(\alpha,x_{\min})$ vs empirical exceedance frequency, per national year. |
-| `fig10_pred_vs_obs` | Results 3.7 | Predicted vs observed annual cases for 2025, log--log, one point per municipality; identity line; 10:1 and 1:10 bands; dotted line at the largest training response. Upper panel pools the country; lower panels are the four states with the smallest median absolute percentage error, among those with at least twenty municipalities. Estimator: the spline-basis quantile regression at $\tau=0.5$, the one the ablation uses. Writes `fig10_states.json` (selection rule, full ranking, PNG pixel shape) which `verify_snapshot` checks against the committed image. |
-| `fig11_ablation_skill` | Results 3.7 | (a) Skill score vs M0 for epidemic size, M1/M2/M3; (b) pinball loss vs $\tau$ for M2 vs M3, with the range over origins. |
-| `fig12_roc_pr_calibration` | Results 3.6 | 2x2: ROC, PR, calibration, F1 vs threshold; out-of-fold predictions averaged over the five origins (not pooled); M0 dotted-dash reference, M2 solid, M3 dashed, population-only dotted. |
-| `fig13_importance` | Results 3.6 | Held-out permutation importance ($\Delta$ Brier), power-law block highlighted; joint block row plus per-origin stability of the three scaling features. |
-| `fig14_error_vs_pop` | Results 3.8 | Single panel: the relative error of the median ($\tau=0.5$) spline-quantile size forecast, one point per municipality, drawn as two boxplots for the size classes either side of 100,000 inhabitants, with the gap between the two medians marked as a distance. Logarithmic axis, windowed to the 1st--99th percentile of the plotted errors with a 15% margin. Writes `fig14_pop_bands.json` with the per-class counts, medians and quartiles, the window and the number of units outside it, and the PNG pixel shape, which `verify_snapshot` compares against the committed image. |
-| `fig15_pred_map` | Results 3.8 | The map drawn as the decision it feeds, for the record season at the top rung: (a) the alert at $p\geq 0.5$, a threshold declared rather than fitted to the season drawn; (b) what became of the alert — hit, false alarm, missed, correct silence; (c) false alarms against the number of municipalities alerted, with the declared alert marked and an unranked list of the same length as the dashed reference. Grey = no forecast (fewer than five seasons of history). Uses `muni_br.gpkg` and writes `fig15_map.json`, whose ledger `make_tables.py --check` audits against the caption. |
+| `fig10_pred_vs_obs` | Results 3.6 | Predicted vs observed annual cases for 2025, log--log, one point per municipality; identity line; 10:1 and 1:10 bands; dotted line at the largest training response. Upper panel pools the country; lower panels are the four states with the smallest median absolute percentage error, among those with at least twenty municipalities. Estimator: the spline-basis quantile regression at $\tau=0.5$, the one the ablation uses. Writes `fig10_states.json` (selection rule, full ranking, PNG pixel shape) which `verify_snapshot` checks against the committed image. |
+| `fig11_ablation_skill` | Results 3.6 | (a) Skill score vs M0 for epidemic size, M1/M2/M3; (b) pinball loss vs $\tau$ for M2 vs M3, with the range over origins. |
+| `fig12_roc_pr_calibration` | Results 3.5 | 2x2: ROC, PR, calibration, F1 vs threshold; out-of-fold predictions averaged over the five origins (not pooled); M0 dotted-dash reference, M2 solid, M3 dashed, population-only dotted. |
+| `fig13_importance` | Results 3.5 | Held-out permutation importance ($\Delta$ Brier), power-law block highlighted; joint block row plus per-origin stability of the three scaling features. |
+| `fig15_pred_map` | Results 3.7 | The map drawn as the decision it feeds, for the record season at the top rung: (a) the alert at $p\geq 0.5$, a threshold declared rather than fitted to the season drawn; (b) what became of the alert — hit, false alarm, missed, correct silence; (c) false alarms against the number of municipalities alerted, with the declared alert marked and an unranked list of the same length as the dashed reference. Grey = no forecast (fewer than five seasons of history). Uses `muni_br.gpkg` and writes `fig15_map.json`, whose ledger `make_tables.py --check` audits against the caption. |
 
 ## Where the numbers come from
 
@@ -45,7 +58,7 @@ All environments use `\includegraphics` **without an extension**, so either
   (`powerlaw_fits`, `powerlaw_fits_yearly`, `powerlaw_fits_total_cases`,
   `episcanner_state_fits`, `episcanner_fits`). Queries in
   `Manuscript/verification/verify_tables.sql` reproduce Table 2 exactly.
-- Predictive panels: `fig10` and `fig14` refit the reported model
+- Predictive panels: `fig10` refits the reported model
   (`run_ablation.fit_quantile_model`, spline quantile at the median) on the
   pooled city panel, because the ablation artefact holds aggregate losses and
   not row-level predictions. `fig11`--`fig13` and `fig15` are *read* from
@@ -63,7 +76,7 @@ All environments use `\includegraphics` **without an extension**, so either
 ## Note on the ablation figures
 
 `fig11`--`fig13` are views of committed artefacts and are never recomputed
-here. `fig10`, `fig14` and `fig15` do refit, because the artefacts carry
+here. `fig10` and `fig15` do refit, because the artefacts carry
 aggregate losses only; they fit the same estimators the ablation reports, in
 one place (`_m3_features`), which aborts rather than draw a model without the
 climate block.

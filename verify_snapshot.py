@@ -88,12 +88,9 @@ FIGURE_SIDECARS = (
     # the image is not in the manifest, and no artefact knows its layout.
     ("07", "fig07_alpha_by_construction", "fig07_panels.json"),
     ("10", "fig10_pred_vs_obs", "fig10_states.json"),
-    # fig14 went from two panels to one, and its caption was rewritten in the
-    # same commit. It was the last predictive figure outside this tuple, and the
-    # rewritten caption over the old two-panel image is precisely the failure
-    # mode the tuple exists for: the image is not in the manifest and nothing
-    # else knows how many panels it carries.
-    ("14", "fig14_error_vs_pop", "fig14_pop_bands.json"),
+    # fig14 was once the fourth entry here. It is gone rather than watched: the
+    # size classes it split do not differ in the quantity it drew, so there is no
+    # image left for this tuple to compare against, and the sidecar went with it.
     ("15", "fig15_pred_map", "fig15_map.json"),
 )
 
