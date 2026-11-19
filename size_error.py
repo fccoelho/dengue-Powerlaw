@@ -36,6 +36,7 @@ within a factor of two is, twice as often, not.
 from __future__ import annotations
 
 import json
+import sys
 from pathlib import Path
 
 import numpy as np
@@ -64,6 +65,7 @@ __all__ = [
     "SIZE_CUT", "BIG_ERROR_APE", "DECISION_Q3_RATIO",
     "unit_errors", "class_stats", "decide", "bootstrap_q3_ratio",
     "draw_ecdf", "load_oof", "report",
+    "repo_root", "ensure_local_module", "doctor",
 ]
 
 
@@ -313,6 +315,95 @@ def draw_ecdf(unit: pd.DataFrame, cut: float | None = None, ax=None,
 # ---------------------------------------------------------------------------
 _OOF_COLUMNS = ("origin", "geocode", "y_true", "y_pred", "population")
 
+#: Modules of this checkout that the refit imports by bare name.
+#:
+#: ``pyproject.toml`` lists the dependencies but declares no build backend, so
+#: ``uv sync`` installs the third-party set and never the project: ``run_ablation``
+#: is a *file of the checkout*, not a package in site-packages. It resolves because
+#: ``generate_figures`` puts the repository root on ``sys.path`` when it is
+#: imported -- an accident of the import order. The refit below no longer depends
+#: on that accident, but the distinction is what the previous error message lost:
+#: it reported an absent source file as a missing dependency, and answered it with
+#: ``uv sync``, which installs packages and cannot supply a source file.
+_LOCAL_MODULES = ("run_ablation", "predictive_model", "data_utils", "fitpl")
+
+
+def repo_root() -> Path:
+    """The checkout holding this file and the modules the refit imports."""
+    return Path(__file__).resolve().parent
+
+
+def _load_from_file(name: str, path: Path):
+    """Import ``path`` under ``name`` and register it in ``sys.modules``.
+
+    Registration is half the job. ``predictive_model`` does
+    ``from run_ablation import fit_quantile_model`` lazily, so a second copy
+    compiled from a different path would hand that import a different module
+    object -- or fail outright.
+    """
+    import importlib.util
+
+    spec = importlib.util.spec_from_file_location(name, path)
+    if spec is None or spec.loader is None:
+        raise RuntimeError(f"{path} cannot be imported as {name!r}")
+    module = importlib.util.module_from_spec(spec)
+    sys.modules[name] = module
+    try:
+        spec.loader.exec_module(module)
+    except BaseException:
+        sys.modules.pop(name, None)  # never leave a half-executed module behind
+        raise
+    return module
+
+
+def ensure_local_module(name: str, root: Path | None = None):
+    """Make one of the checkout's own modules importable, or say what is missing.
+
+    ``sys.path`` is tried first because that is what normally happens; loading
+    from the file is the fallback for interpreters started without the script's
+    directory (``python -P``), for runners that rewrite ``sys.path``, and for
+    import hooks that answer ``find_spec`` with ``None``.
+    """
+    import importlib.util
+
+    root = Path(root or repo_root())
+    try:
+        if importlib.util.find_spec(name) is not None:
+            return sys.modules.get(name)
+    except (ImportError, ValueError):
+        pass  # a broken parent package is not a reason to stop looking
+
+    path = root / f"{name}.py"
+    if not path.exists():
+        raise RuntimeError(
+            f"{name!r} does not resolve and there is no {path} either, so this "
+            "checkout cannot refit the estimator.\n"
+            f"    repository root : {root}\n"
+            f"    python          : {sys.executable}\n"
+            f"    sys.path[:3]    : {sys.path[:3]}\n"
+            f"    {name}.py is a file of the repository, not a dependency: "
+            "`uv sync` installs packages and cannot supply a missing source "
+            f"file. Confirm the checkout is complete (`git ls-files {name}.py`) "
+            "and that you are on the branch you think you are on. Or skip the "
+            "refit: `--oof FILE` needs nothing but pandas.")
+    return _load_from_file(name, path)
+
+
+def _module_error(exc: ModuleNotFoundError, root: Path) -> str:
+    """The right advice for what is actually missing."""
+    name = exc.name or str(exc)
+    if name in _LOCAL_MODULES:
+        return (
+            f"{name!r} is a file of this checkout ({root / (name + '.py')}) and "
+            "Python could not import it, so the estimator cannot be refitted. It "
+            "is a source file, not a package: `uv sync` cannot supply it. Check "
+            f"`git ls-files {name}.py` in {root}, or pass the predictions you "
+            "already have with `--oof FILE`.")
+    return (f"the data layer is missing the dependency {name!r}, so the "
+            "estimator cannot be refitted in this environment. Run `uv sync` in "
+            "the repository root and retry, or pass the predictions you already "
+            "have with `--oof FILE` -- that path needs nothing but pandas.")
+
 
 def load_oof(path: str | Path | None = None, refit: bool = False,
              origins=(2023, 2024, 2025), tau: float = 0.5) -> pd.DataFrame:
@@ -321,7 +412,7 @@ def load_oof(path: str | Path | None = None, refit: bool = False,
     ``path`` reads a parquet/CSV with at least an observed and a predicted
     column; ``refit`` recomputes the panel with the estimator the manuscript
     reports (spline-basis quantile regression at ``tau``), which needs ``data/``
-    and the municipal panel — i.e. a machine where the pipeline has been run.
+    and the municipal panel -- i.e. a machine where the pipeline has been run.
     """
     if path is not None:
         p = Path(path)
@@ -335,8 +426,7 @@ def load_oof(path: str | Path | None = None, refit: bool = False,
             "them. Refitting needs data/<geocode>.parquet and the municipal panel; "
             "from the command line use `--oof FILE` or `--refit`.")
 
-    import sys
-    root = Path(__file__).resolve().parent
+    root = repo_root()
     for cand in (str(root), str(root / "Manuscript" / "figures")):
         if cand not in sys.path:
             sys.path.insert(0, cand)
@@ -357,18 +447,71 @@ def load_oof(path: str | Path | None = None, refit: bool = False,
                 "reported estimator. If you already have the predictions saved, "
                 "use `--oof FILE` instead -- it needs nothing but pandas."
             ) from exc
+
+    # Before the fit, not inside it. ``_size_oof`` imports the estimator by bare
+    # name, so a source file absent from the checkout used to surface as a bare
+    # ModuleNotFoundError from deep inside the figure module, was reported as a
+    # missing dependency of the data layer, and was answered with `uv sync` --
+    # which cannot install a file of the repository.
+    for name in _LOCAL_MODULES:
+        ensure_local_module(name, root)
+
     try:
         return _size_oof(origins=origins, tau=tau)
     except ModuleNotFoundError as exc:
-        # The figure module imports the data layer lazily, so an incomplete
-        # environment only shows up here, at the first fit, as a bare
-        # ModuleNotFoundError from deep inside it. Name the missing package and
-        # the way out.
-        raise RuntimeError(
-            f"the data layer is missing the dependency {exc.name!r}, so the "
-            "estimator cannot be refitted in this environment. Run `uv sync` in "
-            "the repository root and retry, or pass the predictions you already "
-            "have with `--oof FILE` -- that path needs nothing but pandas.") from exc
+        raise RuntimeError(_module_error(exc, root)) from exc
+
+
+def doctor(root: Path | None = None) -> dict:
+    """Where every piece the refit needs resolves to, present or not.
+
+    Written because the failure that prompted it could not be diagnosed from its
+    own message: it named a dependency that was really a source file, and the
+    remedy it printed could not have worked. One run here settles which of the
+    two it is.
+    """
+    import importlib.util
+    import platform
+
+    root = Path(root or repo_root())
+
+    def resolves(name: str) -> bool:
+        try:
+            return importlib.util.find_spec(name) is not None
+        except (ImportError, ValueError):
+            return False
+
+    local = {}
+    for name in _LOCAL_MODULES:
+        path = root / f"{name}.py"
+        local[name] = {"file": str(path), "exists": path.is_file(),
+                       "resolves": resolves(name)}
+
+    third = {n: resolves(n) for n in
+             ("numpy", "pandas", "pyarrow", "sklearn", "matplotlib",
+              "geopandas", "duckdb", "dotenv")}
+
+    data_dir = root / "data"
+    panel = root / "Manuscript" / "figures" / "_panel_city_BR.parquet"
+    n_parquet = (len(list(data_dir.glob("*.parquet")))
+                 if data_dir.is_dir() else 0)
+    return {
+        "python": platform.python_version(),
+        "executable": sys.executable,
+        "cwd": str(Path.cwd()),
+        "repo_root": str(root),
+        "sys_path_head": list(sys.path[:4]),
+        "local_modules": local,
+        "third_party": third,
+        "data": {"dir": str(data_dir), "exists": data_dir.is_dir(),
+                 "parquet_files": n_parquet},
+        "panel_cache": {"path": str(panel), "exists": panel.is_file()},
+        # A refit needs the source files, every third-party import, and the data
+        # directory. It does *not* need the panel cache, which is rebuilt.
+        "ready_to_refit": (all(v["exists"] for v in local.values())
+                           and all(third.values())
+                           and data_dir.is_dir()),
+    }
 
 
 def report(unit: pd.DataFrame, cut: float | None = None,
