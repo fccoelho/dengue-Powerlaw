@@ -83,6 +83,16 @@ Manuscript/figures/fig08_alpha_stability.*
 Manuscript/figures/fig16_survival_exceedance.*
 Manuscript/figures/fig17_survival_duration.*
 
+# fig14 (relative error of the size forecast by municipality size) was dropped:
+# the audit behind it (check_size_error.py) found the two size classes the panel
+# split do not differ in the quantity it drew -- median APE 62.7% against 62.7%,
+# third quartile 85.0% against 80.9%, a ratio of 1.05 against the 1.3 the
+# pre-registered rule required. No effect to draw, and the three sentences that
+# quoted it are gone from the manuscript. Ignored so a stale copy cannot be
+# committed back.
+Manuscript/figures/fig14_error_vs_pop.*
+Manuscript/figures/fig14_pop_bands.json
+
 # survival_analysis.py tables: regenerated, and committed anyway because
 # snapshot_manifest.json hashes them. Only exceedance_transport.csv is still quoted
 # in the manuscript (Section 3.4); the within-season and duration tables are kept
