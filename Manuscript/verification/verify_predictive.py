@@ -192,7 +192,7 @@ CLAIMS = [
     ("state.m1m0.width", 0.26, "0.26", TOL2),
     ("state.m2m1.median", 0.027, "0.027", TOL3),
     ("state.m3m2.median", 0.000, "0.000", TOL3),
-    ("state.m3m2.pass", 0, "no origin in which the block improves", 0),
+    ("state.m3m2.pass", 0, "no season in which the block improves", 0),
     # size ladder, state
     ("size.m1.skill", 0.30, "0.30", TOL2),
     ("size.m1.skill_low", -0.06, "-0.06", TOL2),
@@ -210,7 +210,7 @@ CLAIMS = [
     ("size.grid.median_low", -13.6, "-13.6", TOL1),
     ("size.grid.median_high", 7.2, "7.2", TOL1),
     ("size.grid.quantiles_favouring", 0,
-     "no quantile has three of the five origins agreeing in favour", 0),
+     "no quantile has three of the five seasons agreeing in favour", 0),
     ("size.grid.quantiles_against", 2, "2 of the 19 levels", 0),
 ]
 

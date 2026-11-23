@@ -994,7 +994,7 @@ def fig11(abl):
     ax1.set_ylabel(r"skill score $1-L(\mathrm{rung})/L(\mathrm{M0})$")
     ax1.set_title("(a) skill vs persistence, pinball at $\\tau=0.5$", fontsize=9)
     ax1.legend(fontsize=7, ncol=3, loc="upper left")
-    ax1.text(0.99, 0.02, f"bar = median of {len(origins)} origins, dot = origin",
+    ax1.text(0.99, 0.02, f"bar = median of {len(origins)} seasons, dot = season",
              transform=ax1.transAxes, fontsize=6.5, color="0.35",
              ha="right", va="bottom")
 
@@ -1011,7 +1011,7 @@ def fig11(abl):
             hi = d.groupby("tau")["rel"].max().sort_index()
             ax2.fill_between(med.index, lo.values, hi.values,
                              color=colors[tgt], alpha=0.12, lw=0,
-                             label="range over origins")
+                             label="range over seasons")
     ax2.axhline(0, color="k", lw=0.9)
     # a tiny L_M2 in one origin makes the relative change explode (to
     # several hundred percent), squashing a linear axis; symlog keeps the
@@ -1030,7 +1030,7 @@ def fig11(abl):
     if len(d95):
         ax2.annotate(
             f"$\\tau=0.95$: median {d95.median():+.1f}%\n"
-            f"({int((d95 < 0).sum())}/{len(d95)} origins worse)",
+            f"({int((d95 < 0).sum())}/{len(d95)} seasons worse)",
             xy=(0.95, d95.median()), xytext=(0.55, 0.12),
             textcoords="axes fraction", fontsize=6.5,
             arrowprops=dict(arrowstyle="->", lw=0.7, color="0.3"),
@@ -1145,21 +1145,21 @@ def fig12(art):
     axes[0].plot([0, 1], [0, 1], "k:", lw=0.8)
     axes[0].set_xlabel("false positive rate")
     axes[0].set_ylabel("true positive rate")
-    axes[0].set_title("(a) ROC, averaged over origins", fontsize=9)
+    axes[0].set_title("(a) ROC, averaged over seasons", fontsize=9)
     axes[1].set_xlabel("recall")
     axes[1].set_ylabel("precision")
     axes[1].set_title("(b) precision-recall", fontsize=9)
     axes[2].plot([0, 1], [0, 1], "k:", lw=0.8)
     axes[2].set_xlabel("mean predicted probability")
     axes[2].set_ylabel("observed frequency")
-    axes[2].set_title("(c) calibration (deciles within origin)", fontsize=9)
+    axes[2].set_title("(c) calibration (deciles within season)", fontsize=9)
     axes[3].set_xlabel("decision threshold")
     axes[3].set_ylabel(r"$F_1$")
     axes[3].set_title(r"(d) $F_1$ vs threshold", fontsize=9)
     for ax in axes:
         ax.legend(fontsize=7)
     fig.suptitle(
-        f"$Q_{{{q}}}$ rarity, {scope} threshold, {n_orig} origins averaged, "
+        f"$Q_{{{q}}}$ rarity, {scope} threshold, {n_orig} seasons averaged, "
         f"{meta.get('panel_units', oof['unit'].nunique())} units strictly "
         f"out-of-fold", fontsize=9, y=1.06)
     fig.tight_layout()
@@ -1229,7 +1229,7 @@ def fig13(art):
         ax2.plot(d["origin"], d["importance"], "D-", color="#d62728", ms=6,
                  lw=2, label="block (joint)", zorder=5)
     ax2.axhline(0, color="k", lw=0.8)
-    ax2.set_xlabel("forecast origin")
+    ax2.set_xlabel("season")
     ax2.set_ylabel(r"$\Delta$ Brier when shuffled")
     ax2.set_title("(b) scaling descriptors: stability", fontsize=9)
     ax2.legend(fontsize=7)
