@@ -514,6 +514,17 @@ def compute_facts(root: str = ".") -> dict:
     sdf, _smeta, _ = _load("state_exceedance", root)
     if sdf is not None and facts["sources"]["state_exceedance"]["present"]:
         facts["exceed"]["state"] = {"contrasts": _contrast_summary(sdf, "exceedance")}
+        # Discrimination at the state level. It is quoted in the alert section as
+        # the reason no state-level alert list is built: the level discriminates
+        # better than the municipal one and for the wrong reason, since the
+        # pooled label is close to a ranking by state size. Only the fitted rungs
+        # count -- the M0 rows carry auc 0.5 by construction and the population
+        # rows are the diagnostic, not a rung of the ladder.
+        sloss = sdf[sdf["record_type"] == "loss"]
+        fit = sloss[sloss["rung"].isin(("M1", "M2", "M3"))]["auc"].dropna()
+        if not fit.empty:
+            facts["exceed"]["state"]["auc_median"] = float(fit.median())
+            facts["exceed"]["state"]["auc_range"] = [float(fit.min()), float(fit.max())]
 
     # ---- The classifier artefact behind figures 12 and 13 ---------------
     kdf, kmeta, _ = _load("city_classifier", root)
@@ -1121,6 +1132,16 @@ def claims(f: dict) -> list[dict]:
             {"name": "state scaling Brier at the municipal comparison",
              "want": f"median of ${sm32['median_diff']:+.3f}$",
              "stale": [], "needs": "state_exceedance"})
+    st_auc = st.get("auc_range")
+    if st_auc:
+        out += [
+            {"name": "state classifier discrimination",
+             "want": f"median area under the curve of ${_num(st['auc_median'])}$",
+             "stale": [], "needs": "state_exceedance"},
+            {"name": "state classifier discrimination, range",
+             "want": f"range ${_num(st_auc[0])}$--${_num(st_auc[1])}$",
+             "stale": [], "needs": "state_exceedance"},
+        ]
 
     # The municipal lagged block is now the paper's only `supported` verdict.
     cm1 = ((f.get("exceed", {}).get("city") or {}).get("contrasts") or {}).get("M1-M0") or {}
