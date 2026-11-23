@@ -411,15 +411,8 @@ described as \emph{power-law supported} only when $R>0$ and $p<0.05$, as
 \emph{inconclusive} otherwise. This prevents the common error of counting a
 positive but non-significant $R$ as evidence for scaling.
 
-A fit is flagged as \emph{tail-informative} when $x_{\min}$ exceeds the bulk of
-the observed distribution, operationalised as $x_{\min}>5$ cases for weekly
-counts and as $x_{\min}$ above the median observed value for the size
-constructions. Where $x_{\min} \le 5$, the fitted power law is being asked to
-describe the entire empirical distribution, including the small-count regime in
-which the discrete power law is not a plausible generative model, since counts of
-one or two cases arise from reporting mechanics rather than from scale-free
-branching. Such fits are retained in the analysis but excluded from substantive
-interpretation, and the proportion concerned is reported explicitly.
+A fit is flagged as \emph{tail-informative} when $x_{\min}$ exceeds the bulk of the observed distribution, operationalised as $x_{\min}>5$ cases for weekly counts and as $x_{\min}$ above the median observed value for the size constructions.
+Where $x_{\min} \le 5$, the fitted power law is being asked to describe the entire empirical distribution, including the small-count regime in which the discrete power law is not a plausible generative model, since counts of one or two cases arise from reporting mechanics rather than from scale-free branching. Such fits are retained in the analysis but excluded from substantive interpretation, and the proportion concerned is reported explicitly.
 
 \subsection{From description to prediction}
 \label{sec:bridge}
@@ -587,23 +580,13 @@ percentile, and $Q_p$ is taken across the states of the fold's training seasons.
 two labels therefore answer slightly different questions, and the state-level task is
 the closer of the two to a ranking by state size (Section~\ref{sec:classresults}).
 
-The classifier is a penalised logistic regression on the same spline basis, with
-the class imbalance handled by weighting the training rows by the
-negative-to-positive ratio. As with the regressor, the specification must remain
-informative beyond the range covered by the training rows, and the logistic form
-does so by extrapolating linearly in log-odds, so that a season far outside the
-range of the panel is not forced towards the base rate observed in training.
-Validation is an expanding-window split defined on the season index: fold $j$
-trains on every unit-season earlier than $v_j$ and validates on season $v_j$
-alone, where the $v_j$ are the $k=\min\{5,\, n_{\text{seasons}}-2\}$ most recent
-training seasons. A fold
-therefore exists only once at least two earlier seasons are available, and the
-number of folds is capped at five. Because the folds are a function of the season
-index rather than of arbitrary ordering, they are invariant to the ordering of the
-observations.
+The classifier is a penalised logistic regression on the same spline basis, with the class imbalance handled by weighting the training rows by the negative-to-positive ratio. As with the regressor, the specification must remain informative beyond the range covered by the training rows, and the logistic form does so by extrapolating linearly in log-odds, so that a season far outside the range of the panel is not forced towards the base rate observed in training.
+Validation is an expanding-window split defined on the season index: fold $j$ trains on every unit-season earlier than $v_j$ and validates on season $v_j$ alone, where the $v_j$ are the $k=\min\{5,\, n_{\text{seasons}}-2\}$ most recent training seasons.
+A fold therefore exists only once at least two earlier seasons are available, and the number of folds is capped at five.
+Because the folds are a function of the season index rather than of arbitrary ordering, they are invariant to the ordering of the observations.
 
-This distinction is not cosmetic, and it is the step of the design whose failure
-is silent. A split defined by arbitrary ordering rather than by the season index
+This distinction is not cosmetic, and it is the step of the design whose failure is silent.
+A split defined by arbitrary ordering rather than by the season index
 produces, in a frame ordered by unit, a grouping by municipality: each fold then
 trains on some municipalities across the whole calendar and validates on others
 over the same calendar, so that validation contains no season absent from
