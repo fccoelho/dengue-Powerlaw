@@ -1428,6 +1428,54 @@ length is an output of the rule and not a forecast of the season, and the gain
 over no information is real but narrow, in line with the discrimination of
 Figure~\ref{fig:roc}.
 
+Two readings of one national list, and a state secretariat reads neither.
+Table~\ref{tab:state_lists} applies the declared rule unchanged within each
+state, and the length it returns is governed by the state's own realised share
+rather than by anything the secretariat can act on: the states' realised shares
+range from $0.159$ to $1.000$, and a fixed point on a probability scale cannot
+return comparable lists across that range. In the record season the rule is not
+returned at all in 3 states --- Maranh\~ao, Piau\'i and Rond\^onia, 39
+municipalities with 15 exceedances between them --- and where it does fire it
+can outnumber the events: in Cear\'a it holds 26 alerts against 13 exceedances.
+Read as an ordering the list survives the disaggregation, and the ordering is
+what a secretariat consumes: the within-state area under the curve is $0.601$
+over the 63 state-seasons that hold at least 20 evaluated municipalities,
+against a median of $0.649$ for the national order over the same seasons, so
+what the national model ranks is not an artefact of the differences between
+states. Read as a level it does not survive: recall ranges from $0.213$ in
+Bahia to $0.696$ in Rio de Janeiro, median $0.415$, against $0.504$ nationally,
+and a list whose recall is set by the state's own base rate cannot be sized by
+the secretariat that reads it. Its length is a capacity input rather than an
+output of the rule, and whether it should be issued inside a state at all is
+measured rather than assumed: the head of the order beats a draw of the same
+length inside the state in 42 to 46 of the 63 state-seasons with at least 20
+evaluated municipalities, against 25 to 27 of the 71 with fewer, so the cut of
+Table~\ref{tab:state_lists} marks where the comparison stops being informative
+and not where the list stops being useful.
+
+\input{generated/tab_state_lists}
+
+The repair that suggests itself is to estimate the threshold, or the level,
+inside each state, and it does not survive being tested out of sample. The
+offset between what the model predicts for a state and what that state realises
+does have a large state component --- $71.4\%$ of its weighted variance, against
+$28.6\%$ carried by the season --- but that component is not a stable property
+of the state: fitting it on earlier seasons and ranking states by it against the
+next season gives a correlation of $r=0.300$, interval $[0.006, 0.531]$. A
+correction fitted on earlier seasons therefore carries the wrong sign into the
+season being forecast, and correcting at all is worse than leaving the
+probabilities alone: mean Brier score $0.243$ uncorrected, $0.262$ with a single
+shift and $0.266$ with one per state, a paired difference at the level of the
+state of $+0.023$, interval $[0.003, 0.044]$, the per-state correction being
+worse in $99\%$ of resamples. The threshold behaves no better. Fitting a Youden
+threshold inside each state and applying it to the next season returns a mean
+$F_1$ of $0.596$, the same as the declared rule, at the price of 738 alerts
+where the rule issues 649; and the fitted thresholds run from $0.207$ to $0.632$
+with a median of $0.462$, which is the spread of an estimate with little to
+find, Youden's $J$ being invariant to prevalence by construction. The state may
+act on the order of its list; the length of the list is a decision about
+capacity; and no per-state threshold is issued here.
+
 The alert is issued to municipalities, which is the level of the sampling unit
 rather than a choice made for the convenience of the map. Both \lvl{S-state} and
 \lvl{S-nat} are samples of municipalities, pooled within a state and nationally

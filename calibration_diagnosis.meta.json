@@ -1,0 +1,24 @@
+{
+  "argv": [],
+  "level": "city",
+  "region": "BR",
+  "source": "classifier_results.parquet",
+  "ref_rung": "M3",
+  "fixed_rule": 0.5,
+  "target_seasons": [
+    2022,
+    2023,
+    2024,
+    2025
+  ],
+  "min_units": 20,
+  "shrink_pseudo_obs": 20.0,
+  "seed": 20261123,
+  "bootstrap_replicates": {
+    "persistence": 2000,
+    "recalibration": 400
+  },
+  "bootstrap_unit": "state",
+  "decision_rule": "a per-state correction is issued only if its 95% state-bootstrap interval for the Brier difference against the uncorrected probability lies below zero on seasons held out from the fit",
+  "what": "whether the alert threshold is a per-state quantity"
+}

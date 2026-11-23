@@ -206,6 +206,47 @@ SOURCES = {
 }
 
 
+CALIBRATION_PATH = "calibration_diagnosis.json"
+CALIBRATION_META = "calibration_diagnosis.meta.json"
+CALIBRATION_DESIGN = ("ref_rung", "fixed_rule", "seed", "bootstrap_unit")
+
+
+def _load_calibration(root: str = ".") -> tuple[dict | None, str | None]:
+    """Load the per-state threshold diagnosis, produced by calibration_diagnosis.
+
+    It is a JSON rather than a table, so it does not go through ``_load``: what
+    the prose needs from it is a handful of scalars per quantity, not rows. The
+    meta is checked for the design keys the same way a table's is, because a
+    diagnosis refitted with a different rule or a different reference rung
+    would answer a different question under the same file name.
+    """
+    path = os.path.join(root, CALIBRATION_PATH)
+    meta_path = os.path.join(root, CALIBRATION_META)
+    if not os.path.exists(path):
+        return None, (f"{CALIBRATION_PATH} absent (whether the alert threshold "
+                      "is a per-state quantity)")
+    try:
+        facts = json.load(open(path, encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        return None, f"{CALIBRATION_PATH} unreadable: {e}"
+    if not os.path.exists(meta_path):
+        return None, (f"{CALIBRATION_META} absent: the diagnosis cannot be told "
+                      "apart from a run of a superseded design")
+    try:
+        meta = json.load(open(meta_path, encoding="utf-8"))
+    except Exception as e:  # noqa: BLE001
+        return None, f"{CALIBRATION_META} unreadable: {e}"
+    missing = [k for k in CALIBRATION_DESIGN if k not in meta]
+    if missing:
+        return None, (f"{CALIBRATION_META} predates the current design (no "
+                      f"{missing}): its numbers describe a superseded question")
+    need = ("decomposition", "persistence", "recalibration", "threshold")
+    absent = [k for k in need if k not in facts]
+    if absent:
+        return None, f"{CALIBRATION_PATH} lacks {absent}"
+    return facts, None
+
+
 def facts_get(objs=()):
     """Keys present in the classifier facts dict (a tiny readability shim)."""
     return dict(objs or {})
@@ -909,6 +950,24 @@ def compute_facts(root: str = ".") -> dict:
     if odf is not None and facts["sources"]["classifier_oof"]["present"]:
         facts["alarms"] = _alarm_facts(odf)
         facts["state_lists"] = _state_lists_facts(odf)
+
+    # ---- Is the alert threshold a per-state quantity? ----------------------
+    # Asked because Table~\ref{tab:state_lists} invites it: the declared rule
+    # returns lists of incomparable length, and estimating the threshold inside
+    # each state is the obvious repair. The diagnosis tests the repair out of
+    # sample and the prose reports the answer, so the numbers have to be an
+    # artefact rather than a claim in the source file.
+    diag, dprob = _load_calibration(root)
+    facts["sources"]["calibration"] = {
+        "path": CALIBRATION_PATH,
+        "what": "per-state level and threshold diagnosis",
+        "present": diag is not None,
+        "problem": dprob,
+        "how": "python calibration_diagnosis.py",
+    }
+    facts["diagnosis"] = diag
+    if dprob:
+        facts["warnings"].append(dprob)
 
     return facts
 
@@ -1668,6 +1727,50 @@ def claims(f: dict) -> list[dict]:
              "want": (f"against {min(hi)} to {max(hi)} of the {st20['small']['n']} "
                       f"with fewer"),
              "stale": [], "needs": "classifier_oof"},
+        ]
+
+    dg = f.get("diagnosis") or {}
+    if dg:
+        dec = dg["decomposition"]
+        pe = dg["persistence"]
+        rc = dg["recalibration"]
+        th = dg["threshold"]
+        out += [
+            {"name": "variance decomposition of the state offset",
+             "want": (f"${100 * (1 - dec['share_between_season']):.1f}\\%$ of its "
+                      f"weighted variance, against "
+                      f"${100 * dec['share_between_season']:.1f}\\%$ carried by "
+                      "the season"),
+             "stale": [], "needs": "calibration"},
+            {"name": "persistence of the state offset",
+             "want": (f"correlation of $r={pe['r']:.3f}$, interval "
+                      f"$[{pe['lo']:.3f}, {pe['hi']:.3f}]$"),
+             "stale": [], "needs": "calibration"},
+            {"name": "Brier with and without a per-state correction",
+             "want": (f"mean Brier score ${rc['brier_raw_mean']:.3f}$ uncorrected, "
+                      f"${rc['brier_global_mean']:.3f}$ with a single shift and "
+                      f"${rc['brier_state_mean']:.3f}$ with one per state"),
+             "stale": [], "needs": "calibration"},
+            {"name": "cost of the per-state correction",
+             "want": (f"$+{rc['delta_state_mean']:.3f}$, interval "
+                      f"$[{rc['delta_state_lo']:.3f}, "
+                      f"{rc['delta_state_hi']:.3f}]$"),
+             "stale": [], "needs": "calibration"},
+            {"name": "share of resamples where the correction is worse",
+             "want": (f"worse in ${100 * rc['share_resamples_worse']:.0f}\\%$ of "
+                      "resamples"),
+             "stale": [], "needs": "calibration"},
+            {"name": "F1 of a threshold fitted inside each state",
+             "want": (f"mean $F_1$ of ${th['f1_state_mean']:.3f}$, the same as the "
+                      f"declared rule, at the price of "
+                      f"{round(th['alerts_state_mean'])} alerts where the rule "
+                      f"issues {round(th['alerts_fixed_mean'])}"),
+             "stale": [], "needs": "calibration"},
+            {"name": "spread of the fitted per-state thresholds",
+             "want": (f"run from ${th['threshold_min']:.3f}$ to "
+                      f"${th['threshold_max']:.3f}$ with a median of "
+                      f"${th['threshold_median']:.3f}$"),
+             "stale": [], "needs": "calibration"},
         ]
 
     for o in out:
