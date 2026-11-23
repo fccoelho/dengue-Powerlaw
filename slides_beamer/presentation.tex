@@ -471,7 +471,8 @@ epidemic size confirms that extreme outbreak dynamics are not limited to case co
 \textbf{Methodology}
 \begin{itemize}
     \item \textbf{Models:} XGBoost, LightGBM classifiers
-    \item \textbf{Validation:} TimeSeriesSplit (no shuffle) --- preserves temporal ordering
+    \item \textbf{Validation:} expanding-window split on the \emph{season index} --- fold $j$ trains on seasons $< y_j$, validates on $y_j$
+    \item \emph{Not} a row-position split (\texttt{TimeSeriesSplit}): that would hold out municipalities, not seasons
     \item \textbf{Imbalance:} \texttt{scale\_pos\_weight} (XGBoost), \texttt{is\_unbalance=True} (LightGBM)
     \item \textbf{Threshold optimization:} Youden's $J = \text{Sensitivity} + \text{Specificity} - 1$ on CV out-of-fold predictions
     \item \textbf{Interpretability:} Feature importance + SHAP values
