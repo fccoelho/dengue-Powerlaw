@@ -123,9 +123,9 @@ data under five constructions (Table~\ref{tab:levels}), obtaining two exponents
 rather than one: $\alpha_W$ for the weekly case count and $\alpha_S$ for the
 epidemic size, the total cases in a season, each reported together with the
 $x_{\min}$ that makes it interpretable (Section~\ref{sec:estimation}). Epidemic
-size, the quantity surveillance services act on, proves to be the more useful of
-the two. Other epidemic metrics, duration and peak timing among them, are bounded by
-the length of the season and carry no heavy tail.
+size, the quantity surveillance services act on, is the one we take forward.
+Other epidemic metrics, duration and peak timing among them, are bounded by the
+length of the season and carry no heavy tail.
 
 The second question is what the power-law parameters provide. If the pair
 $(\alpha, x_{\min})$ defines a risk curve, that curve should reproduce the
@@ -138,43 +138,20 @@ seasons 2021--2025 is evaluated against a model trained only on the seasons
 before it, on a four-rung ablation ladder and under a decision rule fixed in
 advance.
 
-The answer to the first question is an epidemic-size exponent together with a
-criterion for when such an exponent is worth reporting. Grouped five ways, the
-same incidence series shows the weekly case count to be poorly described by a
-power law: the fitted lower bound collapses to five cases or fewer in 77\% of
-\lvl{W-mun} and 81\% of \lvl{W-seas}, so the law is describing the bulk rather
-than a tail (Section~\ref{sec:verdicts}). Epidemic size behaves differently. The
-power law is preferred to an exponential in 16 of 16 national seasons and in 96\%
-of 353 state-seasons, with median exponents of $2.03$ and $1.98$ and median
-lower bounds of 730 and 169 cases (Section~\ref{sec:size}). What separates the
-two cases is a reporting rule rather than a statistical one: an exponent
-describes a tail only when $x_{\min}$ is stated beside it
-(Section~\ref{sec:diagnostic}).
+What the paper delivers is a choice of object and a reading of it rather than a
+new estimator. The first two questions are answered constructively: a variable, a
+diagnostic that decides whether an exponent is worth reporting at all, and a
+two-parameter law that attaches a probability to every exceedance level
+(Sections~\ref{sec:levels}--\ref{sec:diagnostic}
+and~\ref{sec:bridge}--\ref{sec:riskmodel}).
 
-The answer to the second is that the two parameters turn into a probability.
-Equation~\eqref{eq:exceed} maps $(\alpha_S, x_{\min})$ onto $\Pr(S\ge s)$ for
-any level $s$, which makes the fitted pair a risk curve rather than a description
-of the data it came from, and the curve reproduces the observed frequency of
-extreme seasons over two decades (Sections~\ref{sec:bridge}
-and~\ref{sec:riskmodel}). A point forecast does not say how likely a season is to
-pass a stated threshold; the curve does. Carried forward a season without
-refitting, it still returns the level of risk at $10x_{\min}$ (median error
-1.6~pp) and overstates the far tail at $100x_{\min}$ (1.0\% implied against
-0.24\% observed), so what it delivers is a risk statement and not a prediction of
-the next season's size.
-
-The answer to the third question is negative, and instructively so. Within a
-state, $\alpha_S$ and $\log_{10}x_{\min}$ are rank-correlated at $0.64$ (median
-over 24 states), and at $0.89$ nationally, whereas data simulated with
-$\alpha_S$ held fixed recover no such association (Table~\ref{tab:coupling}). The
-pair is a stable summary of seasonal magnitude, and $\alpha_S$ is not a signal
-independent of lagged incidence, which is what a predictor in its own right would
-have to be (Section~\ref{sec:coupling}). That coupling is the mechanism behind
-the one predictive contrast that does work: last season's descriptors raise the
-area under the curve from $0.50$ to $0.58$ ($0.65$ with every term) and beat the
-historical-rate baseline in 4 of 5 forecast years, the only contrast in the study
-to satisfy the pre-specified rule, whereas at state scale the same contrast
-reaches 2 of 5 and fails it (Section~\ref{sec:ablation}).
+The third answer sets a limit, and it is best previewed in outline rather than in
+numbers. The tail is worth having as a probability, worth having as an ordering,
+and not worth having as a magnitude. We report the three in that order, and we
+mark the limit as deliberately as we report the gains, because a service that
+mistakes a probability for a prediction ends up worse served than one that keeps
+the probability alone
+(Sections~\ref{sec:classresults}--\ref{sec:prediction}).
 
 \section{Methods}
 
