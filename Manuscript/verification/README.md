@@ -61,6 +61,28 @@ committed classifier artefact carries `per_unit` only.
 `verify_tables.sql` contains the same computations as plain SQL, for readers
 who prefer to query the database directly with `sqlite3` or DuckDB.
 
+## Citations
+
+```bash
+python Manuscript/verification/verify_refs.py           # report
+python Manuscript/verification/verify_refs.py --strict  # exit 1 on an uncited entry
+```
+
+A citation with no `.bib` entry does not fail the LaTeX build. BibTeX emits one
+warning among dozens, the page prints `[?]` where the reference belongs, and the
+manuscript ships — so the defect has to be caught here or not at all. This gate
+reads `main.tex` and `refs.bib` as text and checks the invariant in both
+directions:
+
+- **`MISSING`** — a key cited in the text with no entry. A build defect; fails
+  the run without `--strict`.
+- **`ORPHAN`** — an entry that no cited key refers to. A typo fills both margins
+  at once, so the orphan's job is to name the reference the typo lost. It also
+  flags a reference kept for a section not yet written, which is why it only
+  fails under `--strict`.
+
+No LaTeX installation is required.
+
 ## Conventions that matter
 
 These are easy to get wrong and they change the reported percentages:
