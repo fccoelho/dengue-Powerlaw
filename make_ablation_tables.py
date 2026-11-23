@@ -691,14 +691,14 @@ def render_ablation_table(f: dict) -> str:
         "% Regenerate with: python make_ablation_tables.py\n"
         "\\begin{table}[htbp]\n\\centering\n\\small\n"
         "\\setlength{\\tabcolsep}{4pt}\n"
-        "\\caption{Ablation ladder over the five forecast origins 2021--2025, state\n"
-        "level (26 states, 23--25 evaluated per origin), for the single target. Cells\n"
-        "give the median across origins of the skill score\n"
+        "\\caption{Ablation ladder over the five evaluation seasons 2021--2025, state\n"
+        "level (26 states, 23--25 evaluated per season), for the single target. Cells\n"
+        "give the median across seasons of the skill score\n"
         "$1-L(\\text{rung})/L(\\text{M0})$ against calibrated persistence, with the\n"
-        "range over origins in brackets; the primary loss is the pinball loss at\n"
+        "range over seasons in brackets; the primary loss is the pinball loss at\n"
         "$\\tau=0.5$. The last column is the M3$-$M2 differential at that loss:\n"
         "median relative change, positive meaning that the scaling block improves\n"
-        "the forecast, and in parentheses the number of origins in which M3 does so\n"
+        "the forecast, and in parentheses the number of seasons in which M3 does so\n"
         "by sign alone. The classifier is reported separately in\n"
         "Table~\\ref{tab:exceed}.}\n"
         "\\label{tab:ablation_results}\n"
@@ -775,14 +775,14 @@ def render_exceed_table(f: dict) -> str:
 
     caption = (
         "\\caption{The large-season classifier at both aggregation levels, five\n"
-        "forecast origins 2021--2025. The figure in parentheses is the number of\n"
+        "evaluation seasons 2021--2025. The figure in parentheses is the number of\n"
         "states, respectively municipalities, that enter the level; the number\n"
-        "evaluated per origin is smaller, since a place without the required\n"
+        "evaluated per season is smaller, since a place without the required\n"
         "history is excluded rather than imputed (Section~\\ref{sec:targets}).\n"
         "The target is whether a unit exceeds the 75th\n"
         "percentile of its own history; the loss is the Brier score. Positive values\n"
         "mean the later rung has the lower Brier score, and ``median'' is over the\n"
-        "five origins. ``Origins CI excl.\\ 0'' counts the origins with a\n"
+        "five seasons. ``Seasons CI excl.\\ 0'' counts the seasons with a\n"
         "same-direction improvement whose 95\\% unit-bootstrap interval excludes\n"
         "zero, which is what the decision rule of Section~\\ref{sec:ablation}\n"
         "requires in at least 3 of 5. The municipal rows use a within-municipality\n"
@@ -800,7 +800,7 @@ def render_exceed_table(f: dict) -> str:
         "\\label{tab:exceed}\n"
         "\\begin{tabular}{@{}llrccr@{}}\n\\toprule\n"
         "Level & Contrast & \\makecell{$\\Delta$Brier \\\\ median} & "
-        "Origins $\\Delta>0$ & \\makecell{Origins \\\\ CI excl.\\ 0} & "
+        "Seasons $\\Delta>0$ & \\makecell{Seasons \\\\ CI excl.\\ 0} & "
         "Verdict\\\\\n\\midrule\n"
         + "\n".join(lines) +
         "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
@@ -924,7 +924,7 @@ def render_regression_table(f: dict) -> str:
     rungs = [r for r in ("M0", "M1", "M2", "M3") if r in ab["mae"]["median"]]
     span = len(rungs) + 1
     rule = r"\\"                      # LaTeX row terminator
-    head = "Origin & " + " & ".join(rungs) + " " + rule
+    head = "Season & " + " & ".join(rungs) + " " + rule
 
     def block_title(label: str) -> str:
         return (r"\multicolumn{%d}{@{}l}{\emph{%s}}%s"
@@ -949,12 +949,12 @@ def render_regression_table(f: dict) -> str:
     ]
     body.append(
         "\\caption{Absolute out-of-sample error of the size forecast, state "
-        "level,\nfive forecast origins, at $\\tau=0.5$. Upper block: median "
+        "level,\nfive evaluation seasons, at $\\tau=0.5$. Upper block: median "
         "absolute error\nin cases. Lower block: MASE, the same error divided by "
         "the mean absolute\none-step error the unit showed in training, so that "
         "a value above one\nmeans the forecast is worse than carrying the "
         "previous season's count\nforward unchanged. The last two rows of the "
-        "lower block give the median\nMASE and the number of origins in which it "
+        "lower block give the median\nMASE and the number of seasons in which it "
         "exceeds one. The ratios these\nerrors produce against persistence are "
         "in Table~\\ref{tab:ablation_results}.}"
     )
@@ -975,7 +975,7 @@ def render_regression_table(f: dict) -> str:
     up = ab["mase"].get("n_above_one") or {}
     if up:
         body.append(r"\addlinespace")
-        body.append("origins with MASE $>1$ & "
+        body.append("seasons with MASE $>1$ & "
                     + " & ".join(f"{up[r]} of {len(origins)}" for r in rungs
                                  if r in up) + " " + rule)
     body.append(r"\bottomrule")
@@ -1035,7 +1035,7 @@ def claims(f: dict) -> list[dict]:
              "needs": "state_size"},
             {"name": "extreme-tau sign count",
              "want": f"positive in {ext['n_positive']} of "
-                     f"{ext['n_positive'] + ext['n_negative']} origins",
+                     f"{ext['n_positive'] + ext['n_negative']} seasons",
              "stale": ["negative in \\emph{all five} origins",
                        "in every origin tested"],
              "needs": "state_size"},
@@ -1043,13 +1043,13 @@ def claims(f: dict) -> list[dict]:
              "want": f"2 of {ext['n_positive'] + ext['n_negative']}",
              "stale": [], "needs": "state_size"},
             {"name": "no tau favours the block",
-             "want": ("no quantile has three of the five origins agreeing in favour"
+             "want": ("no quantile has three of the five seasons agreeing in favour"
                       if not tau.get("taus_with_three_favouring")
                       else f"{len(tau['taus_with_three_favouring'])} of "
                            f"{tau.get('n_taus')} quantiles"),
              "stale": ["0 of 19 quantiles clearing the criterion"],
              "needs": "state_size"},
-            {"name": "taus where three origins agree against the block",
+            {"name": "taus where three seasons agree against the block",
              "want": f"{len(tau.get('taus_with_three_against', []))} of "
                      f"the {tau.get('n_taus')} levels",
              "stale": [], "needs": "state_size"},
@@ -1071,8 +1071,8 @@ def claims(f: dict) -> list[dict]:
              "want": f"median of ${d32['median_diff']:+.3f}$",
              "stale": [], "needs": src})
         out.append(
-            {"name": "municipal origins where the scaling block helps",
-             "want": f"in {d32['n_diff_positive']} of {d32['n_origins']} origins",
+            {"name": "municipal seasons where the scaling block helps",
+             "want": f"in {d32['n_diff_positive']} of {d32['n_origins']} seasons",
              "stale": ["improves the Brier score in 4 of\n5 origins"],
              "needs": src})
         if "auc_gain_scaling_median" in city:
@@ -1098,12 +1098,12 @@ def claims(f: dict) -> list[dict]:
         out += [
             {"name": "state lagged block, sign count",
              "want": f"positive in {sm1['n_diff_positive']} of "
-                     f"{sm1['n_origins']} origins",
+                     f"{sm1['n_origins']} seasons",
              "stale": [],
              "needs": "state_exceedance"},
             {"name": "state lagged block, decision count",
              "want": f"exclude zero in only {sm1['n_same_direction_ci']} of the "
-                     f"{sm1['n_origins']} origins",
+                     f"{sm1['n_origins']} seasons",
              "stale": ["excluding zero in 3 of the 5 origins"],
              "needs": "state_exceedance"},
             {"name": "state lagged block, per-origin differentials",
@@ -1138,7 +1138,7 @@ def claims(f: dict) -> list[dict]:
         out.append(
             {"name": "municipal lagged block, decision count",
              "want": f"excluding zero in {cm1['n_same_direction_ci']} of "
-                     f"{cm1['n_origins']} origins",
+                     f"{cm1['n_origins']} seasons",
              "stale": [], "needs": "city_exceedance"})
     # The record-year paragraph: its numbers come from the classifier artefact,
     # and its base rate needs a column that only a re-run of run_classifier.py
@@ -1175,15 +1175,15 @@ def claims(f: dict) -> list[dict]:
             {"name": "median MASE of the best rung",
              "want": f"The best rung on that measure is M2, at ${ms['M2']:.2f}$",
              "stale": [], "needs": "state_size"},
-            {"name": "origins where MASE exceeds one",
+            {"name": "seasons where MASE exceeds one",
              # Every rung clears the naive benchmark in the same number of
              # origins; if a refit ever breaks that, the sentence has to change
              # rather than silently describe four rungs with one number.
              "want": (f"exceeds one in {min(up.values())} of the "
-                      f"{mase['n_origins']} origins for every rung"
+                      f"{mase['n_origins']} seasons for every rung"
                       if len(set(up.values())) == 1
                       else f"exceeds one in {min(up.values())} to "
-                           f"{max(up.values())} of the {mase['n_origins']} origins"),
+                           f"{max(up.values())} of the {mase['n_origins']} seasons"),
              "stale": [], "needs": "state_size"},
         ]
         rec, aft = mae.get("record") or {}, mae.get("before_record") or {}
@@ -1194,9 +1194,9 @@ def claims(f: dict) -> list[dict]:
                  "stale": [], "needs": "state_size"})
         if aft:
             out.append(
-                {"name": "MAE in the origins before the record",
+                {"name": "MAE in the seasons before the record",
                  "want": (f"against {_sci(aft['min'])} to {_sci(aft['max'])} in "
-                          f"the {len(aft['origins'])} origins before it"),
+                          f"the {len(aft['origins'])} seasons before it"),
                  "stale": [], "needs": "state_size"})
     if rmse:
         r = rmse["median"]

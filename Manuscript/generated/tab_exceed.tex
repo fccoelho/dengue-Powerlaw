@@ -5,14 +5,14 @@
 \small
 \setlength{\tabcolsep}{5pt}
 \caption{The large-season classifier at both aggregation levels, five
-forecast origins 2021--2025. The figure in parentheses is the number of
+evaluation seasons 2021--2025. The figure in parentheses is the number of
 states, respectively municipalities, that enter the level; the number
-evaluated per origin is smaller, since a place without the required
+evaluated per season is smaller, since a place without the required
 history is excluded rather than imputed (Section~\ref{sec:targets}).
 The target is whether a unit exceeds the 75th
 percentile of its own history; the loss is the Brier score. Positive values
 mean the later rung has the lower Brier score, and ``median'' is over the
-five origins. ``Origins CI excl.\ 0'' counts the origins with a
+five seasons. ``Seasons CI excl.\ 0'' counts the seasons with a
 same-direction improvement whose 95\% unit-bootstrap interval excludes
 zero, which is what the decision rule of Section~\ref{sec:ablation}
 requires in at least 3 of 5. The municipal rows use a within-municipality
@@ -21,7 +21,7 @@ population-only reference reaches a median AUC of $0.47$ against $0.58$--$0.65$ 
 \label{tab:exceed}
 \begin{tabular}{@{}llrccr@{}}
 \toprule
-Level & Contrast & \makecell{$\Delta$Brier \\ median} & Origins $\Delta>0$ & \makecell{Origins \\ CI excl.\ 0} & Verdict\\
+Level & Contrast & \makecell{$\Delta$Brier \\ median} & Seasons $\Delta>0$ & \makecell{Seasons \\ CI excl.\ 0} & Verdict\\
 \midrule
 \makecell{State \\ ($n=26$)} & \makecell{M1$-$M0 \\ (lagged metrics)} & $+0.126$ & 4/5 & 2/5 & not supported\\
  & \makecell{M2$-$M1 \\ (climate)} & $+0.027$ & 3/5 & 2/5 & not supported\\
