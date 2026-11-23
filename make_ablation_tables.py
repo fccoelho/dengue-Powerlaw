@@ -692,7 +692,7 @@ def render_ablation_table(f: dict) -> str:
         "\\begin{table}[htbp]\n\\centering\n\\small\n"
         "\\setlength{\\tabcolsep}{4pt}\n"
         "\\caption{Ablation ladder over the five forecast origins 2021--2025, state\n"
-        "level (26 units, 23--25 evaluated per origin), for the single target. Cells\n"
+        "level (26 states, 23--25 evaluated per origin), for the single target. Cells\n"
         "give the median across origins of the skill score\n"
         "$1-L(\\text{rung})/L(\\text{M0})$ against calibrated persistence, with the\n"
         "range over origins in brackets; the primary loss is the pinball loss at\n"
@@ -718,13 +718,25 @@ def render_exceed_table(f: dict) -> str:
     cannot be overlooked in the compiled PDF and disappears the moment the run
     happens.
     """
+    def _mc(label: str) -> str:
+        """Break a ``name (qualifier)`` label over two lines, as the float has it.
+
+        Without this the generator emitted the labels on one line while the
+        committed ``tab_exceed.tex`` -- and therefore the compiled PDF -- had
+        them in ``\\makecell``: regenerating the table silently restyled it.
+        """
+        if " (" in label:
+            name, rest = label.split(" (", 1)
+            return f"\\makecell{{{name} \\\\ ({rest}}}"
+        return label
+
     def rows(block: dict, label: str) -> list[str]:
         names = ("M1$-$M0 (lagged metrics)", "M2$-$M1 (climate)",
                  "M3$-$M2 (scaling)")
         out = []
         for i, (c, name) in enumerate(zip(ADJACENT, names)):
             d = block["contrasts"][c]
-            head = label if i == 0 else ""
+            head = _mc(label) if i == 0 else ""
             if d.get("verdict") == "supported":
                 verdict = "\\textbf{supported}"
             elif d.get("verdict") == "not_supported":
@@ -734,14 +746,14 @@ def render_exceed_table(f: dict) -> str:
             ci = ("--" if d.get("n_same_direction_ci") is None
                   else f"{d['n_same_direction_ci']}/{d['n_origins']}")
             out.append(
-                f"{head} & {name} & ${d['median_diff']:+.3f}$ & "
+                f"{head} & {_mc(name)} & ${d['median_diff']:+.3f}$ & "
                 f"{d['n_diff_positive']}/{d['n_origins']} & {ci} & {verdict}\\\\")
         return out
 
     lines: list[str] = []
     state = f["exceed"].get("state")
     if state:
-        lines += rows(state, "State (26 units)")
+        lines += rows(state, "State ($n=26$)")
     else:
         lines.append(
             "\\multicolumn{6}{@{}l}{\\emph{State level: no committed artefact; run "
@@ -751,7 +763,7 @@ def render_exceed_table(f: dict) -> str:
     city = f["exceed"].get("city")
     if city:
         n_units = city.get("n_units")
-        label = (f"Municipal ({int(n_units):,} units)".replace(",", "{,}")
+        label = (f"Municipal ($n={int(n_units):,}$)".replace(",", "{,}")
                  if n_units else "Municipal")
         lines += rows(city, label)
     else:
@@ -763,13 +775,17 @@ def render_exceed_table(f: dict) -> str:
 
     caption = (
         "\\caption{The large-season classifier at both aggregation levels, five\n"
-        "forecast origins 2021--2025. The target is whether a unit exceeds the 75th\n"
+        "forecast origins 2021--2025. The figure in parentheses is the number of\n"
+        "states, respectively municipalities, that enter the level; the number\n"
+        "evaluated per origin is smaller, since a place without the required\n"
+        "history is excluded rather than imputed (Section~\\ref{sec:targets}).\n"
+        "The target is whether a unit exceeds the 75th\n"
         "percentile of its own history; the loss is the Brier score. Positive values\n"
         "mean the later rung has the lower Brier score, and ``median'' is over the\n"
         "five origins. ``Origins CI excl.\\ 0'' counts the origins with a\n"
         "same-direction improvement whose 95\\% unit-bootstrap interval excludes\n"
         "zero, which is what the decision rule of Section~\\ref{sec:ablation}\n"
-        "requires in at least 3 of 5. The municipal rows use a within-unit\n"
+        "requires in at least 3 of 5. The municipal rows use a within-municipality\n"
         "threshold, without which the label is a population indicator; there the\n"
         "population-only reference reaches a median AUC of "
         f"${pop:.2f}$ against {auc_txt} for the fitted rungs.}}"
@@ -782,9 +798,10 @@ def render_exceed_table(f: dict) -> str:
         "\\begin{table}[htbp]\n\\centering\n\\small\n"
         "\\setlength{\\tabcolsep}{5pt}\n" + caption + "\n"
         "\\label{tab:exceed}\n"
-        "\\begin{tabular}{@{}llrrrr@{}}\n\\toprule\n"
-        "Level & Contrast & $\\Delta$Brier, median & Origins $\\Delta>0$ & "
-        "Origins CI excl.\\ 0 & Verdict\\\\\n\\midrule\n"
+        "\\begin{tabular}{@{}llrccr@{}}\n\\toprule\n"
+        "Level & Contrast & \\makecell{$\\Delta$Brier \\\\ median} & "
+        "Origins $\\Delta>0$ & \\makecell{Origins \\\\ CI excl.\\ 0} & "
+        "Verdict\\\\\n\\midrule\n"
         + "\n".join(lines) +
         "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
