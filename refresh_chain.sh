@@ -5,6 +5,7 @@
 #   2. drop the stale figure panel cache so it rebuilds from the new DB
 #   3. run_ablation.py --level state --attach-climate  -> ablation_results.csv (fig11)
 #   4. run_classifier.py                               -> classifier_results.* (fig12/13)
+#   4b. calibration_diagnosis.py                      -> calibration_diagnosis.json (per-state threshold)
 #   5. generate_figures.py                             -> all 15 candidate figures
 #   6. verify_results.py + verify_predictive.py        -> drift reports for main.tex
 #   7. recompile the manuscript
@@ -85,6 +86,14 @@ say "stage 3b: done"
 say "stage 4: rarity classifier (city level, defaults)"
 "$PY" run_classifier.py > logs/classifier.log 2>&1
 say "stage 4: done"
+
+# The per-state threshold diagnosis reads classifier_results.parquet, so it is
+# refitted with the classifier and not with the tables. Its artefact carries
+# numbers the prose gate checks, and a diagnosis computed from a superseded OOF
+# file would state the answer to a different question under the same file name.
+say "stage 4b: per-state threshold diagnosis"
+"$PY" calibration_diagnosis.py > logs/calibration_diagnosis.log 2>&1
+say "stage 4b: done"
 
 # ---- stage 5: all figures -------------------------------------------
 say "stage 5: regenerating all 15 figures"

@@ -153,6 +153,186 @@
       "2025": 0.2626955074875208
     }
   },
+  "diagnosis": {
+    "decomposition": {
+      "max_offset": 0.4846800453740001,
+      "min_offset": -0.4814188875080208,
+      "n_state_seasons": 63,
+      "n_states": 16,
+      "sd_offset": 0.22789366245365725,
+      "seasons": [
+        {
+          "mean_offset": 0.1837202848836487,
+          "n_states": 8,
+          "sd_offset": 0.13041932954253696,
+          "season": 2021
+        },
+        {
+          "mean_offset": 0.10129134055262291,
+          "n_states": 13,
+          "sd_offset": 0.19739649614317065,
+          "season": 2022
+        },
+        {
+          "mean_offset": 0.08478394850426116,
+          "n_states": 13,
+          "sd_offset": 0.21438878984525545,
+          "season": 2023
+        },
+        {
+          "mean_offset": -0.1225609418555356,
+          "n_states": 16,
+          "sd_offset": 0.2667693559076177,
+          "season": 2024
+        },
+        {
+          "mean_offset": 0.12480523966209787,
+          "n_states": 13,
+          "sd_offset": 0.1512989774840349,
+          "season": 2025
+        }
+      ],
+      "share_between_season": 0.2862721852334099,
+      "ss_between_season": 78.9477785113098,
+      "ss_within_state": 196.83094741325152
+    },
+    "min_units": 20,
+    "persistence": {
+      "hi": 0.5310595672668204,
+      "lo": 0.006275356470908174,
+      "n_pairs": 45,
+      "r": 0.3001602378532199,
+      "replicates": 2000
+    },
+    "recalibration": {
+      "brier_global_mean": 0.2617562192528734,
+      "brier_raw_mean": 0.2430224559840039,
+      "brier_state_mean": 0.2661023262432978,
+      "delta_state_hi": 0.044049893590406605,
+      "delta_state_lo": 0.0031817287965180976,
+      "delta_state_mean": 0.022917559371856758,
+      "per_season": [
+        {
+          "base_rate": 0.4520123839009288,
+          "brier_global": 0.28338328586599515,
+          "brier_raw": 0.2582403087267419,
+          "brier_state": 0.2795903283109484,
+          "fitted_global_shift": -1.0726989289875957,
+          "n": 969,
+          "season": 2022,
+          "states_with_own_shift": 8
+        },
+        {
+          "base_rate": 0.477818853974122,
+          "brier_global": 0.23422207955020768,
+          "brier_raw": 0.2400071880617745,
+          "brier_state": 0.2538376976832018,
+          "fitted_global_shift": -0.48398354896402895,
+          "n": 1082,
+          "season": 2023,
+          "states_with_own_shift": 16
+        },
+        {
+          "base_rate": 0.6954177897574124,
+          "brier_global": 0.3027279000742733,
+          "brier_raw": 0.25002372478096796,
+          "brier_state": 0.2963610908696254,
+          "fitted_global_shift": -0.42232251842688096,
+          "n": 1484,
+          "season": 2024,
+          "states_with_own_shift": 21
+        },
+        {
+          "base_rate": 0.4411149825783972,
+          "brier_global": 0.22669161152101738,
+          "brier_raw": 0.22381860236653114,
+          "brier_state": 0.23462018810941557,
+          "fitted_global_shift": 0.09351788779863206,
+          "n": 1435,
+          "season": 2025,
+          "states_with_own_shift": 24
+        }
+      ],
+      "replicates": 400,
+      "share_resamples_worse": 0.99
+    },
+    "ref_rung": "M3",
+    "seed": 20261123,
+    "target_seasons": [
+      2022,
+      2023,
+      2024,
+      2025
+    ],
+    "threshold": {
+      "alerts_fixed_mean": 649.0,
+      "alerts_state_mean": 738.5,
+      "f1_fixed_mean": 0.5957468571047407,
+      "f1_global_mean": 0.5768710162073863,
+      "f1_state_mean": 0.5962631457877654,
+      "fixed_rule": 0.5,
+      "per_season": [
+        {
+          "alerts_fixed": 484,
+          "alerts_state_threshold": 687,
+          "f1_fixed": 0.5097613882863341,
+          "f1_global_threshold": 0.5672727272727273,
+          "f1_state_threshold": 0.592,
+          "global_threshold": 0.4306444386447037,
+          "n": 969,
+          "n_true": 438,
+          "season": 2022,
+          "states_with_own_threshold": 5
+        },
+        {
+          "alerts_fixed": 752,
+          "alerts_state_threshold": 889,
+          "f1_fixed": 0.6430260047281324,
+          "f1_global_threshold": 0.6491582491582492,
+          "f1_state_threshold": 0.6600284495021337,
+          "global_threshold": 0.3852757357906005,
+          "n": 1082,
+          "n_true": 517,
+          "season": 2023,
+          "states_with_own_threshold": 10
+        },
+        {
+          "alerts_fixed": 648,
+          "alerts_state_threshold": 514,
+          "f1_fixed": 0.6190476190476191,
+          "f1_global_threshold": 0.4724517906336088,
+          "f1_state_threshold": 0.5278137128072445,
+          "global_threshold": 0.5510702393620807,
+          "n": 1484,
+          "n_true": 1032,
+          "season": 2024,
+          "states_with_own_threshold": 15
+        },
+        {
+          "alerts_fixed": 712,
+          "alerts_state_threshold": 864,
+          "f1_fixed": 0.6111524163568773,
+          "f1_global_threshold": 0.6186012977649603,
+          "f1_state_threshold": 0.6052104208416834,
+          "global_threshold": 0.491871880875069,
+          "n": 1435,
+          "n_true": 633,
+          "season": 2025,
+          "states_with_own_threshold": 18
+        }
+      ],
+      "threshold_fit_states": 18,
+      "threshold_max": 0.6317103537493454,
+      "threshold_median": 0.46158466070088655,
+      "threshold_min": 0.20744957912756395
+    },
+    "verdict": {
+      "per_state_threshold_issued": false,
+      "reason_level_not_stable": true,
+      "reason_recalibration_hurts": true,
+      "share_boot_worse": 0.99
+    }
+  },
   "exceed": {
     "city": {
       "auc_gain_scaling_median": 0.013260067590227798,
@@ -587,6 +767,13 @@
     }
   },
   "sources": {
+    "calibration": {
+      "how": "python calibration_diagnosis.py",
+      "path": "calibration_diagnosis.json",
+      "present": true,
+      "problem": null,
+      "what": "per-state level and threshold diagnosis"
+    },
     "city_classifier": {
       "how": null,
       "path": "classifier_results_metrics.csv",
