@@ -103,7 +103,7 @@ def test_exceed_table_marks_a_missing_block_instead_of_dropping_it():
     tex = mat.render_exceed_table(facts)
     assert "no committed artefact" in tex
     assert "run\\_ablation.py" in tex
-    assert "Municipal (3{,}976 units)" in tex
+    assert r"Municipal \\ ($n=3{,}976$)" in tex
 
 
 def test_ablation_table_refuses_to_render_without_a_ladder():

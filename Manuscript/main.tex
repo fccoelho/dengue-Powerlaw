@@ -48,16 +48,17 @@ that 5.6--16.5\% of municipalities exceed ten times $x_{\min}$ in a given year a
 0.3--2.7\% a hundred times it.
 
 Forecasting depends on the target and on the spatial unit. For the municipal
-question of whether a season will exceed the unit's own upper quartile, last
-season's descriptors, duration and peak timing among them, beat a baseline of the
-unit's own rate in four of five forecast years and lose in the fifth, the only
-contrast here to satisfy the pre-specified test; the area under the ROC curve rises
-from 0.50 to 0.58, and to 0.65 with every term. At state level the same contrast
-satisfies the test in two of five years. For the magnitude of the size no model
-reaches skill: the power-law parameters add a median $+4.9\%$ at the 95th
-percentile, with intervals excluding zero in two years and in opposite directions.
-The parameters give the probability of an extreme season and no prediction of next
-season's size.
+question of whether a season will exceed the municipality's own upper quartile,
+last season's descriptors, duration and peak timing among them, beat a baseline
+of that municipality's own rate in four of five forecast years and lose in the
+fifth, the only contrast here to satisfy the pre-specified test; the area under
+the ROC curve rises from 0.50 to 0.58, and to 0.65 with every term. At state
+level the same contrast satisfies the test in two of five years. For the
+magnitude of the size no model reaches skill: the power-law parameters add a
+median $+4.9\%$ at the 95th percentile, with intervals excluding zero in two
+years and in opposite directions. The parameters give the probability of an
+extreme season and no prediction of next season's size.
+
 \end{abstract}
 
 \section{Introduction}
@@ -363,7 +364,7 @@ The five samples those two decisions produce are
 %
 where $i$ is a municipality, $s$ a state and $t$ a season; the first two fit the weekly count and the last three the epidemic size. Each sample is estimated on its own, so that every row of Table~\ref{tab:levels} carries its own $\alpha$ and $x_{\min}$, and no parameter is shared between constructions.
 
-A sample enters the estimator only if it holds at least ten positive values, a floor applied identically at the five constructions; samples below it are discarded rather than fitted, which is one reason the fit counts of Table~\ref{tab:levels} differ from the number of units the data hold.
+A sample enters the estimator only if it holds at least ten positive values, a floor applied identically at the five constructions; samples below it are discarded rather than fitted, which is one reason the fit counts of Table~\ref{tab:levels} differ from the number of municipalities the data hold.
 The floor binds unevenly.
 At \lvl{S-mun} it leaves out municipalities whose history is too short to define a distribution; at \lvl{S-state} it leaves out a state-season in which fewer than ten municipalities have an identified episode, so a state with fewer than ten municipalities contributes to no state-year fit, and the Federal District, a single municipality, appears in the pooled sample alone.
 
@@ -488,7 +489,7 @@ Figure~\ref{fig:exceed} confronts them with the empirical exceedance frequencies
 Second, $\alpha_S$ is a low-variance quantity \emph{relative to its target}.
 Across the national cross-sections it takes values between $1.78$ and $2.25$, over
 a period in which annual case counts vary by two orders of magnitude. The weekly
-exponent is in the same position across units: $\alpha_W$ is essentially unrelated
+exponent is in the same position across municipalities: $\alpha_W$ is essentially unrelated
 to municipality size ($r=-0.043$ over $5{,}264$ municipalities,
 Section~\ref{sec:coupling}), so an exponent is not a restatement of how large a
 municipality is, and $\alpha_S$ is not a restatement of how heavily burdened it
@@ -525,6 +526,9 @@ in which such a comparison could be falsified and how each is prevented.
 The forecasting problem is posed at the level of an administrative unit, a
 municipality or a state, and a target season $t$: every predictor is measured in
 season $t-1$ or earlier, and the target is a property of the season of year $t$.
+Where a statement refers to one of the two levels it names that level, states at
+state level and municipalities at municipal level, and ``unit'' is reserved for the
+places where the statement holds at either.
 There is one target, the epidemic size $S_t$ defined in
 Section~\ref{sec:definitions}, because it is the quantity surveillance services
 act on and the only one of the three seasonal descriptors with unbounded support.
@@ -595,7 +599,7 @@ scale. The $L_1$ penalty is $10^{-4}$, deliberately weak.
 
 Quantile models are fitted on the grid
 $\tau \in \{0.05, 0.10, \dots, 0.95\}$, which yields a full predictive
-distribution per unit and season rather than a point forecast, and all stochastic
+distribution per municipality and season rather than a point forecast, and all stochastic
 components were seeded identically across runs. Figure~\ref{fig:predobs} shows
 the resulting out-of-sample forecasts for the most recent season, in aggregate
 and broken down by state, over the municipal panel. The boundary
@@ -622,12 +626,12 @@ class-imbalance weight, set to the ratio of negative to positive observations in
 the training fold.
 
 The scope over which the percentile is taken is set by what each level can support.
-At municipal level $Q_p$ is computed from each unit's own training seasons, and
+At municipal level $Q_p$ is computed from each municipality's own training seasons, and
 3{,}976 of the 5{,}571 municipalities supply the five seasons that estimate requires.
-At state level the panel supplies 23 to 25 units per origin, too few for a within-unit
+At state level the panel supplies 23 to 25 states per origin, too few for a within-state
 percentile, and $Q_p$ is taken across the states of the fold's training seasons. The
 two labels therefore answer slightly different questions, and the state-level task is
-the closer of the two to a ranking by unit size (Section~\ref{sec:classresults}).
+the closer of the two to a ranking by state size (Section~\ref{sec:classresults}).
 
 The classifier is a penalised logistic regression on the same spline basis, with
 the class imbalance handled by weighting the training rows by the
@@ -760,7 +764,7 @@ M3 & \quad + scaling   & M2 + $\alpha_{S,t-1}$, $x_{\min,S,t-1}$, $\dot\alpha_{t
 \end{table}
 
 Forecast values at M0 are scaled by the empirical $\tau$-quantile of the
-within-unit season-on-season ratio, estimated on the training seasons, so that the
+within-municipality season-on-season ratio, estimated on the training seasons, so that the
 same benchmark can be evaluated at every quantile level rather than only at the
 median. At $\tau=0.5$ the scale factor is close to unity and M0 reduces to plain
 persistence; at the other levels this is the honest analogue of persistence and
@@ -960,7 +964,7 @@ the verdict.}
 \label{sec:size}
 
 The construction that survives both criteria is the one that matters
-operationally: the distribution of epidemic size across units within a season. At
+operationally: the distribution of epidemic size across municipalities within a season. At
 the national cross-section, all 16 annual fits favour the power law and all are
 significant, with median $\alpha_S=2.03$ (IQR 1.90--2.10) and
 median $x_{\min}=730$ cases. $\alpha_S$ is stable, ranging from 1.78 to 2.25 over
@@ -1042,7 +1046,7 @@ Simulated, $\alpha_S$ fixed at $2.0$    & control               & $-0.20$ & 40\\
 The association is strong at national level and strong \emph{within} states over
 time --- positive in 92\% of the 24 states with at least six seasons of data, and
 significantly positive in 67\% --- but weak between states. It is therefore a
-within-unit, over-time relationship and not a contrast between places. The
+within-municipality, over-time relationship and not a contrast between places. The
 control recovers no such association, so the estimator does not generate it: it
 places the sampling dispersion of $\hat\alpha_S$ at $0.03$ (40 replicates, samples
 of 800 to 4{,}000 points, true $\alpha_S$ fixed at $2.0$), against an observed
@@ -1144,7 +1148,7 @@ the previous season's duration and peak timing as ordinary covariates, alongside
 size, $R_0$ and population, move the Brier score in the expected direction: a
 median of $+0.126$, positive in 4 of 5 origins and reaching $+0.212$. The
 intervals exclude zero in only 2 of the 5 origins, against the 3 that the rule requires, so the rung fails the rule at state level: each origin is a
-bootstrap over 23 to 25 units and the median interval is $0.26$ wide, wider than
+bootstrap over 23 to 25 states and the median interval is $0.26$ wide, wider than
 the effect it is asked to resolve. Climate adds nothing to it (median $+0.027$) and neither does the scaling block
 (median of $+0.000$, with no origin in which the block improves by an interval excluding
 zero). The per-origin
@@ -1153,26 +1157,28 @@ which is the pattern expected of a model that requires history in order to be
 trained.
 
 At municipal level the same ladder runs over 3{,}976 municipalities with enough
-history for a within-unit threshold, at least five seasons, with between 580 and
-1{,}484 units evaluated per origin. Two things change, and only one of them
-concerns the scaling descriptors. The first is a correction. With the threshold
-taken from each municipality's own seasons, the population-only reference falls to a
-median area under the curve of $0.47$ (range $0.454$--$0.522$), against $0.87$ (range
-$0.84$--$0.93$) where the threshold is pooled across units, as it must be at state
-level: a pooled label is largely a restatement of unit size, whereas the within-unit
-label is not. The second is that the lagged block, which the state level could not
-resolve, satisfies the rule here. Its Brier differential has a median of $+0.049$, positive and with an
-interval excluding zero in 4 of 5 origins, the only contrast in this study to satisfy
-the pre-specified rule (Table~\ref{tab:exceed}). Discrimination rises from $0.50$ for
-the no-skill reference to $0.58$, $0.63$ and $0.65$ for M1, M2 and M3; M3 is the best
-of the three in 3 of 5 origins and gains a median $+0.013$ over M2.
+history for a within-municipality threshold, at least five seasons, with between
+580 and 1{,}484 municipalities evaluated per origin. Two things change, and only
+one of them concerns the scaling descriptors. The first is a correction. With
+the threshold taken from each municipality's own seasons, the population-only
+reference falls to a median area under the curve of $0.47$ (range
+$0.454$--$0.522$), against $0.87$ (range $0.84$--$0.93$) where the threshold is
+pooled across municipalities, as it must be at state level: a pooled label is
+largely a restatement of municipality size, whereas the within-municipality
+label is not. The second is that the lagged block, which the state level could
+not resolve, satisfies the rule here. Its Brier differential has a median of
+$+0.049$, positive and with an interval excluding zero in 4 of 5 origins, the
+only contrast in this study to satisfy the pre-specified rule
+(Table~\ref{tab:exceed}). Discrimination rises from $0.50$ for the no-skill
+reference to $0.58$, $0.63$ and $0.65$ for M1, M2 and M3; M3 is the best of the
+three in 3 of 5 origins and gains a median $+0.013$ over M2.
 
 The inversion between the two levels is a statement about precision and not about
 epidemiology. The state estimate of the same effect is the larger of the two in
 absolute terms, $+0.126$ against $+0.049$, and the less certain by a factor of
 eight in interval width, $0.26$ against $0.034$, so that a rule which fails at one
-level and passes at the other is failing on sample size: twenty-five units per
-origin cannot resolve an effect that 1{,}484 units can. The two levels also differ in
+level and passes at the other is failing on sample size: twenty-five states per
+origin cannot resolve an effect that 1{,}484 municipalities can. The two levels also differ in
 the scope of the label, which is pooled across states but taken within each
 municipality, so the state comparison inherits the size ranking described above and is
 the weaker of the two tests of epidemic rarity. What the two levels agree on is the
@@ -1189,7 +1195,7 @@ municipalities exceeded their own upper quartile, against a training base rate o
 26.4\%. The no-skill reference scores a Brier score of $0.40$ there and the fitted rungs about $0.25$, better than the reference but worse than the $0.21$ that a
 predictor knowing the season's own frequency would earn. That season was a
 national record, and no model trained on earlier seasons anticipated its level.
-This is the boundary of the exercise: the classifier ranks units within a season
+This is the boundary of the exercise: the classifier ranks municipalities within a season
 of familiar magnitude; it does not anticipate a change of regime.
 
 Figures~\ref{fig:roc} and~\ref{fig:importance} report discrimination, calibration
@@ -1260,7 +1266,7 @@ previous season. Panel (b) tracks the three scaling descriptors across forecast
 origins. The joint bar is the scaling block permuted as a single unit: permuting
 one column while its correlated partners remain in place understates a collinear
 block, and $\alpha_{t-1}$ and $x_{\min,t-1}$ are rank-correlated at $0.64$ within
-units.}
+municipalities.}
 \label{fig:importance}
 \end{figure}
 
@@ -1404,7 +1410,7 @@ interval belonging to the paired differential.}
 \subsection{Spatial output and the alarm list}
 \label{sec:spatial}
 
-Accuracy pooled over units is not the same as accuracy where decisions are taken,
+Accuracy pooled over municipalities is not the same as accuracy where decisions are taken,
 so we report the output a surveillance service would read: the map for the record
 season (Figure~\ref{fig:map}) and the list of alerts that follows from it.
 
@@ -1500,7 +1506,7 @@ place, when it is a property of the tuple (variable, sampling unit, dimension of
 pooling, comparison model).
 
 The same comparison identifies which construction \emph{does} carry a stable tail.
-Epidemic size across units within a season is power-law at every construction at
+Epidemic size across municipalities within a season is power-law at every construction at
 which $x_{\min}$ lies above the bulk: all 16 national cross-sections, 96\% support
 across 353 state-year cross-sections, and a lower bound in the hundreds of cases,
 two to three orders of magnitude above the body of the distribution. The paper rests on this result.
@@ -1541,7 +1547,7 @@ seasonal descriptors improve the Brier score over calibrated persistence in 4 of
 origins and are significantly the worse in the fifth, and they raise discrimination
 from $0.50$ to $0.58$ in area under the curve, the full ladder reaching $0.65$. At
 state level the same rung produces a larger point estimate and fails the rule, on 23
-to 25 units per origin and with a label pooled across them. The scaling block, which is
+to 25 states per origin and with a label pooled across them. The scaling block, which is
 the object of the paper, satisfies the criterion at neither level. Where the question is posed as a magnitude, the answer
 is negative, and the failure has a stated mechanism.
 
@@ -1559,7 +1565,7 @@ a large season next, and that is what a forecast needs.
 \subsection{How the coupling explains both results}
 
 The coupling between $\alpha_S$ and $x_{\min}$ is the mechanism behind both halves
-of the predictive result, and it is a finding rather than a caveat. Within units the two estimates are rank-correlated at $0.64$ (median over 24
+of the predictive result, and it is a finding rather than a caveat. Within municipalities the two estimates are rank-correlated at $0.64$ (median over 24
 states) and at $0.89$ nationally, whereas a simulation with the true $\alpha_S$ held
 fixed at $2.0$ recovers $-0.20$. The association is a property of the data and not of the
 estimator.
@@ -1567,7 +1573,7 @@ estimator.
 Descriptively, this makes the pair a compact readout of seasonal magnitude: two
 numbers that move with the size of the season, vary far less than the case counts
 they summarise (SD $0.150$ against a sampling noise of $0.03$), and
-are available for every unit. This is a substantive contribution to the
+are available for every municipality. This is a substantive contribution to the
 characterisation of a season, since it reduces a quantity spanning two orders of
 magnitude to a stable low-dimensional summary.
 
@@ -1605,7 +1611,7 @@ rather than a property of the estimator. The quantile regression at $\tau=0.95$
 represents the upper region instead of interpolating within it, and the forecast
 still fails in 2024: knowledge of the previous season's size and duration, of its
 peak week, of the climate covariates and of the scaling descriptors does not order
-five origins at 23 to 25 units each.
+five origins at 23 to 25 states each.
 
 The summary supported by these results is a division of labour between two
 products. The
@@ -1673,7 +1679,7 @@ a scaling description improves forecasts is meaningful only against a specified
 benchmark, on a proper scoring rule, out of sample, with the scaling block isolated
 from the blocks to which it is added, and with every channel of leakage closed. The
 redundancy documented here would be invisible under a pooled coefficient of
-determination without a benchmark, since between-unit differences are reproduced
+determination without a benchmark, since between-municipality differences are reproduced
 trivially by persistence.
 
 \subsection{Relation to operational forecast systems}
@@ -1703,7 +1709,7 @@ benchmark that already carries the lagged case count, the block of
 $(\alpha_{t-1}, x_{\min,t-1}, \dot\alpha_{t-1})$ fails the pre-specified test on size
 in 0 of 5 origins. At the 95th percentile its differential is $+4.9\%$ in
 median, with intervals excluding zero in only 2 of 5 origins and in opposite
-directions, so that the design cannot sign the effect there: with 23 to 25 units per
+directions, so that the design cannot sign the effect there: with 23 to 25 states per
 origin the test is underpowered at the extreme quantile, and we report the absence of
 a measured gain rather than a measured deterioration. The mechanism is the coupling
 documented in Section~\ref{sec:coupling}. A rung containing the scaling descriptors
@@ -1714,11 +1720,11 @@ full set of covariates --- and is not reported here.
 \emph{The municipal classifier is a ranking device, not a level forecast.} With the
 exceedance label referred to each municipality's own history, the population-only
 reference falls to a median area under the curve of $0.47$, so that the task no longer
-measures unit size, and the lagged block satisfies the pre-specified incremental test
+measures municipality size, and the lagged block satisfies the pre-specified incremental test
 at that level. What bounds the claim is the purpose of the classifier: discrimination
 reaches a median of $0.65$ only with the full ladder, against $0.58$ for the rung that
 satisfies the rule, the scaling block adds a median $+0.002$ in Brier score,
-and the 2024 origin, in which 69.5\% of units exceeded their own upper quartile
+and the 2024 origin, in which 69.5\% of municipalities exceeded their own upper quartile
 against a training base rate of 26.4\%, defeats every rung. The classifier orders
 municipalities within a season of familiar magnitude. It does not anticipate a change
 of regime, and in a record season its probabilities should not be read as levels.
@@ -1769,7 +1775,7 @@ forecast can take, so that a large error in a record season can be attributed to
 data, and that it does not remove the risk of a large error.
 
 \emph{The classification threshold is a choice.} Exceeding the 75th percentile of a
-unit's own history defines a large season; at the 90th percentile the positive class
+municipality's own history defines a large season; at the 90th percentile the positive class
 becomes small enough that the balanced accuracy of any classifier falls and the
 comparison between rungs loses power. The threshold is therefore a design parameter,
 fixed before the evaluation and reported with it.
@@ -1789,8 +1795,8 @@ assumptions about the initial susceptible fraction, and serological surveys are 
 would be needed to characterise serotype-specific immunity \citep{coelho2015attack};
 where susceptibility has been built into municipal dengue forecasts it has improved
 their weather-based predictions, which is reason to expect its omission to matter
-here \citep{mcgough2021dynamic}. To the extent that these are stable within a unit they
-are absorbed by unit-level effects; to the extent that they vary by season they
+here \citep{mcgough2021dynamic}. To the extent that these are stable within a municipality they
+are absorbed by municipality-level effects; to the extent that they vary by season they
 constitute unmodelled heterogeneity that the scaling block may be inadvertently
 representing. This is a tenable explanation for the null reported here, and it is the
 first that we would test.
@@ -1841,13 +1847,13 @@ This is the main practical result: a surveillance service can obtain the exceeda
 The fitted pair adds no forecast skill; where the ladder improves, the gain comes
 from the lagged descriptors.
 
-The first question is whether a season will exceed the unit's own upper quartile.
-At municipal level the lagged descriptors improve the Brier score over calibrated
-persistence in 4 of 5 origins and lift AUC from $0.50$ to $0.58$, the full ladder
-reaching $0.65$. That contrast is the only one in the study that satisfies the
-pre-specified rule. At state level it holds in 2 of 5 origins and fails it, since
-each origin is a bootstrap over only 23 to 25 units — an interval wider than the
-effect it must resolve.
+The first question is whether a season will exceed the municipality's own upper
+quartile. At municipal level the lagged descriptors improve the Brier score over
+calibrated persistence in 4 of 5 origins and lift AUC from $0.50$ to $0.58$, the
+full ladder reaching $0.65$. That contrast is the only one in the study that
+satisfies the pre-specified rule. At state level it holds in 2 of 5 origins and
+fails it, since each origin is a bootstrap over only 23 to 25 states — an
+interval wider than the effect it must resolve.
 
 The second question is how large the season will be. No model in the ladder achieves
 skill, in any of the 5 origins. The scaling block contributes nothing: its
