@@ -151,7 +151,7 @@ and not worth having as a magnitude. We report the three in that order, and we
 mark the limit as deliberately as we report the gains, because a service that
 mistakes a probability for a prediction ends up worse served than one that keeps
 the probability alone
-(Sections~\ref{sec:classresults}--\ref{sec:prediction}).
+(Sections~\ref{sec:classresults}--\ref{sec:alarms}).
 
 \section{Methods}
 
@@ -598,6 +598,27 @@ informative summary under class imbalance, the Brier score
 \citep{gneiting2007strictly}, defined below, the $F_1$ score at the Youden threshold and a
 calibration curve, and we test differences in the area under the curve between
 nested predictor sets by the method of \citet{delong1988comparing}.
+
+A probability is not yet a decision, and a service reads a list rather than a
+score, so the alert is defined here, as part of the protocol, and not where it
+is reported. Two operating points are used, and neither is estimated from the
+season it is applied to. Under the probability rule, unit $i$ is alerted for
+season $t$ when $\hat p_{i,t}\ge p^{\ast}$, with $p^{\ast}=0.5$ throughout, and
+the alerted set is then described by what it contains: hits, false alarms and
+missed exceedances. This is deliberately not the threshold of the preceding
+paragraph. Youden's $J$ is estimated from the out-of-fold predictions and is
+therefore a quantity the data choose, so applying it to the season whose list is
+being read would tune that list to that season, and it enters the reporting only
+through the $F_1$ it defines. The fixed $0.5$ is the cruder rule and the one
+that can be declared before the season is seen, and Section~\ref{sec:alarms}
+shows that what the list is asked to support does not depend on it, since the
+threshold is swept there rather than fixed. Under the capacity rule the units
+are ordered by $\hat p_{i,t}$ and the first $C$ are taken, which is the form the
+decision takes when what binds is how many units a service can act on rather
+than how confident it is. Precision is read against the share of units that
+exceeded in that season, not against one half: where most units exceed their own
+quartile a list that alerts everyone is right most of the time, so the
+comparison that carries information is with that list and not with chance.
 
 \paragraph{The Brier score: definition, reference value and three uses.}
 
@@ -1189,7 +1210,7 @@ municipalities.}
 \label{fig:importance}
 \end{figure}
 
-\subsection{Predicting epidemic size, and the alarm list a service reads}
+\subsection{Predicting epidemic size}
 \label{sec:prediction}
 
 The harder question is whether the tail helps forecast the magnitude of a season,
@@ -1319,6 +1340,16 @@ interval belonging to the paired differential.}
 \label{fig:ablation}
 \end{figure}
 
+\subsection{The alert list a service reads}
+\label{sec:alarms}
+
+What failed in Section~\ref{sec:prediction} is the level of a season; the
+classifier of Section~\ref{sec:classresults} is asked only where a season falls
+against the unit's own history, and an ordering is what an alert list consumes.
+The two results are consistent, and the list is the applicable output of this
+paper because it is the one that survives the resolution limit of the size
+forecast.
+
 Accuracy pooled over municipalities is not the same as accuracy where decisions are taken,
 so we report the output a surveillance service would read: the map for the record
 season (Figure~\ref{fig:map}) and the list of alerts that follows from it.
@@ -1396,6 +1427,26 @@ M1's holds 199, below chance. The list is therefore an order of attention. Its
 length is an output of the rule and not a forecast of the season, and the gain
 over no information is real but narrow, in line with the discrimination of
 Figure~\ref{fig:roc}.
+
+The alert is issued to municipalities, which is the level of the sampling unit
+rather than a choice made for the convenience of the map. Both \lvl{S-state} and
+\lvl{S-nat} are samples of municipalities, pooled within a state and nationally
+(Table~\ref{tab:levels}), so the tail that Equation~\eqref{eq:exceed} converts
+into a probability is a tail over municipalities, and the map is the national
+cross-section of \lvl{S-nat} read as a list. A list at national scale is not
+available in principle, because that level holds one value per season and there
+is nothing there to rank: the only forecast it supports is the size forecast of
+Section~\ref{sec:prediction}. The classifier is also run with the state as the
+unit (Table~\ref{tab:exceed}), where its discrimination exceeds what the
+municipal rungs reach, at a median area under the curve of $0.93$ across the
+rungs and seasons, range $0.82$--$0.99$, and that figure is the reason no
+state-level list is reported. The quartile has to be pooled across states at that
+level, a pooled label is largely a ranking by state size, and a list built on it
+would name the states that are large every season. The within-municipality label
+is what removes that reading, as the collapse of the population-only reference
+from $0.87$ to $0.47$ measures (Section~\ref{sec:classresults}), and the
+municipal list is the only one here whose precision is not available from
+population alone.
 
 
 
