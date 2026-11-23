@@ -1642,13 +1642,23 @@ def claims(f: dict) -> list[dict]:
         _m0 = r.get("M0") or {}
         _c = al["capacity"]
         out += [
+            # Both windows point at the one sentence of the manuscript that
+            # quotes this ledger, in the paragraph introducing
+            # Table~\ref{tab:alarms}. The map carries the same list, so
+            # ``make_tables.map_claims`` is pointed at that same sentence rather
+            # than at a second paraphrase of it: two phrasings of one ledger is
+            # what used to make the prose state the four numbers twice, once in
+            # the caption of Figure~\ref{fig:map} and once in the text.
             {"name": "municipalities in the alert season",
-             "want": f"{_thou(al['n_units'])} municipalities had the five seasons",
-             "stale": [], "needs": "classifier_oof"},
+             "want": (f"{_thou(al['n_true'])} of the {_thou(al['n_units'])} "
+                      f"municipalities with"),
+             "stale": ["municipalities had the five seasons"],
+             "needs": "classifier_oof"},
             {"name": "alert list at the declared rule",
-             "want": (f"{_thou(_m3['alerts'])} alerts, {_thou(_m3['hits'])} of "
-                      f"them true"),
-             "stale": [], "needs": "classifier_oof"},
+             "want": (f"{_thou(_m3['hits'])} exceeded their own upper quartile and "
+                      f"{_thou(_m3['false'])} did not"),
+             "stale": ["alerts, 520 of them true"],
+             "needs": "classifier_oof"},
             {"name": "base rate as an alert rule",
              "want": (f"${100 * al['base_rate']:.1f}\\%$ of municipalities "
                       f"exceeded"),

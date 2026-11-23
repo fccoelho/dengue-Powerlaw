@@ -24,39 +24,45 @@ large dengue epidemics in Brazil}
 \maketitle
 
 \begin{abstract}
-Power-law tails in dengue have been read as evidence that the size of a large
-epidemic cannot be forecast. We test that reading on 5{,}571 Brazilian
-municipalities over 2010--2026, fitting 50{,}391 discrete power laws to weekly
-case counts and to epidemic size under five constructions of the series,
-selecting $x_{\min}$ by Kolmogorov--Smirnov distance and testing each fit
-against an exponential.
+Studies of dengue report power-law distributions of epidemic size and read them as
+evidence that large epidemics cannot be forecast. We separate the two statements and
+test the second. For 5{,}571 Brazilian municipalities (2010--2026) we fit discrete
+power laws to weekly case counts and to epidemic size under five constructions of
+the series, selecting $x_{\min}$ by Kolmogorov--Smirnov distance and comparing each
+fit against an exponential (50{,}391 fits).
 
-The construction fixes what the exponent describes. Median exponents span
-$1.95$ to $2.08$ across constructions. Weekly counts follow a power law in 77\%
-of municipalities when a decade is pooled and in 23\% within a single season,
-with the lower bound at five cases or fewer in most fits, so the exponent
-summarises the bulk. Epidemic size, the total cases of one season, carries a
-tail under every construction: the power law is preferred in all 16 national
-seasons (median exponent 2.03) and in 96\% of 353 state-years (1.98), the tail
-beginning two to three orders of magnitude above the bulk.
+The construction decides what the exponent describes. Median exponents range from
+$1.95$ to $2.08$. Weekly counts follow a power law in 77\% of municipalities pooled
+over a decade and in 23\% within single seasons, but in most of those fits the lower
+bound falls at five cases or fewer, so the exponent describes the bulk and not a
+tail. Epidemic size, the case total of one season, keeps a tail at every
+construction tested: the power law is preferred in all 16 national seasons (median
+exponent 2.03) and in 96\% of 353 state-years (1.98), with lower bounds two to three
+orders of magnitude above the bulk.
 
-With the size exponent near two, the fitted pair $(\alpha_S, x_{\min})$ assigns
-a probability to every exceedance level at once, a risk curve for the
-municipality. It places 5.6--16.5\% of municipalities above ten times $x_{\min}$
-in a given year and 0.3--2.7\% above a hundred times it.
+Because the size exponent is close to two, the fitted pair $(\alpha_S, x_{\min})$
+fixes the probability that a season exceeds any level $s$. It therefore defines a
+risk curve; whether large epidemics can be forecast is a separate question, and the
+exponent does not settle it. From the 16 national cross-sections the pair implies
+that 5.6--16.5\% of municipalities exceed ten times $x_{\min}$ in a given year and
+0.3--2.7\% a hundred times it.
 
-Whether a municipality will exceed its own upper quartile is predictable from
-the previous season's descriptors: the classifier beats a baseline of the
-municipality's own rate in four of five years, the only contrast to pass the
-pre-specified test, the area under the ROC curve at 0.58, and 0.65 with every
-term. Next season's size remains out of reach, no model reaching skill and the
-power-law parameters adding nothing to one that already knows the previous
-season's size.
+Forecasting depends on the target and on the spatial unit. For the municipal
+question of whether a season will exceed the municipality's own upper quartile,
+last season's descriptors, duration and peak timing among them, beat a baseline
+of that municipality's own rate in four of five forecast years and lose in the
+fifth, the only contrast here to satisfy the pre-specified test; the area under
+the ROC curve rises from 0.50 to 0.58, and to 0.65 with every term. At state
+level the same contrast satisfies the test in two of five years. For the
+magnitude of the size no model reaches skill, and the power-law parameters add
+nothing to one that already knows the previous season's size. They give the
+probability of an extreme season and no prediction of next season's size.
 
-Read as an alert list for 2024, the classifier flags 648 of 1{,}484
-municipalities, four in five of them correctly against a base rate of 69.5\%,
-and the ordering holds within states (median AUC 0.60, against 0.65
-nationally), so a state can act on the ranking before its season begins.
+Read as an alert list, the same classifier is operational: in 2024 it alerts 648
+of 1{,}484 municipalities, four alerts in five are correct against a base rate of
+70\%, and it ranks municipalities almost as well within a state as nationally,
+which is what a service acts on before a season begins.
+
 \end{abstract}
 
 \section{Introduction}
@@ -1456,28 +1462,20 @@ the map of Figure~\ref{fig:map} and the list that follows from it.
 \centering
 \includegraphics[width=\textwidth]{figures/fig15_pred_map}
 \caption{The forecast read as a decision, for the record season and the top rung
-of the ladder of Table~\ref{tab:exceed}. The event is the one defined in
-Section~\ref{sec:classifier}: a season exceeding the 75th percentile of the
-municipality's own earlier seasons. Panel (a) is the alert itself, a
-municipality being coloured when the predicted probability of the event reaches
-one half --- a threshold declared in advance and not fitted to the season drawn.
-Panel (b) is what became of it, dark green where the municipality was alerted
-and did exceed its own upper quartile, red where it was alerted and did not, and
-amber where the alert fell below the threshold and the season exceeded it
-regardless; red is therefore the false alarms and amber the seasons the map
-leaves unflagged. Of the 648 municipalities alerted out of the 1{,}484 with the
-five seasons of history the event requires, 520 exceeded their own upper
-quartile and 128 did not: one alert in five is a false alarm, against one in
-three in an unranked list of the same length, which would carry 197. Panel (c)
-sweeps the threshold instead of fixing it, plotting the number of false alarms
-against the number of municipalities alerted, with the declared alert marked and
-the unranked list of each length as the dashed diagonal; the vertical gap
-between the two is what the ranking buys, and it narrows only as the list
-approaches every municipality. The rung is the top of the ladder, and the
-increment of its scaling block over the rung below is not distinguishable from
-zero (Table~\ref{tab:exceed}), so what the panels measure is the performance of
-the ladder rather than the contribution of any one block. Municipalities without
-that history carry no forecast and are drawn in grey.}
+of the ladder of Table~\ref{tab:exceed}, which is read whole: its scaling block
+adds nothing resolvable at either level (Section~\ref{sec:classresults}). The
+event is the one defined in Section~\ref{sec:classifier}, a season exceeding the
+75th percentile of the municipality's own earlier seasons. Panel (a) is the alert
+itself, a municipality being coloured when the predicted probability of the event
+reaches one half, a threshold declared in advance and not fitted to the season
+drawn. Panel (b) is what became of it, dark green where the municipality was
+alerted and did exceed its own upper quartile, red where it was alerted and did
+not, amber where it was not alerted and the season exceeded it regardless; red is
+the false alarms and amber the exceedances left unflagged. Panel (c) sweeps the
+threshold instead of fixing it: false alarms against municipalities alerted,
+the declared alert marked and the unranked list of each length as the dashed
+diagonal. Municipalities without the history the event requires carry no
+forecast and are drawn in grey.}
 \label{fig:map}
 \end{figure}
 
