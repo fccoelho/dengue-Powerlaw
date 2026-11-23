@@ -54,10 +54,9 @@ of that municipality's own rate in four of five forecast years and lose in the
 fifth, the only contrast here to satisfy the pre-specified test; the area under
 the ROC curve rises from 0.50 to 0.58, and to 0.65 with every term. At state
 level the same contrast satisfies the test in two of five years. For the
-magnitude of the size no model reaches skill: the power-law parameters add a
-median $+4.9\%$ at the 95th percentile, with intervals excluding zero in two
-years and in opposite directions. The parameters give the probability of an
-extreme season and no prediction of next season's size.
+magnitude of the size no model reaches skill, and the power-law parameters add
+nothing to one that already knows the previous season's size. They give the
+probability of an extreme season and no prediction of next season's size.
 
 \end{abstract}
 
@@ -310,8 +309,7 @@ Table~\ref{tab:levels} defines the five aggregation levels used; each is a const
 Two variables are fitted, both derived from the same municipal series: the weekly case count $c_{i,w}$ at constructions \lvl{W-mun} and \lvl{W-seas}, and the epidemic size $S_{i,t}$ at constructions \lvl{S-mun}, \lvl{S-state} and \lvl{S-nat}. Within each group the constructions differ only in the dimension along which the variable is pooled, which is what allows a contrast between two of them to be read as the effect of that dimension alone.
 
 The paper therefore estimates two exponents, not one: $\alpha_W$ for the weekly case count and $\alpha_S$ for the epidemic size.
-They are close in value, the median across the five constructions spans $1.95$ to $2.08$, and the two groups overlap inside that span, and the near-agreement is why the distinction has to be carried by the notation rather than by the number.
-An $\alpha_W$ of $1.95$ and an $\alpha_S$ of $2.08$ differ by $0.13$ in the exponent and by a factor of $150$ in the lower bound (Section~\ref{sec:size}), and only the second describes the risk of a large season.
+They are close in value --- the median across the five constructions spans $1.95$ to $2.08$, and the two groups overlap inside that span --- which is why the distinction has to be carried by the notation rather than by the number: the two are not estimates of one quantity, they are estimates of two quantities that happen to be nearly equal, and only $\alpha_S$ describes the risk of a large season (Section~\ref{sec:size}).
 
 Every handle is read as a variable and a scope. The initial letter names the fitted variable, \emph{W} for the weekly count, \emph{S} for the epidemic size, and the remainder names the scope over which observations are pooled: \emph{mun} for a single municipality, \emph{seas} for a single season of a single municipality, \emph{state} for the municipalities of one state in one season, and \emph{nat} for the municipalities of the country in one season.
 The handles name constructions and are not random variables: only $c_{i,w}$ and $S_{i,t}$ enter the likelihood.
@@ -1327,22 +1325,15 @@ The best rung on that measure is M2, at $1.12$, and the MASE exceeds one in 4 of
 the 5 seasons for every rung. The ladder beats the naive rule only in isolated
 cells, 2021 for M1 at $0.72$ and 2025 for M2 at $0.68$.
 
-The levels also show what a pooled average would hide. In the record season the
-median absolute error runs from $2.99\times10^{5}$ to $3.28\times10^{5}$ cases
-across the four rungs, against $1.52\times10^{4}$ to $6.71\times10^{4}$ in the 3
-seasons before it. The ratio in Table~\ref{tab:ablation_results} and the levels
-here are the same finding read from either end: the ladder does not separate the
-rungs, and it does not approach a usable error at any of them.
-
-Two seasons dominate the size target and require separate treatment. The 2024
-season was the largest on record and 2025 fell back sharply; persistence
-extrapolated the record into 2025 and, in absolute terms, lost there much of what
-it had gained in 2024. The pinball losses for size are accordingly an order of
-magnitude larger in those two seasons, $1.5$ to $1.7\times10^{5}$ cases, than in
-the other three, $1.2$ to $3.2\times10^{4}$, so that a pooled mean over seasons
-would mostly describe how each rung behaves across a change of regime. We
-therefore report the median across seasons and the sign of the per-season
-differential rather than a pooled average.
+The levels also show what a pooled average would hide. In the record season the median
+absolute error runs from $2.99\times10^{5}$ to $3.28\times10^{5}$ cases across the
+four rungs, against $1.52\times10^{4}$ to $6.71\times10^{4}$ in the 3 seasons
+before it; the pinball losses for size are an order of magnitude larger in 2024 and
+2025, $1.5$ to $1.7\times10^{5}$ cases, than in the other three, $1.2$ to
+$3.2\times10^{4}$, because persistence extrapolated the record into a season that
+fell back sharply. A pooled mean would therefore mostly describe how each rung
+behaves across a change of regime, and we report the median across seasons and the
+sign of the per-season differential instead.
 
 That change of regime is the substantive lesson of this subsection, and it is
 consistent with the descriptive result rather than in tension with it. If epidemic
@@ -1496,130 +1487,77 @@ Figure~\ref{fig:roc}.
 \subsection{What each of the two exponents describes, and what neither describes}
 
 The comparison across five constructions settles a question that the applied
-literature has treated as empirical when it is largely definitional. Median
-exponents span $1.95$ to $2.08$ across constructions of the same series and across
-the two fitted variables, the weekly count and the epidemic size; the share of fits
-favouring a power law ranges from 23\% to 100\%, and a single change of
-temporal window moves support from 77\% to 23\% with no transmission parameter
-altered. What does not survive is the inference from an exponent to a regime: the
-step that treats $\alpha_W$ or $\alpha_S$ as a property of the pathogen or of the
-place, when it is a property of the tuple (variable, sampling unit, dimension of
-pooling, comparison model).
+literature has treated as empirical when it is largely definitional. What does not
+survive is the inference from an exponent to a regime: the step that treats
+$\alpha_W$ or $\alpha_S$ as a property of the pathogen or of the place, when it is
+a property of the tuple (variable, sampling unit, dimension of pooling, comparison
+model). Section~\ref{sec:verdicts} gives the range that inference has to span.
 
-The same comparison identifies which construction \emph{does} carry a stable tail.
-Epidemic size across municipalities within a season is power-law at every construction at
-which $x_{\min}$ lies above the bulk: all 16 national cross-sections, 96\% support
-across 353 state-year cross-sections, and a lower bound in the hundreds of cases,
-two to three orders of magnitude above the body of the distribution. The paper rests on this result.
+The same comparison identifies which construction \emph{does} carry a stable
+tail: the epidemic size across municipalities within a season, power-law in all 16
+national cross-sections and in 96\% of 353 state-year cross-sections, with the
+lower bound in the hundreds of cases, two to three orders of magnitude above the
+body of the distribution. The paper rests on this result.
 
-The distinction between this result and the weekly-count fits that collapse to
-$x_{\min} \le 5$ is substantive rather than technical. At $x_{\min}=2$ the fitted
-law describes counts of one and two cases; at $x_{\min}=730$ it describes the upper
-decade of a distribution. Two analyses reported as agreeing on the exponent can be
-describing entirely different objects, as the comparison of \lvl{W-mun} and
-\lvl{S-mun} shows: $\alpha_W=1.95$ against $\alpha_S=2.08$, a difference of $0.13$
-in the exponent and a factor of $150$ in the lower bound. The two exponents are
-not two estimates of one quantity; they are estimates of two quantities that
-happen to be nearly equal.
+The distinction between it and the weekly fits that collapse to
+$x_{\min} \le 5$ is substantive rather than technical, and the reason is the one
+given in Section~\ref{sec:size}: two analyses that agree on the exponent and
+disagree on the lower bound are not estimating the same quantity. The two
+exponents here happen to be nearly equal without measuring the same object.
 
 \subsection{The tail as a risk specification rather than a forecast input}
 
-This paper treats $\alpha_S \approx 2$ as a probability statement, not as a
-statement about whether epidemics can be forecast. A power
-law assigns $\Pr(S \ge s)$ at every level; what it precludes is that the
-\emph{magnitude} of the largest event be estimated from the variance. These are
-distinct claims, and conflating them is what produced the intuition that
-heavy-tailed epidemics are unforecastable.
+The risk statement holds across the cross-section that produced it and stops one
+season out, and both boundaries are worth fixing.
 
 As a risk specification the fitted pair reproduces the empirical exceedance
-frequency over two decades of epidemic size (Figure~\ref{fig:exceed}; the distance is
-small by construction, the range over which it stays small is not), and it implies
-that between 5.6\% and 16.5\% of municipalities exceed ten times $x_{\min}$ in a given
-season against 0.3--2.7\% exceeding a hundred times it. No covariate, no training period and no
-fitted case count is involved: the statement is available from the current
-cross-section, for every municipality, including those that have never experienced
-an extreme season. For a service deciding how much capacity to hold in reserve,
-this is the quantity the decision requires, and a point forecast is not.
+frequency over two decades of epidemic size (Figure~\ref{fig:exceed}); the
+distance is small by construction, the range over which it stays small is not. No
+covariate, no training period and no fitted case count is involved: the statement
+is available from the current cross-section, for every municipality, including
+those that have never experienced an extreme season. For a service deciding how
+much capacity to hold in reserve, this is the quantity the decision requires, and
+a point forecast is not.
 
-The predictive evaluation separates the two questions the pair could answer. Where the question is posed as a probability ---
-will this municipality exceed its own upper quartile? --- the answer is
-affirmative, but only where the panel can resolve it. At municipal level lagged
-seasonal descriptors improve the Brier score over calibrated persistence in 4 of 5
-seasons and are significantly the worse in the fifth, and they raise discrimination
-from $0.50$ to $0.58$ in area under the curve, the full ladder reaching $0.65$. At
-state level the same rung produces a larger point estimate and fails the rule, on 23
-to 25 states per season and with a label pooled across them. The scaling block, which is
-the object of the paper, satisfies the criterion at neither level. Where the question is posed as a magnitude, the answer
-is negative, and the failure has a stated mechanism.
+The reach is set by the season, not by the exponent. Within the season that
+produced it the curve reproduces the data; one season ahead it holds at ten times
+the bound and overstates a hundred times it. A fitted pair describes the
+cross-section in which it was estimated, and it does not extend to an unobserved
+season at an arbitrary threshold. That is a further reason why it is not a
+forecast input: it gives a risk level for the current cross-section, which is what
+a service holding capacity in reserve needs, and no information about which
+municipality will have a large season next, which is what a forecast needs.
 
-The reach of the statement is set by the season, not by the exponent. Within the
-season that produced it the curve reproduces the data; one season ahead it holds at
-ten times the bound and overstates a hundred times it. The rule this implies is the
-one argued throughout the paper: a fitted pair describes the cross-section in which
-it was estimated, and it does not extend to an unobserved season at an arbitrary
-threshold. It is also a further reason why the pair is not a forecast input. A
-quantity whose second moment does not exist, and whose upper levels do not transport,
-gives a risk level for the current cross-section, and that is what a service holding
-capacity in reserve needs. It gives no information about which municipality will have
-a large season next, and that is what a forecast needs.
+The predictive evaluation separates the two questions the pair could answer. Posed
+as a probability --- will this municipality exceed its own upper quartile? --- the
+answer is affirmative, but only where the panel can resolve it: the lagged
+seasonal descriptors satisfy the pre-specified test at municipal level, and the
+scaling block satisfies it at neither level. Posed as a magnitude, the answer is
+negative, and the failure has a stated mechanism. The two are different products
+for different decisions, and only the first is answered by this paper.
 
 \subsection{How the coupling explains both results}
 
 The coupling between $\alpha_S$ and $x_{\min}$ is the mechanism behind both halves
-of the predictive result, and it is a finding rather than a caveat. Within municipalities the two estimates are rank-correlated at $0.64$ (median over 24
-states) and at $0.89$ nationally, whereas a simulation with the true $\alpha_S$ held
-fixed at $2.0$ recovers $-0.20$. The association is a property of the data and not of the
-estimator.
+of the predictive result, and it is a finding rather than a caveat. Within municipalities the two estimates are
+rank-correlated at $0.64$ (median over 24 states) and at $0.89$ nationally,
+whereas a simulation with the true $\alpha_S$ held fixed at $2.0$ recovers
+$-0.20$; the association is a property of the data and not of the estimator.
 
-Descriptively, this makes the pair a compact readout of seasonal magnitude: two
+Descriptively, it makes the pair a compact readout of seasonal magnitude: two
 numbers that move with the size of the season, vary far less than the case counts
-they summarise (SD $0.150$ against a sampling noise of $0.03$), and
-are available for every municipality. This is a substantive contribution to the
-characterisation of a season, since it reduces a quantity spanning two orders of
-magnitude to a stable low-dimensional summary.
+they summarise (SD $0.150$ against a sampling noise of $0.03$), and are available
+for every municipality. This is a substantive contribution to the characterisation
+of a season, since it reduces a quantity spanning two orders of magnitude to a
+stable low-dimensional summary.
 
-Predictively, the same fact accounts for the null. $\alpha_S$ co-varies with the
-scale of the season and is, to that extent, a re-encoding of $S_{t-1}$, which the
-model already contains. The ablation measures that redundancy directly: the scaling
-block adds nothing to a rung that already knows the previous season's size, in 0 of 5 seasons, and at $\tau=0.95$ its differential is $+4.9\%$ in median with
-intervals that exclude zero in only 2 of 5 seasons and in opposite directions,
-so that the design has no power there to sign the effect in either direction. The
-redundancy was predictable from the coupling before the ablation was run, and the
-ablation confirmed it where the prediction had content: a re-encoding of a variable
-already in the model must deliver no incremental information, and none appears at
-any quantile of the grid.
-
-The same reasoning explains why the exceedance question behaves differently.
-Asking whether a season will be large is a question about upper-tail probability,
-and the coefficient on the lagged descriptors is doing the work there; adding a
-transformation of the same lagged quantity cannot improve it, which is why the
-Brier differentials of the scaling block sit near zero with no interval excluding
-it. The information $\alpha_S$ carries is real, and it is already contained in
-the lagged count.
-
-\subsection{Epidemic size as the prediction target}
-
-Nothing in this paper shows that epidemic size can be forecast well. Against
-calibrated persistence no rung achieves skill in more than 3 of 5 seasons,
-and 2 of the 5 seasons dominate the loss because they straddle a change of
-regime: 2024 was the largest season on record and 2025 fell back sharply.
-
-The failure is not an artefact of the estimator. The model is a
-spline-basis quantile regression, which by construction continues the boundary
-trend beyond the largest response on which it was trained
-(Figure~\ref{fig:predobs}), so that a record season is a statement about the data
-rather than a property of the estimator. The quantile regression at $\tau=0.95$
-represents the upper region instead of interpolating within it, and the forecast
-still fails in 2024: knowledge of the previous season's size and duration, of its
-peak week, of the climate covariates and of the scaling descriptors does not order
-five seasons at 23 to 25 states each.
-
-The summary supported by these results is a division of labour between two
-products. The
-tail does not indicate how large the next season will be; it indicates how likely an
-extreme season is, and does so with two parameters and no training data. These are
-different products for different decisions, and the second is the one a surveillance
-service can use before the season begins.
+Predictively, the same fact accounts for the null, and predicts it in advance.
+$\alpha_S$ co-varies with the scale of the season and is, to that extent, a
+re-encoding of $S_{t-1}$, which the model already contains. A re-encoding of a
+variable already in the model must deliver no incremental information, so the
+ablation was expected to find none, and none appears at any quantile of the grid.
+The design has no power at the extreme quantile to sign the effect either way, and
+reports the absence of a measured gain rather than a measured deterioration.
 
 \subsection{The resolution limit of the size forecast}
 \label{sec:smallmunic}
@@ -1657,32 +1595,6 @@ point size; a point forecast there should be read as an order of magnitude. The
 aggregate panel of Figure~\ref{fig:predobs} is the pooled view, and the four
 state panels show what the forecast achieves where the limit does not bind.
 
-\subsection{A reporting convention}
-
-The practical consequence of the descriptive half is a reporting convention, and it
-is inexpensive to adopt. An exponent should travel with the lower bound that
-produced it, the construction of the sample, the number of observations and the
-alternative model against which it was tested. Of these, $x_{\min}$ is the most
-informative and the most frequently omitted, because it separates two analyses that
-look identical in a table of results. The convention holds for $\alpha_W$ as much
-as for $\alpha_S$, and it is what exposes the difference between them: an
-$\alpha_W$ of $1.95$ accompanied by its lower bound is the same number as an
-$\alpha_S$ of $2.08$ accompanied by its own, and the two bounds differ by two
-orders of magnitude. The diagnostic is easy to apply and difficult to manipulate,
-since $x_{\min}$ is selected by the same goodness-of-fit criterion that selects the
-model and cannot be tuned to produce a desired $\alpha$. We would argue further
-that an $\alpha_W$ or an $\alpha_S$ reported without $x_{\min}$ should be treated
-as an incomplete statistic, in the same way that a correlation is incomplete
-without its sample size.
-
-We would add a second convention, specific to the argument tested here. A claim that
-a scaling description improves forecasts is meaningful only against a specified
-benchmark, on a proper scoring rule, out of sample, with the scaling block isolated
-from the blocks to which it is added, and with every channel of leakage closed. The
-redundancy documented here would be invisible under a pooled coefficient of
-determination without a benchmark, since between-municipality differences are reproduced
-trivially by persistence.
-
 \subsection{Relation to operational forecast systems}
 
 Operational arbovirus platforms --- InfoDengue and Mosqlimate in Brazil, and the
@@ -1705,30 +1617,23 @@ Several limitations bound these conclusions.
 
 \emph{The scaling block does not improve the size forecast.} This is reported in the
 Results rather than only here because it is a measured outcome, but it is the
-principal negative result of the paper and should accompany any use of it. Against a
-benchmark that already carries the lagged case count, the block of
-$(\alpha_{t-1}, x_{\min,t-1}, \dot\alpha_{t-1})$ fails the pre-specified test on size
-in 0 of 5 seasons. At the 95th percentile its differential is $+4.9\%$ in
-median, with intervals excluding zero in only 2 of 5 seasons and in opposite
-directions, so that the design cannot sign the effect there: with 23 to 25 states per
-season the test is underpowered at the extreme quantile, and we report the absence of
-a measured gain rather than a measured deterioration. The mechanism is the coupling
-documented in Section~\ref{sec:coupling}. A rung containing the scaling descriptors
+principal negative result of the paper and should accompany any use of it. Against
+a benchmark that already carries the lagged case count, the block of
+$(\alpha_{t-1}, x_{\min,t-1}, \dot\alpha_{t-1})$ fails the pre-specified test on
+size in 0 of 5 seasons, and at the extreme quantile the design cannot sign the
+effect in either direction. The mechanism is the coupling documented in
+Section~\ref{sec:coupling}: a rung containing the scaling descriptors
 \emph{alone}, without the lagged descriptors, would answer a different and
 interesting question --- whether three power-law parameters can substitute for the
 full set of covariates --- and is not reported here.
 
-\emph{The municipal classifier is a ranking device, not a level forecast.} With the
-exceedance label referred to each municipality's own history, the population-only
-reference falls to a median area under the curve of $0.47$, so that the task no longer
-measures municipality size, and the lagged block satisfies the pre-specified incremental test
-at that level. What bounds the claim is the purpose of the classifier: discrimination
-reaches a median of $0.65$ only with the full ladder, against $0.58$ for the rung that
-satisfies the rule, the scaling block adds a median $+0.002$ in Brier score,
-and the 2024 season, in which 69.5\% of municipalities exceeded their own upper quartile
-against a training base rate of 26.4\%, defeats every rung. The classifier orders
-municipalities within a season of familiar magnitude. It does not anticipate a change
-of regime, and in a record season its probabilities should not be read as levels.
+\emph{The municipal classifier is a ranking device, not a level forecast.} Its
+discrimination reaches a median of $0.65$ only with the full ladder, against $0.58$
+for the rung that satisfies the pre-specified test, and a season of a magnitude
+outside the training record defeats every rung. The classifier orders
+municipalities within a season of familiar magnitude; it does not anticipate a
+change of regime, and in such a season its probabilities should not be read as
+levels.
 
 \emph{The case series are nowcast-adjusted.} The analysed variable is the estimated
 case count produced by the nowcasting model of the platform, not the raw notification
@@ -1812,67 +1717,91 @@ therefore not a sample of national performance.
 
 \subsection{Implications for surveillance practice}
 
-Three practices follow, none of them costly.
+Four practices follow, none of them costly, and they are the operational content of
+the paper.
 
-First, report the tuple. An exponent accompanied by its construction, its $x_{\min}$,
-its sample size and its comparison model can be assessed by a reader; an exponent
-alone cannot, and the five constructions examined here show that the same exponent can
-carry opposite meanings. Name the variable as well: an $\alpha_W$ and an $\alpha_S$
-are not interchangeable, and here they differ by $0.13$ while the objects they
-describe differ by a factor of $150$ in scale.
+First, report the tuple. An exponent accompanied by its construction, its
+$x_{\min}$, its sample size and its comparison model can be assessed by a reader;
+an exponent alone cannot, and the five constructions examined here show that the
+same exponent can carry opposite meanings. Name the variable as well: an
+$\alpha_W$ and an $\alpha_S$ are not interchangeable, and the pair that a table
+would read as agreement describes two objects a factor of $150$ apart in scale.
+The convention is inexpensive and difficult to game, since $x_{\min}$ is selected
+by the same goodness-of-fit criterion that selects the model and cannot be tuned
+to produce a desired $\alpha$. We would argue that an exponent reported without
+$x_{\min}$ should be treated as an incomplete statistic, in the same way that a
+correlation is incomplete without its sample size.
 
 Second, use the exceedance curve. The pair $(\alpha_S, x_{\min})$ fitted to the
 current cross-section gives the probability that a municipality will exceed any
-level, and the national fits reproduce the observed frequency of large seasons over
-two decades. This is an
-inexpensive input to planning that requires no model training and no history beyond
-the current season.
+level, and the national fits reproduce the observed frequency of large seasons
+over two decades. This is an inexpensive input to planning that requires no model
+training and no history beyond the current season, and it is the only one of the
+products here that a service can act on before a season begins.
 
-Third, do not translate a heavy tail into a claim of unpredictability without
+Third, read the alert list as an ordering rather than as a level. The municipal
+classifier ranks municipalities within a season of familiar magnitude, and the
+ranking is what supports a bounded list: its length is an output of the decision
+rule, not a forecast of how many alerts the season will generate. In a season of a
+magnitude outside the training record the probabilities should not be read as
+levels at all, and the ordering is all that survives.
+
+Fourth, do not translate a heavy tail into a claim of unpredictability without
 specifying the loss function. A distribution without a finite variance constrains
-squared-error point forecasts and leaves probabilistic exceedance statements intact,
-and the exceedance statement is usually the one a health service requires.
+squared-error point forecasts and leaves probabilistic exceedance statements
+intact, and the exceedance statement is usually the one a health service requires.
+
+A claim that a scaling description improves forecasts is, in turn, meaningful only
+against a specified benchmark, on a proper scoring rule, out of sample, with the
+scaling block isolated from the blocks to which it is added, and with every channel
+of leakage closed. The redundancy documented here would be invisible under a pooled
+coefficient of determination without a benchmark, since between-municipality
+differences are reproduced trivially by persistence.
 
 \section{Conclusion}
 
-Dengue epidemics sizes in Brazil follow a power law with an exponent close to two.
-The power law is preferred to an exponential in 16 of 16 national seasons (years) and in
-96\% of 353 state-year cross-sections, and in each of those fits the lower bound
-lies two to three orders of magnitude above the bulk of the data, meaning the fit properly describes the tail of the distribution.
+Dengue epidemic size in Brazil follows a power law with an exponent close to two.
+The law is preferred to an exponential in 16 of 16 national seasons and in 96\%
+of 353 state-year cross-sections, and in each of those fits the lower bound lies
+two to three orders of magnitude above the bulk, so that what is described is the
+tail and not the body of small seasons. The same estimator applied to the weekly
+count fails the identification instead: preferred in 77\% of the pooled municipal
+series and in 23\% of the within-season ones, with a median lower bound of two
+cases at both, so that the law describes the bulk and no tail.
 
-The power law holds for epidemic size and not for the weekly case count. Fitted to the weekly count, for the decade-long cases series, a Power-law is still preferred to an exponential in 77\% of the 5{,}264 municipalities, but in the within-season series, it is preferred in only 23\% of the 43{,}673 seasonal series. This makes the scaling parameters not useful to predict extreme seasonal incidence peaks.
+Because the size exponent is close to two, the pair $(\alpha_S, x_{\min})$ fixes
+the probability that a season exceeds any level $s$, and those two parameters
+reproduce the observed frequency of extreme seasons over two decades. This is the
+practical result of the paper: two numbers, taken from the current cross-section,
+give the exceedance probability of any threshold for every municipality in the
+country, without a training period and without a forecast.
 
-Because the size exponent is close to two, the fitted pair $(\alpha_S, x_{\min})$ fixes the probability that a season exceeds any level $s$, and those two parameters reproduce the observed frequency of extreme seasons over two decades.
-This is the main practical result: a surveillance service can obtain the exceedance probability of a given season, without training a model or issuing a forecast.
+The pair does not give the magnitude of the next season, and cannot. $\alpha_S$
+co-varies with $x_{\min}$, and therefore with the scale of the season, at $0.89$
+nationally and $0.64$ within states, so that the pair summarises how large a
+season was and is a redundant input to any model that already contains the
+previous season's size; the ablation confirmed the redundancy the coupling
+predicted. What the pair adds instead is a probability, and the ladder shows the
+difference between the two products: posed as a probability, the municipal
+question of exceeding a unit's own upper quartile is answered by last season's
+descriptors in 4 of 5 seasons, the only contrast in the study to satisfy the
+pre-specified rule; posed as a magnitude, it is answered by no rung.
 
-The fitted pair adds no forecast skill; where the ladder improves, the gain comes
-from the lagged descriptors.
+Two lessons generalise beyond this study. The first is a reporting one: an
+exponent reported without its lower bound, its construction, its sample size and
+its comparison model is not interpretable, since two analyses that agree on the
+exponent can describe objects two orders of magnitude apart in scale, and the
+convention costs one line in a table. The second is that the exceedance curve is a
+deliverable rather than a by-product, because it is the only statement in this
+paper that a service can act on before a season begins.
 
-The first question is whether a season will exceed the municipality's own upper
-quartile. At municipal level the lagged descriptors improve the Brier score over
-calibrated persistence in 4 of 5 seasons and lift AUC from $0.50$ to $0.58$, the
-full ladder reaching $0.65$. That contrast is the only one in the study that
-satisfies the pre-specified rule. At state level it holds in 2 of 5 seasons and
-fails it, since each season is a bootstrap over only 23 to 25 states — an
-interval wider than the effect it must resolve.
-
-The second question is how large the season will be. No model in the ladder achieves
-skill, in any of the 5 seasons. The scaling block contributes nothing: its
-contribution at the 95th percentile has median $+4.9\%$, and the interval excludes
-zero in only 2 of the 5 seasons, in opposite directions.
-
-The reason is a property of the estimates and not a defect of the model.
-$\alpha_S$ co-varies with $x_{\min}$, and therefore with the scale of the season,
-at $0.89$ nationally and $0.64$ within states, and a simulation with $\alpha_S$
-held fixed does not reproduce that association. The pair therefore summarises how
-large a season was. That makes it a compact description of a season, and a
-redundant input to any model that already contains the previous season's size; the
-ablation confirmed the redundancy that the coupling predicted.
-
-Two consequences follow for work in this area. First, an exponent reported without its lower bound, its construction, its sample size and its comparison model is not interpretable, because two analyses that report the same exponent can describe objects that differ by two orders of magnitude in scale. The convention costs one line in a table.
-Second, a heavy tail constrains how well the magnitude of the largest event can be estimated from second moments, but leaves the probability of exceeding any level fully specified. These are separate statements, and reading the first as a limit on the second is the step that produced the claim that heavy-tailed epidemics cannot be forecast.
-
-The two exponents are not two estimates of one quantity. $\alpha_W$ describes the weekly count, sits at $1.95$ in the pooled series and at $2.07$ within single seasons, and its lower bound of two cases makes the exceedance curve attached to it silent about the risk of a large season. $\alpha_S$ describes the epidemic size; it is the quantity to report, and it is to be reported with its lower bound and as a risk curve rather than as a predictor.
+A heavy tail does rule out a point forecast of the largest event, and that part of
+the received view is right. It does not rule out the probability that such an
+event occurs, which two parameters estimate from a single cross-section, for every
+municipality, including those that have never had an extreme season; and that
+probability, not the magnitude, is what a decision to hold capacity in reserve is
+made of. The obstacle to forecasting dengue size was never the shape of its
+distribution. It was the choice of quantity.
 
 \bibliographystyle{apalike}
 \bibliography{refs}
