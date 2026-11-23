@@ -80,6 +80,57 @@ ALARM_RULE = 0.5
 ALARM_CAPACITIES = (300, 600, 1000)
 ALARM_RUNGS = ("M0", "POP", "M1", "M2", "M3")
 
+#: The third operating point of the alert list, and the one a state service
+#: actually uses: the same ranking taken *within* each state instead of across
+#: the country. Both numbers below are choices, so they are fixed here, before
+#: the result is seen, and stated in the table caption rather than in the prose.
+#:
+#: The capacity is a *share* of the state's own evaluated municipalities and not
+#: a count, because the states differ by more than a factor of seventy in how
+#: many municipalities the panel retains: a fixed count would be a different
+#: rule in each one.
+STATE_ALERT_SHARE = 0.20
+
+#: Below this many evaluated municipalities the state's list is not issued. The
+#: list would hold four municipalities or fewer, and one that short cannot be
+#: separated from an unranked list of the same length -- which is measured
+#: below rather than asserted. The cut is therefore a property of the list and
+#: not of the state.
+STATE_MIN_UNITS = 20
+
+#: Shares at which the capacity rule is checked, so that a conclusion drawn from
+#: one of them cannot be an artefact of that choice.
+STATE_ALERT_SHARES = (0.10, 0.20, 0.30)
+
+#: The per-state recall range is quoted over the states with at least this many
+#: exceedances. Below it the share takes so few values that a single small state
+#: would set the range on its own.
+BUSY_EXCEEDANCES = 20
+
+#: Two-digit UF prefix of the seven-digit IBGE municipal code. The out-of-fold
+#: artefact carries the code and not the state, so the grouping is derived here
+#: and an unmapped prefix raises instead of becoming a silent ``NaN`` group.
+UF_ABBREV = {
+    "11": "RO", "12": "AC", "13": "AM", "14": "RR", "15": "PA", "16": "AP",
+    "17": "TO", "21": "MA", "22": "PI", "23": "CE", "24": "RN", "25": "PB",
+    "26": "PE", "27": "AL", "28": "SE", "29": "BA", "31": "MG", "32": "ES",
+    "33": "RJ", "35": "SP", "41": "PR", "42": "SC", "43": "RS", "50": "MS",
+    "51": "MT", "52": "GO", "53": "DF",
+}
+
+#: Full names, for the two states the prose names by name. Kept beside the codes
+#: so that a claim quoting a state cannot quote the wrong one.
+UF_NAME = {
+    "RO": r"Rond\^onia", "AC": "Acre", "AM": "Amazonas", "RR": "Roraima",
+    "PA": r"Par\'a", "AP": r"Amap\'a", "TO": "Tocantins", "MA": r"Maranh\~ao",
+    "PI": r"Piau\'i", "CE": r"Cear\'a", "RN": "Rio Grande do Norte",
+    "PB": r"Para\'iba", "PE": "Pernambuco", "AL": "Alagoas", "SE": "Sergipe",
+    "BA": "Bahia", "MG": "Minas Gerais", "ES": r"Esp\'irito Santo",
+    "RJ": "Rio de Janeiro", "SP": r"S\~ao Paulo", "PR": r"Paran\'a",
+    "SC": "Santa Catarina", "RS": "Rio Grande do Sul", "MS": "Mato Grosso do Sul",
+    "MT": "Mato Grosso", "GO": r"Goi\'as", "DF": "Distrito Federal",
+}
+
 #: Every artefact the tables depend on. ``columns`` is the minimum a file must
 #: have to be used at all: a file that exists but carries the wrong shape is
 #: worse than a missing one, because it reads as present.
@@ -332,6 +383,192 @@ def _alarm_facts(oof: pd.DataFrame) -> dict:
             "base_rate": float(base), "rule_threshold": ALARM_RULE,
             "rule": rule, "capacity": capacity, "rungs": rungs,
             "capacities": list(ALARM_CAPACITIES)}
+
+
+def _state_of(units: pd.Series) -> pd.Series:
+    """Two-letter state of a seven-digit IBGE municipal code.
+
+    The artefact carries the municipal code, and the per-state reading needs the
+    state. Deriving it here keeps the grouping reproducible without an external
+    table at render time; a code of the wrong length or an unmapped prefix is an
+    error, because either would otherwise produce a silent ``NaN`` group that
+    looks like a state with no municipalities.
+    """
+    code = units.astype(str)
+    bad = code.str.len() != 7
+    if bad.any():
+        raise ValueError(
+            "classifier_results.parquet holds municipal codes that are not seven "
+            f"digits (e.g. {code[bad].iloc[0]!r}), so the state of a unit cannot "
+            "be derived")
+    uf = code.str[:2].map(UF_ABBREV)
+    if uf.isna().any():
+        raise ValueError(
+            "unmapped UF prefix in classifier_results.parquet: "
+            f"{sorted(set(code[uf.isna()].str[:2]))} is not a Brazilian state code")
+    return uf
+
+
+def _top_share(g: pd.DataFrame, share: float) -> tuple[int, int]:
+    """Length and true-exceedance count of the first ``share`` of one state."""
+    k = max(1, int(round(share * len(g))))
+    return k, int(g.sort_values("y_prob", ascending=False).y_true.head(k).sum())
+
+
+def _state_lists_facts(oof: pd.DataFrame) -> dict:
+    """The same alert list read within each state, for the record season.
+
+    A state secretariat reads its own list, not a national threshold, and the
+    two are not the same object. The declared probability rule is a fixed point
+    on a scale, so applied across states whose realised shares differ sixfold it
+    returns a list whose length is governed by the state's share rather than by
+    anything a service can act on. This block measures what that costs per
+    state, and what a list of a declared capacity recovers.
+
+    Three quantities are reported per state and they answer different questions.
+    *Recall* is the share of the state's own exceedances the declared rule
+    captures, and it is the one an operational reader cares about. *Within-state
+    AUC* asks whether the ordering survives disaggregation, or whether the
+    national ranking is an artefact of the differences between states. The
+    *capacity* count asks whether a list of the length the state can actually
+    follow beats drawing the same number at random in that state.
+
+    That last comparison is made over all five seasons rather than on the record
+    season alone, and split at ``STATE_MIN_UNITS``, because it is the only one of
+    the three that can be beaten by noise: a state with five evaluated
+    municipalities has a list of one, and one draw cannot be separated from
+    chance. Splitting the count is how the paper can say where the list should be
+    issued instead of asserting it.
+    """
+    from sklearn.metrics import roc_auc_score
+
+    rate = oof.groupby("origin")["y_true"].mean()
+    origin = int(rate.idxmax())
+    s_all = oof[oof["origin"] == origin].copy()
+    s_all["uf"] = _state_of(s_all["unit"])
+    ref = "M3" if "M3" in set(s_all["rung"].dropna()) else sorted(
+        set(s_all["rung"].dropna()))[-1]
+    ref_rows = s_all[s_all["rung"] == ref]
+
+    states: list[dict] = []
+    for uf, g in ref_rows.groupby("uf"):
+        alarm = g["y_prob"] >= ALARM_RULE
+        n = len(g)
+        n_true = int(g["y_true"].sum())
+        hits = int((alarm & (g["y_true"] == 1)).sum())
+        alerts = int(alarm.sum())
+        auc = None
+        if n >= STATE_MIN_UNITS and g["y_true"].nunique() == 2:
+            auc = float(roc_auc_score(g["y_true"], g["y_prob"]))
+        states.append({
+            "uf": uf, "n": n, "n_true": n_true,
+            "base": float(g["y_true"].mean()),
+            "alerts": alerts, "hits": hits,
+            "recall": (hits / n_true) if n_true else None,
+            "precision": (hits / alerts) if alerts else None,
+            "auc": auc,
+        })
+    states.sort(key=lambda d: (-d["n"], d["uf"]))
+
+    issued = [d for d in states if d["n"] >= STATE_MIN_UNITS]
+    below = [d for d in states if d["n"] < STATE_MIN_UNITS]
+
+    def _pool(rows: list[dict]) -> dict:
+        n = sum(d["n"] for d in rows)
+        n_true = sum(d["n_true"] for d in rows)
+        alerts = sum(d["alerts"] for d in rows)
+        hits = sum(d["hits"] for d in rows)
+        return {"n": n, "n_true": n_true, "alerts": alerts, "hits": hits,
+                "recall": (hits / n_true) if n_true else None,
+                "precision": (hits / alerts) if alerts else None}
+
+    tot = _pool(states)
+    blw = _pool(below)
+    blw["n_states"] = len(below)
+
+    # Across every season, at three declared shares, does a list of that length
+    # beat drawing the same number at random inside the state? The split at
+    # STATE_MIN_UNITS is the whole point; a single pooled count would average a
+    # distinction away.
+    share_stats = {}
+    for share in STATE_ALERT_SHARES:
+        big = {"beats": 0, "n": 0}
+        small = {"beats": 0, "n": 0}
+        for season in sorted(oof["origin"].unique()):
+            g = oof[(oof["origin"] == season)
+                    & (oof["rung"] == ref)].copy()
+            if g.empty:
+                continue
+            g["uf"] = _state_of(g["unit"])
+            for _uf, st in g.groupby("uf"):
+                k, hits = _top_share(st, share)
+                base = float(st["y_true"].mean())
+                bucket = big if len(st) >= STATE_MIN_UNITS else small
+                bucket["n"] += 1
+                if base > 0 and hits / k > base:
+                    bucket["beats"] += 1
+        share_stats[f"{share:.2f}"] = {"large": big, "small": small}
+
+    global_auc = float(roc_auc_score(ref_rows["y_true"], ref_rows["y_prob"]))
+
+    # The national order is the comparison the within-state figure has to beat
+    # being an artefact of; it is taken season by season and summarised by its
+    # median, so that the record season does not set it alone.
+    national_auc = {}
+    for season, g in oof[oof["rung"] == ref].groupby("origin"):
+        if g["y_true"].nunique() == 2:
+            national_auc[int(season)] = float(
+                roc_auc_score(g["y_true"], g["y_prob"]))
+    within = [d["auc"] for d in states if d["auc"] is not None]
+
+    # Within-state discrimination is summarised over every season, not over the
+    # record one: sixteen states clear the cut in a single season, which is too
+    # few to set a median that the prose then compares with the national one.
+    within_all: list[float] = []
+    for _season, g in oof[oof["rung"] == ref].groupby("origin"):
+        g = g.copy()
+        g["uf"] = _state_of(g["unit"])
+        for _uf, st in g.groupby("uf"):
+            if len(st) >= STATE_MIN_UNITS and st["y_true"].nunique() == 2:
+                within_all.append(float(roc_auc_score(st["y_true"], st["y_prob"])))
+
+    # The recall range the prose quotes, restricted to the states with enough
+    # exceedances for a share to be meaningful. A state with three exceedances
+    # has a recall of 0, 1/3, 2/3 or 1 and would set the range by itself.
+    busy = [d for d in states if d["n_true"] >= BUSY_EXCEEDANCES and d["recall"] is not None]
+    busy.sort(key=lambda d: d["recall"])
+    extremes = (
+        {"min": busy[0], "max": busy[-1],
+         "median": float(np.median([d["recall"] for d in busy])),
+         "n_states": len(busy)} if busy else None
+    )
+
+    return {
+        "origin": origin, "rung": ref,
+        "rule_threshold": ALARM_RULE,
+        "share": STATE_ALERT_SHARE,
+        "shares": list(STATE_ALERT_SHARES),
+        "min_units": STATE_MIN_UNITS,
+        "n_states": len(states),
+        "states": states,
+        "issued": _pool(issued),
+        "below_cut": blw,
+        "totals": tot,
+        "global_auc": global_auc,
+        "n_zero_alert_states": sum(1 for d in states if d["alerts"] == 0),
+        "zero_alert": sorted(d["uf"] for d in states if d["alerts"] == 0),
+        "zero_alert_units": sum(d["n"] for d in states if d["alerts"] == 0),
+        "zero_alert_true": sum(d["n_true"] for d in states if d["alerts"] == 0),
+        "share_stats": share_stats,
+        "recall_extremes": extremes,
+        "base_rate_range": {"min": float(min(d["base"] for d in states)),
+                            "max": float(max(d["base"] for d in states))},
+        "within_auc_median": (float(np.median(within_all)) if within_all else None),
+        "n_auc_states": len(within_all),
+        "national_auc": national_auc,
+        "national_auc_median": (float(np.median(list(national_auc.values())))
+                                if national_auc else None),
+    }
 
 
 def compute_facts(root: str = ".") -> dict:
@@ -671,6 +908,7 @@ def compute_facts(root: str = ".") -> dict:
     # ---- The alert list a service would read, for the record season --------
     if odf is not None and facts["sources"]["classifier_oof"]["present"]:
         facts["alarms"] = _alarm_facts(odf)
+        facts["state_lists"] = _state_lists_facts(odf)
 
     return facts
 
@@ -911,6 +1149,78 @@ def render_alarms_table(f: dict) -> str:
         "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
+
+def render_state_lists_table(f: dict) -> str:
+    """LaTeX float for the alert list applied within each state.
+
+    The same artefact and the same season as Table~\ref{tab:alarms}, read at the
+    resolution a state service works at. It refuses to render without the
+    artefact for the same reason that table does: a placeholder would be a row
+    of numbers a reader could mistake for a state's alert list.
+    """
+    s = f.get("state_lists")
+    if not s:
+        raise ValueError(
+            "no per-state alert facts: classifier_results.parquet is absent or "
+            "unreadable, so the ranking within states cannot be rendered")
+
+    def _cell(x, d=3):
+        return "--" if x is None else f"${x:.{d}f}$"
+
+    rows = []
+    for d in s["states"]:
+        if d["n"] < s["min_units"]:
+            continue
+        rows.append(
+            f"{d['uf']} & {_thou(d['n'])} & {_thou(d['n_true'])} & "
+            f"{_thou(d['alerts'])} & {_cell(d['recall'])} & "
+            f"{_cell(d['precision'])} & {_cell(d['auc'])}\\\\")
+
+    b = s["below_cut"]
+    t = s["totals"]
+    rows.append("\\midrule")
+    rows.append(
+        f"\\emph{{{b['n_states']} states below the cut, pooled}} & {_thou(b['n'])} & "
+        f"{_thou(b['n_true'])} & {_thou(b['alerts'])} & {_cell(b['recall'])} & "
+        f"{_cell(b['precision'])} & --\\\\")
+    rows.append("\\midrule")
+    rows.append(
+        f"\\emph{{All {s['n_states']} states}} & {_thou(t['n'])} & "
+        f"{_thou(t['n_true'])} & {_thou(t['alerts'])} & {_cell(t['recall'])} & "
+        f"{_cell(t['precision'])} & {_cell(s['global_auc'])}\\\\")
+
+    caption = (
+        "\\caption{The alert list of Table~\\ref{tab:alarms} applied within each\n"
+        "state, which is the resolution a state health secretariat reads. The\n"
+        f"declared rule $p\\ge {s['rule_threshold']:g}$ is applied unchanged, and the event\n"
+        "is the one of Section~\\ref{sec:classifier}: a season exceeding the 75th\n"
+        "percentile of the municipality's own earlier seasons. The season is\n"
+        f"{s['origin']}, the same record season as Table~\\ref{{tab:alarms}}.\n"
+        "\\emph{Exceedances} is the number of municipalities in the state that did\n"
+        "exceed their own quartile, \\emph{Alerts} the number the rule flagged,\n"
+        "\\emph{Recall} the share of the exceedances the list contains and\n"
+        "\\emph{Precision} the share of the alerts that were true, which is to be\n"
+        "read against the state's own realised share and not against the national\n"
+        "one. \\emph{AUC} is the area under the receiver operating characteristic\n"
+        "curve computed inside the state, so it measures the ordering with the\n"
+        "differences between states removed; it is withheld where the state holds\n"
+        f"fewer than {s['min_units']} evaluated municipalities, the same cut below\n"
+        "which a per-state list is not issued, and those states are pooled in one\n"
+        "row. The last row applies the rule to the country as a whole and repeats\n"
+        "row M3 of Table~\\ref{tab:alarms}, so that the two tables cannot disagree.}"
+    )
+
+    return (
+        "% GENERATED by make_ablation_tables.py -- do not edit.\n"
+        "% Regenerate with: python make_ablation_tables.py\n"
+        "\\begin{table}[htbp]\n\\centering\n\\small\n"
+        "\\setlength{\\tabcolsep}{5pt}\n" + caption + "\n"
+        "\\label{tab:state_lists}\n"
+        "\\begin{tabular}{@{}lrrrrrr@{}}\n\\toprule\n"
+        "State & Municipalities & Exceedances & Alerts & Recall & Precision & AUC\\\\\n"
+        "\\midrule\n" + "\n".join(rows) +
+        "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+    )
 
 def render_regression_table(f: dict) -> str:
     """LaTeX float for the absolute error of the size forecast.
@@ -1306,6 +1616,60 @@ def claims(f: dict) -> list[dict]:
              "stale": [], "needs": "classifier_oof"},
         ]
 
+    # The per-state reading of the same list, Table~\ref{tab:state_lists}.
+    sl = f.get("state_lists") or {}
+    if sl:
+        ex = sl.get("recall_extremes") or {}
+        by_uf = {d["uf"]: d for d in sl["states"]}
+        st20 = sl["share_stats"][f"{sl['share']:.2f}"]
+        lo, hi = [], []
+        for share in sl["shares"]:
+            b = sl["share_stats"][f"{share:.2f}"]
+            lo.append(b["large"]["beats"]); hi.append(b["small"]["beats"])
+        out += [
+            {"name": "within-state discrimination",
+             "want": (f"within-state area under the curve is "
+                      f"${sl['within_auc_median']:.3f}$ over the "
+                      f"{sl['n_auc_states']} state-seasons"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "national discrimination, same seasons",
+             "want": (f"against a median of ${sl['national_auc_median']:.3f}$ "
+                      f"for the national order"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "range of the realised shares across states",
+             "want": (f"the states' realised shares range from "
+                      f"${sl['base_rate_range']['min']:.3f}$ to "
+                      f"${sl['base_rate_range']['max']:.3f}$"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "states the rule leaves silent",
+             "want": (f"not returned at all in {sl['n_zero_alert_states']} states"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "municipalities without an alert",
+             "want": (f"{_thou(sl['zero_alert_units'])} municipalities with "
+                      f"{_thou(sl['zero_alert_true'])} exceedances"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "per-state recall range",
+             "want": (f"recall ranges from ${ex['min']['recall']:.3f}$ in "
+                      f"{UF_NAME[ex['min']['uf']]} to ${ex['max']['recall']:.3f}$ in "
+                      f"{UF_NAME[ex['max']['uf']]}, median ${ex['median']:.3f}$, "
+                      f"against ${sl['totals']['recall']:.3f}$ nationally"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "a state where the list outnumbers the event",
+             "want": (f"in {UF_NAME['CE']} it holds "
+                      f"{_thou(by_uf['CE']['alerts'])} alerts against "
+                      f"{_thou(by_uf['CE']['n_true'])} exceedances"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "capacity list in the thick half",
+             "want": (f"in {min(lo)} to {max(lo)} of the {st20['large']['n']} "
+                      f"state-seasons with at least {sl['min_units']} evaluated "
+                      "municipalities"),
+             "stale": [], "needs": "classifier_oof"},
+            {"name": "capacity list in the thin half",
+             "want": (f"against {min(hi)} to {max(hi)} of the {st20['small']['n']} "
+                      f"with fewer"),
+             "stale": [], "needs": "classifier_oof"},
+        ]
+
     for o in out:
         if o["needs"] == "train_prevalence":
             o["available"] = "train_prevalence" in (
@@ -1443,7 +1807,8 @@ def main(argv=None) -> int:
     for name, fn in (("tab_ablation.tex", render_ablation_table),
                      ("tab_exceed.tex", render_exceed_table),
                      ("tab_regression.tex", render_regression_table),
-                     ("tab_alarms.tex", render_alarms_table)):
+                     ("tab_alarms.tex", render_alarms_table),
+                     ("tab_state_lists.tex", render_state_lists_table)):
         try:
             rendered[name] = fn(f)
         except ValueError as e:
