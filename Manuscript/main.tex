@@ -58,6 +58,11 @@ magnitude of the size no model reaches skill, and the power-law parameters add
 nothing to one that already knows the previous season's size. They give the
 probability of an extreme season and no prediction of next season's size.
 
+Read as an alert list, the same classifier is operational: in 2024 it alerts 648
+of 1{,}484 municipalities, four alerts in five are correct against a base rate of
+70\%, and it ranks municipalities almost as well within a state as nationally,
+which is what a service acts on before a season begins.
+
 \end{abstract}
 
 \section{Introduction}
@@ -1457,28 +1462,20 @@ the map of Figure~\ref{fig:map} and the list that follows from it.
 \centering
 \includegraphics[width=\textwidth]{figures/fig15_pred_map}
 \caption{The forecast read as a decision, for the record season and the top rung
-of the ladder of Table~\ref{tab:exceed}. The event is the one defined in
-Section~\ref{sec:classifier}: a season exceeding the 75th percentile of the
-municipality's own earlier seasons. Panel (a) is the alert itself, a
-municipality being coloured when the predicted probability of the event reaches
-one half --- a threshold declared in advance and not fitted to the season drawn.
-Panel (b) is what became of it, dark green where the municipality was alerted
-and did exceed its own upper quartile, red where it was alerted and did not, and
-amber where the alert fell below the threshold and the season exceeded it
-regardless; red is therefore the false alarms and amber the seasons the map
-leaves unflagged. Of the 648 municipalities alerted out of the 1{,}484 with the
-five seasons of history the event requires, 520 exceeded their own upper
-quartile and 128 did not: one alert in five is a false alarm, against one in
-three in an unranked list of the same length, which would carry 197. Panel (c)
-sweeps the threshold instead of fixing it, plotting the number of false alarms
-against the number of municipalities alerted, with the declared alert marked and
-the unranked list of each length as the dashed diagonal; the vertical gap
-between the two is what the ranking buys, and it narrows only as the list
-approaches every municipality. The rung is the top of the ladder, and the
-increment of its scaling block over the rung below is not distinguishable from
-zero (Table~\ref{tab:exceed}), so what the panels measure is the performance of
-the ladder rather than the contribution of any one block. Municipalities without
-that history carry no forecast and are drawn in grey.}
+of the ladder of Table~\ref{tab:exceed}, which is read whole: its scaling block
+adds nothing resolvable at either level (Section~\ref{sec:classresults}). The
+event is the one defined in Section~\ref{sec:classifier}, a season exceeding the
+75th percentile of the municipality's own earlier seasons. Panel (a) is the alert
+itself, a municipality being coloured when the predicted probability of the event
+reaches one half, a threshold declared in advance and not fitted to the season
+drawn. Panel (b) is what became of it, dark green where the municipality was
+alerted and did exceed its own upper quartile, red where it was alerted and did
+not, amber where it was not alerted and the season exceeded it regardless; red is
+the false alarms and amber the exceedances left unflagged. Panel (c) sweeps the
+threshold instead of fixing it: false alarms against municipalities alerted,
+the declared alert marked and the unranked list of each length as the dashed
+diagonal. Municipalities without the history the event requires carry no
+forecast and are drawn in grey.}
 \label{fig:map}
 \end{figure}
 
