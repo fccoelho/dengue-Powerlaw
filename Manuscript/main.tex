@@ -96,21 +96,12 @@ the claim correct, it would bear directly on forecasting and on the allocation o
 resources.
 
 The empirical record is inconsistent, and the first source of the inconsistency is
-what was measured. Power laws have been reported for the distribution of dengue
-case counts across the municipalities of a country~\citep{antonio2017spatial}, for
-the attack rates and durations of provincial epidemics~\citep{chowell2008spatial},
-and for the topology of the dengue transmission network, with an exponent of $2.1$
-in the last case~\citep{malik2019nature}. These are different random variables over
-different supports, so their exponents are not estimates of one quantity; and where
-a power-law claim has been tested against alternatives it has frequently been
-rejected~\citep{clauset2009power, stumpf2012critical}. The presence of a heavy tail
-therefore appears to depend on the study period, on the spatial unit and on the
-outcome variable. This heterogeneity has generally been attributed to
-biology or to geography, on the assumption that different places or different
-years are governed by different regimes. In Brazil the geography has itself moved:
-dengue has expanded towards higher latitudes and towards municipalities with no
-prior transmission, so that consecutive seasons describe different sets of
-municipalities~\citep{codeco2022expansion}.
+what was measured.
+Power laws have been reported for the distribution of dengue case counts across the municipalities of a country~\citep{antonio2017spatial}, for the attack rates and durations of provincial epidemics~\citep{chowell2008spatial}, and for the topology of the dengue transmission network, with an exponent of $2.1$ in the last case~\citep{malik2019nature}.
+These are different random variables over different supports, so their exponents are not estimates of one quantity; and where a power-law claim has been tested against alternatives it has frequently been rejected~\citep{clauset2009power, stumpf2012critical}.
+The presence of a heavy tail therefore appears to depend on the study period, on the spatial unit and on the outcome variable.
+This heterogeneity has generally been attributed to biology or to geography, on the assumption that different places or different years are governed by different regimes.
+In Brazil the geography has itself moved: dengue has expanded towards higher latitudes and towards municipalities with no prior transmission, so that consecutive seasons describe different sets of municipalities~\citep{codeco2022expansion}.
 
 We test a narrower set of claims, and we begin from a different premise: that a power law is not a statement about whether epidemics can be forecast but a
 \emph{specification of risk}.
@@ -829,8 +820,8 @@ cross-section.
 \item \textbf{The validation split itself.} Folds are defined on the season index
 (Section~\ref{sec:classifier}), so that no fold trains on a season at or after the
 season it validates on. This is the only one of the four channels that fails
-silently in a plausible implementation --- every number still resembles a
-respectable validation score --- and it is therefore enforced rather than merely
+silently in a plausible implementation, every number still resembles a
+respectable validation score, and it is therefore enforced rather than merely
 documented.
 \end{enumerate}
 
